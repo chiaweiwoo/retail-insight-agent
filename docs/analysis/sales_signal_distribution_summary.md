@@ -23,10 +23,41 @@ Recommended primary signal candidate: `trailing_7d_pct_change`
 | trailing_7d_pct_change | 15 | 30 | 37 | 81 | 118 |
 | trailing_7d_pct_change | 25 | 10 | 17 | 101 | 118 |
 
+## Pure Percent Trigger Distribution
+
+| metric | pct_threshold | eligible_store_days | triggered_store_days | drop_store_days | lift_store_days | triggered_dates | triggered_stores |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| trailing_7d_pct_change | 10 | 1305 | 681 | 321 | 360 | 85 | 15 |
+| trailing_7d_pct_change | 15 | 1305 | 430 | 175 | 255 | 73 | 15 |
+| trailing_7d_pct_change | 20 | 1305 | 242 | 66 | 176 | 49 | 15 |
+| trailing_7d_pct_change | 25 | 1305 | 136 | 22 | 114 | 39 | 15 |
+| trailing_7d_pct_change | 30 | 1305 | 77 | 5 | 72 | 28 | 15 |
+
+## Per-Store Spread At 20%
+
+| store_alias | triggered_days | trigger_rate_pct |
+| --- | --- | --- |
+| m041 | 30 | 34.48275862068966 |
+| l185 | 27 | 31.03448275862069 |
+| m236 | 27 | 31.03448275862069 |
+| l165 | 26 | 29.88505747126437 |
+| m648 | 18 | 20.689655172413794 |
+| h235 | 15 | 17.24137931034483 |
+| l164 | 15 | 17.24137931034483 |
+| h182 | 14 | 16.091954022988507 |
+
+## Grid Legend
+
+- `D` = drop trigger
+- `L` = lift trigger
+- `.` = no trigger
+
 ## Notes
 
 - `day_over_day` captures immediate swings but is the noisiest candidate.
 - `trailing_7d` is smoother and currently the best default operational trigger when we want broad coverage.
 - `same_weekday_4w` is the most retail-shaped benchmark, but it only covers 77.5% of the rows that `day_over_day` covers in this 90-day slice.
 - `same_weekday_4w` also has an upward mean drift of 5.19% in this sample, so it is better as a reasoning baseline than as the first trigger baseline.
-- Final RCA trigger logic should likely use both percentage change and absolute sales change.
+- Pure `trailing_7d_pct_change` at 20% gives 242 triggered store-days across 49 calendar dates.
+- Pure `trailing_7d_pct_change` at 25% gives 136 triggered store-days across 39 calendar dates, which is a better anomaly-style discussion set.
+- The current trigger exploration is per store-day, not a single global daily alarm.

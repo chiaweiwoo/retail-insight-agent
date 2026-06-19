@@ -27,6 +27,12 @@ Not part of the current milestones:
 - agents
 - LLM integration
 
+Decision hygiene:
+
+- important analytical decisions should be recorded in the PRD and linked analysis notes
+- trigger definitions should be data-backed, not guessed
+- fixed-snapshot derived layers can be precomputed when that improves consistency
+
 ## 3. Problem Statement
 
 Retail sales movement can be affected by many factors, including stockout, discount, activity, holiday and weekend effects, weather, and peer-store patterns.
@@ -276,6 +282,6 @@ RCA report generation
 After Phase 1 works:
 
 1. Add evidence query helpers over DuckDB.
-2. Add deterministic RCA logic.
-3. Add a lightweight UI.
+2. Add precomputed sales drop and lift signal layers.
+3. Add deterministic RCA logic.
 4. Add an LLM report writer later, if still useful.

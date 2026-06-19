@@ -77,5 +77,6 @@ npm run dev
 - The committed database artifact is the clean analytical output and the current test input.
 - The raw parquet file is expected locally at `data/raw/train.parquet` and is not committed.
 - Sales-signal exploration outputs are written to `data/analysis/` and `docs/analysis/`.
+- Important analytical decisions should be reflected in `README.md`, `AGENTS.md`, `docs/PRD.md`, and the detailed note under `docs/analysis/`.
 - The UI is an evidence viewer only. It does not generate RCA conclusions.
 - CI runs validation, tests, UI data export, and UI build from the committed DuckDB.

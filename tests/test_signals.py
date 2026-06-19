@@ -4,9 +4,11 @@ import pandas as pd
 import pytest
 
 from rca_foundry.signals import (
+    build_pct_trigger_grid,
     build_sales_signal_frame,
     load_sales_history,
     recommend_primary_signal,
+    summarize_pct_trigger_distribution,
     summarize_signal_distribution,
 )
 
@@ -73,3 +75,27 @@ def test_recommend_primary_signal_is_supported_metric() -> None:
         "trailing_7d_pct_change",
         "same_weekday_4w_pct_change",
     }
+
+
+def test_summarize_pct_trigger_distribution_outputs_expected_shapes() -> None:
+    signals = build_sales_signal_frame(load_sales_history())
+    summary = summarize_pct_trigger_distribution(
+        signals,
+        metric="trailing_7d_pct_change",
+    )
+    assert set(summary.keys()) == {"overall", "per_store", "per_date"}
+    assert len(summary["overall"]) == 5
+    assert len(summary["per_store"]) == 75
+    assert not summary["per_date"].empty
+
+
+def test_build_pct_trigger_grid_shape() -> None:
+    signals = build_sales_signal_frame(load_sales_history())
+    grid = build_pct_trigger_grid(
+        signals,
+        metric="trailing_7d_pct_change",
+        pct_threshold=20,
+    )
+    assert grid.shape[0] == 15
+    assert grid.shape[1] == 87
+    assert set(grid.to_numpy().ravel()).issubset({".", "D", "L"})

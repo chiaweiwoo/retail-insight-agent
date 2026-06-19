@@ -1,0 +1,6 @@
+metric,pct_threshold,eligible_store_days,triggered_store_days,drop_store_days,lift_store_days,triggered_dates,triggered_stores
+trailing_7d_pct_change,10,1305,681,321,360,85,15
+trailing_7d_pct_change,15,1305,430,175,255,73,15
+trailing_7d_pct_change,20,1305,242,66,176,49,15
+trailing_7d_pct_change,25,1305,136,22,114,39,15
+trailing_7d_pct_change,30,1305,77,5,72,28,15

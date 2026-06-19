@@ -45,6 +45,15 @@ query/export helpers
 
 Keep the implementation read-only and evidence-first.
 
+Important project decisions should be documented when they are made:
+
+```text
+update README.md for operator-facing workflow
+update AGENTS.md for implementation constraints
+update docs/PRD.md for product-level intent
+add or refresh docs/analysis notes for metric or threshold decisions
+```
+
 ## Package Manager
 
 Use `uv`.

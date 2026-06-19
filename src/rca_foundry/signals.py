@@ -168,6 +168,95 @@ def summarize_signal_distribution(signals: pd.DataFrame) -> dict[str, pd.DataFra
     }
 
 
+def summarize_pct_trigger_distribution(
+    signals: pd.DataFrame,
+    metric: str,
+    thresholds: tuple[int, ...] = (10, 15, 20, 25, 30),
+) -> dict[str, pd.DataFrame]:
+    eligible = signals[signals[metric].notna()].copy()
+
+    overall_rows: list[dict[str, float | str | int]] = []
+    per_store_rows: list[dict[str, float | str | int]] = []
+    per_date_rows: list[dict[str, float | str | int]] = []
+
+    for pct_threshold in thresholds:
+        drop_mask = eligible[metric] <= -pct_threshold
+        lift_mask = eligible[metric] >= pct_threshold
+        trigger_mask = drop_mask | lift_mask
+        triggered = eligible[trigger_mask].copy()
+
+        overall_rows.append(
+            {
+                "metric": metric,
+                "pct_threshold": pct_threshold,
+                "eligible_store_days": int(eligible.shape[0]),
+                "triggered_store_days": int(trigger_mask.sum()),
+                "drop_store_days": int(drop_mask.sum()),
+                "lift_store_days": int(lift_mask.sum()),
+                "triggered_dates": int(triggered["dt"].nunique()),
+                "triggered_stores": int(triggered["store_alias"].nunique()),
+            }
+        )
+
+        for store_alias, store_frame in eligible.groupby("store_alias"):
+            store_drop_mask = store_frame[metric] <= -pct_threshold
+            store_lift_mask = store_frame[metric] >= pct_threshold
+            store_trigger_count = int((store_drop_mask | store_lift_mask).sum())
+            per_store_rows.append(
+                {
+                    "metric": metric,
+                    "pct_threshold": pct_threshold,
+                    "store_alias": str(store_alias),
+                    "eligible_days": int(store_frame.shape[0]),
+                    "drop_days": int(store_drop_mask.sum()),
+                    "lift_days": int(store_lift_mask.sum()),
+                    "triggered_days": store_trigger_count,
+                    "trigger_rate_pct": float((store_trigger_count / store_frame.shape[0]) * 100.0),
+                }
+            )
+
+        if not triggered.empty:
+            per_date = (
+                triggered.groupby("dt", as_index=False)
+                .agg(triggered_store_days=("store_alias", "count"))
+                .sort_values(["triggered_store_days", "dt"], ascending=[False, True])
+            )
+            for row in per_date.itertuples(index=False):
+                per_date_rows.append(
+                    {
+                        "metric": metric,
+                        "pct_threshold": pct_threshold,
+                        "dt": row.dt.strftime("%Y-%m-%d"),
+                        "triggered_store_days": int(row.triggered_store_days),
+                    }
+                )
+
+    return {
+        "overall": pd.DataFrame(overall_rows),
+        "per_store": pd.DataFrame(per_store_rows),
+        "per_date": pd.DataFrame(per_date_rows),
+    }
+
+
+def build_pct_trigger_grid(
+    signals: pd.DataFrame,
+    metric: str,
+    pct_threshold: int,
+) -> pd.DataFrame:
+    eligible = signals[signals[metric].notna()].copy()
+    eligible["trigger_flag"] = "."
+    eligible.loc[eligible[metric] <= -pct_threshold, "trigger_flag"] = "D"
+    eligible.loc[eligible[metric] >= pct_threshold, "trigger_flag"] = "L"
+    eligible["dt_label"] = eligible["dt"].dt.strftime("%Y-%m-%d")
+
+    grid = eligible.pivot(
+        index="store_alias",
+        columns="dt_label",
+        values="trigger_flag",
+    ).fillna(".")
+    return grid.sort_index()
+
+
 def recommend_primary_signal(summary_tables: dict[str, pd.DataFrame]) -> str:
     distribution = summary_tables["distribution"].set_index("metric")
     day_over_day = distribution.loc["day_over_day_pct_change"]
