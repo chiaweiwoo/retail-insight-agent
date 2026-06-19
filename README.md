@@ -95,6 +95,7 @@ npm run dev
 - CI runs validation, tests, UI data export, and UI build from the committed DuckDB.
 - The agent backend uses domain-specific tool functions, not raw SQL exposure.
 - First live model target: DeepSeek via the OpenAI-compatible API.
+- Example environment file: `.env.example`
 - Required environment for live agent runs:
 
 ```bash
