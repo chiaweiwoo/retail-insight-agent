@@ -38,14 +38,15 @@ def build_openai_compatible_client(settings: LLMSettings | None = None) -> OpenA
 def build_chat_completion_kwargs(
     settings: LLMSettings,
     messages: list[dict[str, Any]],
-    tools: list[dict[str, Any]],
+    tools: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     kwargs: dict[str, Any] = {
         "model": settings.model,
         "messages": messages,
-        "tools": tools,
-        "tool_choice": "auto",
     }
+    if tools:
+        kwargs["tools"] = tools
+        kwargs["tool_choice"] = "auto"
     if not settings.thinking_enabled and "deepseek" in settings.base_url:
         kwargs["extra_body"] = {"thinking": {"type": "disabled"}}
     return kwargs

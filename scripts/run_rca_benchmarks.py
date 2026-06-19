@@ -2,12 +2,11 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict, dataclass
-from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from rca_foundry.agent import AgentRunResult, run_rca_agent
-from rca_foundry.config import AGENT_BENCHMARK_PATH
+from rca_foundry.config import AGENT_BENCHMARK_PATH, current_timestamp_sgt_label
 from rca_foundry.llm import load_llm_settings
+from rca_foundry.multi_agent import ManagerRunResult, run_manager_analyst_pipeline
 from rca_foundry.rca_tools import get_signal_evidence
 
 
@@ -29,11 +28,8 @@ SCENARIOS: tuple[BenchmarkScenario, ...] = (
     BenchmarkScenario("lift_low_l185_2024-04-13", "low", "lift", "l185", "2024-04-13"),
 )
 
-SGT = timezone(timedelta(hours=8), name="SGT")
-
-
 def _timestamp_label() -> str:
-    return datetime.now(SGT).strftime("%Y%m%dT%H%M%S_SGT")
+    return current_timestamp_sgt_label()
 
 
 def _scenario_dir(base_dir: Path, scenario: BenchmarkScenario) -> Path:
@@ -52,7 +48,7 @@ def _write_json(path: Path, payload: object) -> None:
 
 def _result_payload(
     scenario: BenchmarkScenario,
-    result: AgentRunResult,
+    result: ManagerRunResult,
     run_started_at_sgt: str,
     model_name: str,
 ) -> dict[str, object]:
@@ -62,15 +58,16 @@ def _result_payload(
         "run_started_at_sgt": run_started_at_sgt,
         "model_name": model_name,
         "signal_snapshot": signal,
-        "tool_call_count": len(result.tool_calls),
-        "tool_calls": result.tool_calls,
-        "report_markdown": result.report_markdown,
+        "analyst_count": len(result.analyst_results),
+        "tool_call_count": int(sum(len(item.tool_calls) for item in result.analyst_results)),
+        "analyst_results": [asdict(item) for item in result.analyst_results],
+        "report_markdown": result.manager_report_markdown,
     }
 
 
 def _summary_row(
     scenario: BenchmarkScenario,
-    result: AgentRunResult,
+    result: ManagerRunResult,
 ) -> dict[str, object]:
     signal = get_signal_evidence(scenario.store_alias, scenario.dt)
     return {
@@ -79,7 +76,8 @@ def _summary_row(
         "observed_signal": signal["signal_label"],
         "store_alias": scenario.store_alias,
         "dt": scenario.dt,
-        "tool_call_count": len(result.tool_calls),
+        "analyst_count": len(result.analyst_results),
+        "tool_call_count": int(sum(len(item.tool_calls) for item in result.analyst_results)),
     }
 
 
@@ -98,24 +96,27 @@ def _build_manifest_markdown(
         "",
         "## Scenario Outputs",
         "",
-        "| scenario_id | expected_signal | observed_signal | store_alias | dt | tool_call_count | report | trace |",
-        "| --- | --- | --- | --- | --- | ---: | --- | --- |",
+        "| scenario_id | expected_signal | observed_signal | store_alias | dt | analysts | tool_call_count | report | trace | logs |",
+        "| --- | --- | --- | --- | --- | ---: | ---: | --- | --- | --- |",
     ]
     for row in summary_rows:
         scenario_dir = run_dir / str(row["scenario_id"])
         report_path = scenario_dir / "report.md"
-        trace_path = scenario_dir / "trace.json"
+        trace_path = scenario_dir / "manager_trace.json"
+        log_path = scenario_dir / "logs" / "event_log.md"
         lines.append(
-            "| {scenario_id} | {expected_signal} | {observed_signal} | {store_alias} | {dt} | {tool_call_count} | "
-            "[report]({report}) | [trace]({trace}) |".format(
+            "| {scenario_id} | {expected_signal} | {observed_signal} | {store_alias} | {dt} | {analyst_count} | {tool_call_count} | "
+            "[report]({report}) | [trace]({trace}) | [logs]({log_path}) |".format(
                 scenario_id=row["scenario_id"],
                 expected_signal=row["expected_signal"],
                 observed_signal=row["observed_signal"],
                 store_alias=row["store_alias"],
                 dt=row["dt"],
+                analyst_count=row["analyst_count"],
                 tool_call_count=row["tool_call_count"],
                 report=report_path.relative_to(run_dir).as_posix(),
                 trace=trace_path.relative_to(run_dir).as_posix(),
+                log_path=log_path.relative_to(run_dir).as_posix(),
             )
         )
     lines.extend(
@@ -139,15 +140,20 @@ def main() -> None:
 
     summary_rows: list[dict[str, object]] = []
     for scenario in SCENARIOS:
-        result = run_rca_agent(store_alias=scenario.store_alias, dt=scenario.dt, settings=settings)
         scenario_dir = _scenario_dir(run_dir, scenario)
+        result = run_manager_analyst_pipeline(
+            store_alias=scenario.store_alias,
+            dt=scenario.dt,
+            settings=settings,
+            output_dir=scenario_dir,
+        )
         payload = _result_payload(
             scenario=scenario,
             result=result,
             run_started_at_sgt=timestamp_label,
             model_name=settings.model,
         )
-        _write_text(scenario_dir / "report.md", result.report_markdown)
+        _write_text(scenario_dir / "report.md", result.manager_report_markdown)
         _write_json(scenario_dir / "trace.json", payload)
         summary_rows.append(_summary_row(scenario, result))
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 import os
 from pathlib import Path
 
@@ -81,6 +82,7 @@ DEFAULT_LIFT_THRESHOLD_PCT = 30.0
 DEFAULT_LLM_BASE_URL = "https://api.deepseek.com"
 DEFAULT_LLM_MODEL = "deepseek-v4-flash"
 DEFAULT_LLM_MAX_TOOL_ROUNDS = 8
+SGT = timezone(timedelta(hours=8), name="SGT")
 
 
 def load_env_file(env_file_path: Path = ENV_FILE_PATH) -> None:
@@ -98,6 +100,14 @@ def load_env_file(env_file_path: Path = ENV_FILE_PATH) -> None:
 
 
 load_env_file()
+
+
+def current_timestamp_sgt_label() -> str:
+    return datetime.now(SGT).strftime("%Y%m%dT%H%M%S_SGT")
+
+
+def current_timestamp_sgt_iso() -> str:
+    return datetime.now(SGT).isoformat(timespec="seconds")
 
 
 def get_llm_api_key() -> str:

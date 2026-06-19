@@ -309,9 +309,11 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
 }
 
 
-def get_tool_schemas() -> list[dict[str, Any]]:
+def get_tool_schemas(tool_names: list[str] | tuple[str, ...] | None = None) -> list[dict[str, Any]]:
     schemas: list[dict[str, Any]] = []
-    for name, tool in TOOL_REGISTRY.items():
+    names = list(tool_names) if tool_names is not None else list(TOOL_REGISTRY.keys())
+    for name in names:
+        tool = TOOL_REGISTRY[name]
         schemas.append(
             {
                 "type": "function",
