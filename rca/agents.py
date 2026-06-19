@@ -19,6 +19,7 @@ from rca.llm import (
     build_openai_compatible_client,
     load_llm_settings,
 )
+from rca.outcomes import build_outcome_record, get_prior_rca, record_outcome
 from rca.tools import (
     execute_tool,
     get_activity_context,
@@ -616,6 +617,7 @@ def _run_slt_brief(
     coordinator_report_markdown: str,
     controller_note_markdown: str,
     critic_note_markdown: str,
+    prior_rca_summary: dict[str, Any],
     settings: LLMSettings,
     logger: RunLogger,
     client_factory: ClientFactory,
@@ -633,7 +635,8 @@ def _run_slt_brief(
                 f"Create the decision card for store {store_alias} on {dt}.\n\n"
                 f"RCA:\n\n{coordinator_report_markdown}\n\n"
                 f"Finance controller note:\n\n{controller_note_markdown}\n\n"
-                f"Critic note:\n\n{critic_note_markdown}"
+                f"Critic note:\n\n{critic_note_markdown}\n\n"
+                f"Prior RCA summary:\n\n{json.dumps(prior_rca_summary, indent=2)}"
             ),
         },
     ]
@@ -677,6 +680,7 @@ def run_coordinator(
 
     planning_inputs: dict[str, Any] | None = None
     skipped_analysts: list[dict[str, Any]] = []
+    prior_rca_summary = get_prior_rca(store_alias, db_path=LOG_DB_PATH)
     if specialists is None:
         specialists, skipped_analysts, planning_inputs = _plan_specialists_with_reasons(
             store_alias=store_alias,
@@ -693,6 +697,7 @@ def run_coordinator(
         details={
             "analyst_count": len(specialists),
             "planning_inputs": planning_inputs,
+            "prior_rca_summary": prior_rca_summary,
         },
     )
     logger.log(
@@ -705,6 +710,7 @@ def run_coordinator(
             "selected_analysts": [spec.name for spec in specialists],
             "skipped_analysts": skipped_analysts,
             "include_research": include_research,
+            "prior_rca_summary": prior_rca_summary,
         },
     )
 
@@ -776,6 +782,7 @@ def run_coordinator(
         coordinator_report_markdown=coordinator_report,
         controller_note_markdown=controller_note,
         critic_note_markdown=critic_note,
+        prior_rca_summary=prior_rca_summary,
         settings=settings,
         logger=logger,
         client_factory=client_factory,
@@ -789,6 +796,29 @@ def run_coordinator(
         details={
             "analyst_count": len(analyst_results),
             "output_dir": str(output_dir) if output_dir is not None else None,
+        },
+    )
+    outcome_record = build_outcome_record(
+        run_name=run_name,
+        store_alias=store_alias,
+        dt=dt,
+        signal_evidence=(planning_inputs or {}).get("signal_evidence") or get_signal_evidence(store_alias, dt),
+        coordinator_report_markdown=coordinator_report,
+        decision_card_markdown=decision_card,
+    )
+    record_outcome(outcome_record, db_path=LOG_DB_PATH)
+    logger.log(
+        actor_type="workflow",
+        actor_name="coordinator_pipeline",
+        action="outcome_recorded",
+        subject=subject,
+        source="system",
+        details={
+            "signal_label": outcome_record.signal_label,
+            "top_driver": outcome_record.top_driver,
+            "driver_class": outcome_record.driver_class,
+            "confidence": outcome_record.confidence,
+            "escalated": outcome_record.escalated,
         },
     )
     logger.write_to_db(LOG_DB_PATH)
@@ -856,6 +886,7 @@ def run_coordinator(
                 "skipped_analysts": skipped_analysts,
                 "include_research": include_research,
                 "planning_inputs": planning_inputs,
+                "prior_rca_summary": prior_rca_summary,
             },
             "critic_note_markdown": critic_note,
             "controller_note_markdown": controller_note,

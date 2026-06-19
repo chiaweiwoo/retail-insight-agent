@@ -12,6 +12,7 @@ from rca.config import (
     DEFAULT_SIGNAL_METRIC,
 )
 from rca.evidence import get_store_day_evidence
+from rca.outcomes import get_prior_rca as load_prior_rca
 from rca.signals import build_sales_signal_frame, load_sales_history
 
 
@@ -229,6 +230,10 @@ def search_news(query: str, max_results: int = 5) -> dict[str, Any]:
     return {"query": query, "result_count": len(results), "results": results}
 
 
+def get_prior_rca(store_alias: str) -> dict[str, Any]:
+    return load_prior_rca(store_alias)
+
+
 TOOL_REGISTRY: dict[str, dict[str, Any]] = {
     "get_signal_evidence": {
         "description": "Get the precomputed store-day sales trigger signal and baseline comparisons.",
@@ -334,6 +339,18 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
             "additionalProperties": False,
         },
         "function": search_news,
+    },
+    "get_prior_rca": {
+        "description": "Get prior RCA outcomes for this store from the local run history.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "store_alias": {"type": "string"},
+            },
+            "required": ["store_alias"],
+            "additionalProperties": False,
+        },
+        "function": get_prior_rca,
     },
 }
 

@@ -115,15 +115,7 @@ dilution is possible. Margin data unavailable; flag for finance review.
 **One-off vs structural:** Single-day trigger in stub mode. Insufficient history to classify
 as structural. Recommend watching the next 5 trading days.
 """,
-    "slt_brief": """\
-## Decision Card — {store} {dt}
-- headline: Low confidence: inconclusive sales drop; insufficient evidence to identify primary driver
-- confidence: low
-- materiality: immaterial / noise — single store-day, ~$200 estimated exposure (stub)
-- pattern: first observed — no prior RCA history for this store
-- action: none — monitor next 5 trading days
-- escalate: no
-""",
+    "slt_brief": "__dynamic__",
 }
 
 
@@ -156,7 +148,10 @@ class _StubCompletions:
         messages = kwargs.get("messages") or []
         store, dt = _extract_store_and_dt(messages)
         template = _STUB_RESPONSES.get(self._node_name, _default_stub(self._node_name))
-        content = template.format(store=store, dt=dt)
+        if self._node_name == "slt_brief":
+            content = _build_slt_stub(messages, store, dt)
+        else:
+            content = template.format(store=store, dt=dt)
         return _StubResponse(content)
 
 
@@ -189,6 +184,32 @@ def _extract_store_and_dt(messages: list[dict[str, Any]]) -> tuple[str, str]:
         if match:
             return match.group(1), match.group(2)
     return "unknown_store", "unknown_date"
+
+
+def _build_slt_stub(messages: list[dict[str, Any]], store: str, dt: str) -> str:
+    previous_trigger_count = 0
+    for message in reversed(messages):
+        content = message.get("content")
+        if not isinstance(content, str):
+            continue
+        match = re.search(r'"previous_trigger_count"\s*:\s*(\d+)', content)
+        if match:
+            previous_trigger_count = int(match.group(1))
+            break
+    pattern = (
+        f"recurring — {previous_trigger_count} prior RCA outcome(s) for this store"
+        if previous_trigger_count > 0
+        else "first observed — no prior RCA history for this store"
+    )
+    return f"""\
+## Decision Card — {store} {dt}
+- headline: Low confidence: inconclusive sales drop; insufficient evidence to identify primary driver
+- confidence: low
+- materiality: immaterial / noise — single store-day, ~$200 estimated exposure (stub)
+- pattern: {pattern}
+- action: none — monitor next 5 trading days
+- escalate: no
+"""
 
 
 def stub_client_factory(node_name: str) -> StubClient:
