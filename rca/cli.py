@@ -168,22 +168,28 @@ def _cmd_run(args: argparse.Namespace) -> None:
     from rca.agents import run_coordinator, ANALYST_SPECS
     from rca.config import AGENT_BENCHMARK_PATH, current_timestamp_sgt_label
 
+    client_factory = None
+    if args.dry_run:
+        from rca.stubclient import stub_client_factory
+        client_factory = stub_client_factory
+        print("[dry-run] Using stub LLM client — no API calls will be made.")
+
     specialists = None
     if args.quick:
-        # Quick mode: signal specialist only
         sales_spec = next(s for s in ANALYST_SPECS if s.name == "sales_analyst")
         specialists = [sales_spec]
 
     output_dir = None
     if not args.quick:
         from rca.config import PROJECT_ROOT
-        timestamp = current_timestamp_sgt_label()
-        output_dir = PROJECT_ROOT / "data" / "analysis" / "agent_benchmark_runs" / f"{args.store}_{args.dt}_{timestamp}"
+        label = "dry_run" if args.dry_run else current_timestamp_sgt_label()
+        output_dir = PROJECT_ROOT / "data" / "analysis" / "agent_benchmark_runs" / f"{args.store}_{args.dt}_{label}"
 
     result = run_coordinator(
         store_alias=args.store,
         dt=args.dt,
         specialists=specialists,
+        client_factory=client_factory,
         output_dir=output_dir,
     )
     print(result.coordinator_report_markdown)
@@ -301,6 +307,12 @@ def main() -> None:
         "--quick",
         action="store_true",
         help="Quick mode: signal specialist only (no full coordinator)",
+    )
+    run_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        dest="dry_run",
+        help="Use stub LLM client — exercises the full pipeline with no API calls",
     )
     run_parser.set_defaults(func=_cmd_run)
 
