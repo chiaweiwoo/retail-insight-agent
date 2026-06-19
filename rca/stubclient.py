@@ -118,6 +118,24 @@ as structural. Recommend watching the next 5 trading days.
     "evaluator": """\
 {"groundedness": 4, "calibration": 4, "actionability": 3, "conciseness": 4, "causal_honesty": 4, "summary": "Stub evaluation only."}
 """,
+    "story_writer": """\
+# Story Report: h555 on 2024-05-16
+
+## Executive Takeaway
+The system ends with a low-confidence but readable decision: the drop is real, stockout pressure is plausible, and the next action is to validate operations before escalating.
+
+## Why This Day Triggered Review
+Sales fell enough versus the trailing seven-day baseline to cross the configured drop threshold, so the workflow opened a full RCA run.
+
+## How The Analysis Unfolded
+The sales analyst confirmed the signal with `get_signal_evidence` and `get_sales_context`. The ops analyst used `get_stockout_context` to test whether availability was part of the story. The commercial analyst checked promotions and discounts, while the market analyst looked at calendar, weather, and peer context.
+
+## Where The System Challenged Itself
+The critic pushed back on overconfident claims, especially where the analysts tried to turn correlation into proof or where no baseline was available.
+
+## Final Decision
+The final card keeps the tone restrained: monitor, validate stockout baseline, and avoid escalation until the operational hypothesis is better supported.
+""",
     "slt_brief": "__dynamic__",
 }
 

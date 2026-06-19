@@ -339,6 +339,38 @@ def _cmd_eval(args: argparse.Namespace) -> None:
     )
 
 
+def _cmd_story(args: argparse.Namespace) -> None:
+    from rca.report import build_story_report
+
+    client_factory = None
+    settings = None
+    use_llm = not args.no_llm
+    if args.dry_run:
+        from rca.stubclient import stub_client_factory
+        from rca.llm import LLMSettings
+
+        client_factory = stub_client_factory
+        settings = LLMSettings(
+            api_key="dry-run",
+            base_url="https://api.deepseek.com",
+            model="deepseek-v4-flash",
+            thinking_enabled=False,
+        )
+        use_llm = True
+        print("[dry-run] Using stub LLM story writer.")
+
+    run_dir = Path(args.run_dir)
+    markdown_path, html_path = build_story_report(
+        run_dir=run_dir,
+        output_name=args.output_name,
+        use_llm=use_llm,
+        settings=settings,
+        client_factory=client_factory,
+    )
+    print(f"Story markdown written to {markdown_path}")
+    print(f"Story HTML written to {html_path}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="rca",
@@ -436,6 +468,34 @@ def main() -> None:
         help="Use the stub LLM judge instead of a real API call",
     )
     eval_parser.set_defaults(func=_cmd_eval)
+
+    # rca story
+    story_parser = subparsers.add_parser(
+        "story",
+        help="Build a story-style HTML walkthrough from one run folder",
+    )
+    story_parser.add_argument(
+        "--run-dir",
+        required=True,
+        help="Path to a run folder containing run_trace.json or coordinator_trace.json",
+    )
+    story_parser.add_argument(
+        "--output-name",
+        default="story_report",
+        help="Basename for the generated markdown and html files",
+    )
+    story_parser.add_argument(
+        "--no-llm",
+        action="store_true",
+        help="Skip the final LLM polish and use deterministic report assembly only",
+    )
+    story_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        dest="dry_run",
+        help="Use the stub LLM story writer",
+    )
+    story_parser.set_defaults(func=_cmd_story)
 
     args = parser.parse_args()
     args.func(args)

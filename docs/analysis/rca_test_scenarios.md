@@ -4,6 +4,8 @@ This file defines the fixed early-stage RCA scenario set we will use before broa
 
 The goal is not coverage. The goal is to use strong, discussion-friendly scenarios across different store tiers while the project is still in a learning phase.
 
+These six scenarios are regression fixtures. They should remain stable unless we intentionally redefine the benchmark.
+
 ## Signal Definition
 
 - metric: `trailing_7d_pct_change`
@@ -43,3 +45,26 @@ Use these six store-day cases as the default benchmark set for:
 - prompt design and grounding checks
 - early LLM report evaluation
 - regression comparisons when RCA logic changes
+
+## Exploratory Story Report Candidates
+
+Story-report examples can be selected outside the fixed benchmark set. These are for narrative quality and human review, not regression comparison.
+
+Selection criteria for a good exploratory negative example:
+
+- strong drop signal
+- enough history for same-weekday comparison
+- possible tension between stockout, promotion, peer, or calendar evidence
+- room for the system to say "not actionable" when the signal is a measurement artifact
+
+Current exploratory negative candidate:
+
+| store_alias | dt | total_sales | trailing_7d_avg_sales | trailing_7d_pct_change | same_weekday_4w_avg_sales | same_weekday_4w_pct_change | why interesting |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | --- |
+| l165 | 2024-06-06 | 28.10 | 40.40 | -30.4% | 28.83 | -2.5% | Strong trailing-window drop, but nearly normal Thursday baseline; tests whether the RCA avoids over-attribution. |
+
+Notes from the first search pass:
+
+- `l165 2024-04-03` is the largest-scoring drop candidate, but it is early in the dataset and lacks same-weekday baseline.
+- `l165 2024-06-06` is a better calibration test because it has stronger historical context and a plausible "window composition artifact" conclusion.
+- Negative examples may be more useful than lifts for report demos because they force the system to handle operational risk, stockout ambiguity, and false-positive alerts.
