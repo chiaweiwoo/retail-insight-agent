@@ -11,7 +11,7 @@ Read both before making non-trivial changes.
 Rebuild it with:
 
 ```bash
-rca dashboard
+uv run python -m rca.cli dashboard
 ```
 
 Source: `rca/report.py::build_dashboard_html`
@@ -22,7 +22,7 @@ Data inputs: `data/analysis/trigger_grids/trailing_7d_pct_trigger_grid_20.csv`, 
 All pipeline runs write events to `data/runs.duckdb` (table `run_log_event`). Created automatically on first run. To view recent runs in the terminal:
 
 ```bash
-rca runs
+uv run python -m rca.cli runs
 ```
 
 ## DB Migration

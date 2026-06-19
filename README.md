@@ -5,12 +5,12 @@ A coordinator-led multi-agent system for retail root cause analysis (RCA), runni
 ## Quick Start
 
 ```bash
-uv sync                                       # install dependencies
-rca build                                     # ingest parquet → data/rca.duckdb, validate
-rca analyze                                   # compute signals → data/analysis/*.csv
-rca run --store h555 --dt 2024-05-16          # run coordinator pipeline for one store-day
-open ui/public/dashboard.html                 # view signal grid + recent runs
-rca runs                                      # print run history in terminal
+uv sync                                                    # install dependencies
+uv run python -m rca.cli build                             # ingest parquet → data/rca.duckdb, validate
+uv run python -m rca.cli analyze                           # compute signals → data/analysis/*.csv
+uv run python -m rca.cli run --store h555 --dt 2024-05-16 # run coordinator pipeline for one store-day
+# open ui/public/dashboard.html in a browser              # view signal grid + recent runs
+uv run python -m rca.cli runs                              # print run history in terminal
 ```
 
 > **DB migration note:** if you are upgrading from the old structure, copy `data/db/rca_foundry.duckdb` to `data/rca.duckdb` before running.
@@ -19,13 +19,13 @@ rca runs                                      # print run history in terminal
 
 | Command | Description |
 | --- | --- |
-| `rca build` | Ingest `data/raw/train.parquet` into `data/rca.duckdb` and validate row counts |
-| `rca analyze` | Compute drop/lift signals → `data/analysis/*.csv` |
-| `rca run --store S --dt D [--quick]` | Coordinator pipeline for one store-day; `--quick` runs signal specialist only |
-| `rca bench` | Batch benchmark over 6 fixed scenarios |
-| `rca dashboard` | Regenerate `ui/public/dashboard.html` from analysis CSVs and run logs |
-| `rca export` | Refresh `ui/public/evidence_data.json` for the Vite evidence viewer |
-| `rca runs` | Print recent run history from `data/runs.duckdb` |
+| `uv run python -m rca.cli build` | Ingest `data/raw/train.parquet` into `data/rca.duckdb` and validate row counts |
+| `uv run python -m rca.cli analyze` | Compute drop/lift signals → `data/analysis/*.csv` |
+| `uv run python -m rca.cli run --store S --dt D [--quick]` | Coordinator pipeline for one store-day; `--quick` runs signal specialist only |
+| `uv run python -m rca.cli bench` | Batch benchmark over 6 fixed scenarios |
+| `uv run python -m rca.cli dashboard` | Regenerate `ui/public/dashboard.html` from analysis CSVs and run logs |
+| `uv run python -m rca.cli export` | Refresh `ui/public/evidence_data.json` for the Vite evidence viewer |
+| `uv run python -m rca.cli runs` | Print recent run history from `data/runs.duckdb` |
 
 ## Agent Architecture
 
@@ -70,8 +70,8 @@ Each specialist writes a bounded memo. The coordinator synthesizes them into a f
 
 ## Viewing Results
 
-- Open `ui/public/dashboard.html` in a browser to see the signal grid (store × date, D/L/.) and a table of recent pipeline runs. Regenerate with `rca dashboard`.
-- Run `rca runs` in the terminal for a summary table of recent runs.
+- Open `ui/public/dashboard.html` in a browser to see the signal grid (store × date, D/L/.) and a table of recent pipeline runs. Regenerate with `uv run python -m rca.cli dashboard`.
+- Run `uv run python -m rca.cli runs` in the terminal for a summary table of recent runs.
 - Each `rca run` with an output dir writes `report.html` and per-specialist HTML memos under `data/analysis/agent_benchmark_runs/`.
 
 ## Environment
