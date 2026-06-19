@@ -43,6 +43,7 @@ def build_chat_completion_kwargs(
     kwargs: dict[str, Any] = {
         "model": settings.model,
         "messages": messages,
+        "temperature": 0.0,
     }
     if tools:
         kwargs["tools"] = tools

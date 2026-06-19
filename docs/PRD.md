@@ -1,10 +1,21 @@
 # Retail Insight Agent - PRD
 
+## Data Semantics Guardrail
+
+The source dataset field `sale_amount` is documented as a **daily sales amount after global normalization, multiplied by a specific coefficient**. `hours_sale` is the hourly version of the same normalized measure.
+
+For this project, that means:
+
+- sales values are useful for **relative comparison, anomaly detection, and baseline reasoning**
+- sales values are **not** literal unit counts
+- sales values are **not** real currency revenue
+- report language should prefer `sales amount` or `normalized sales amount`
+
 ## 1. Project Overview
 
 Retail Insight Agent is a personal learning project for building an evidence-backed retail root cause analysis system.
 
-The near-term priority is to create a clean, scoped local analytical database from FreshRetailNet-50K, then use it to power a small runnable tool-calling RCA agent.
+The near-term priority is to create a clean, scoped local analytical database from FreshRetailNet-50K, then use it to power a small runnable tool-calling RCA agent with auditable reports.
 
 This is not a production system. It is a learning project built in phases.
 
@@ -20,14 +31,14 @@ The current implementation milestones are:
 6. Expose a read-only evidence viewer over the DuckDB output.
 7. Explore precomputed daily drop/lift signals for store-day RCA triggering.
 8. Build a small runnable RCA agent that calls bounded evidence tools over the local DuckDB-backed dataset.
+9. Save traceable RCA outputs, logs, evaluator results, and reader-facing story reports.
 
 Not part of the current milestones:
 
-- RCA report generation
-- LangGraph orchestration
 - MCP server runtime
 - runtime skill system
-- external research or news enrichment
+- production external research dependence
+- production serving stack
 
 Decision hygiene:
 
@@ -262,10 +273,10 @@ The first agentic runtime should be intentionally small:
 - tool-calling LLM over local DuckDB-backed evidence
 - tools should be domain-specific functions such as signal, sales, stockout, discount, activity, calendar-weather, and peer-store context
 - no raw SQL tool exposed to the model
-- no external web or news enrichment in the first runnable version
-- no manager agent yet
+- optional research tool is gated and should not be used by default
+- manager-style synthesis is allowed through explicit coordinator/controller/brief stages
 
-The goal is a runnable evidence-backed RCA note, not a production workflow engine.
+The goal is a runnable evidence-backed RCA note with inspectable reasoning, not a production workflow engine.
 
 ## 10. UI Direction
 
@@ -274,6 +285,8 @@ The first interface phase is a simple analyst view over DuckDB-derived evidence,
 - selecting a store and date
 - viewing sales, stockout, discount, activity, holiday, and weather context
 - displaying metrics before any generated narrative
+
+The current UI work is secondary to backend and LLM workflow quality. Static report HTML is acceptable for now because it makes individual RCA runs easy to inspect without committing to a full app surface.
 
 ## 11. Current Signal Direction
 
@@ -298,35 +311,69 @@ Current fixed RCA benchmark set:
 
 ```text
 3 drop scenarios + 3 lift scenarios
-covering high, medium, and low store tiers
+covering different store-prefix groups
 used for early deterministic RCA and LLM evaluation
 ```
 
-## 12. Non-Goals For This Milestone
+Benchmark scenarios are regression fixtures, not necessarily the most interesting demos. Ad hoc story-report examples may be chosen separately.
+
+Current exploratory negative candidate:
+
+```text
+l165 on 2024-06-06
+```
+
+This candidate is useful because it triggers a strong trailing-7-day drop while same-weekday baseline is nearly normal. The intended lesson is calibration: the system should be able to conclude that an alert may be a window-composition artifact instead of forcing a causal story.
+
+## 12. Reporting Direction
+
+Each full RCA run should produce two classes of outputs:
+
+1. Audit artifacts in the run folder:
+   - decision card
+   - full RCA report
+   - critic note
+   - controller note
+   - specialist memos
+   - trace JSON
+   - run logs
+
+2. Reader-facing story artifacts under:
+
+```text
+output/story_reports/<run_folder>/
+```
+
+The story report should walk through the RCA from trigger to final decision:
+
+- why the store-day triggered
+- which analysts were selected
+- which tools each analyst used
+- what each analyst found
+- what the critic challenged
+- what action survived synthesis
+
+The story report may use a small LLM polishing step, but it must stay grounded in the saved trace.
+
+## 13. Non-Goals For This Milestone
 
 Do not build:
 
 ```text
-autonomous agents
 MCP server
 skills
-persistent memory
-web search
-news agent
 customer analysis
 product/category drilldown
-dashboard UI
 FastAPI service
 production deployment
-RCA report generation
 ```
 
-## 13. Future Roadmap
+## 14. Future Roadmap
 
-After Phase 1 works:
+Next direction:
 
-1. Add evidence query helpers over DuckDB.
-2. Add precomputed sales drop and lift signal layers.
-3. Add a small runnable tool-calling RCA agent.
-4. Strengthen tests and benchmark cases.
+1. Keep improving the bounded evidence tools before adding more orchestration.
+2. Strengthen tests around tool access, trace faithfulness, and story report rendering.
+3. Use fixed benchmark scenarios for regression.
+4. Use ad hoc examples for report design and narrative quality.
 5. Revisit richer orchestration only if the small agent path proves too limited.
