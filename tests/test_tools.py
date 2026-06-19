@@ -40,7 +40,8 @@ def test_domain_tools_return_expected_keys() -> None:
     assert "avg_discount" in discount
     assert "activity_sales_share" in activity
     assert calendar_weather["holiday_name_inferred"] == "normal_weekday"
-    assert peer["store_tier"] == "h"
+    assert peer["store_prefix_group"] == "h"
+    assert peer["prefix_group_avg_sales_same_day"] is not None
 
 
 def test_tool_registry_and_execute_tool_work() -> None:

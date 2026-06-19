@@ -188,30 +188,35 @@ def get_calendar_weather_context(store_alias: str, dt: str) -> dict[str, Any]:
 def get_peer_store_context(store_alias: str, dt: str) -> dict[str, Any]:
     row = _get_signal_row(store_alias, dt)
     frame = _signal_frame()
-    tier = store_alias[0]
+    prefix_group = store_alias[0]
     daily = frame[frame["dt_label"] == dt].copy()
-    tier_daily = daily[daily["store_alias"].str.startswith(tier)]
+    prefix_daily = daily[daily["store_alias"].str.startswith(prefix_group)]
     overall_avg = _round_float(daily["total_sales"].mean())
-    tier_avg = _round_float(tier_daily["total_sales"].mean())
+    prefix_avg = _round_float(prefix_daily["total_sales"].mean())
     rank = int(
         daily["total_sales"].rank(method="min", ascending=False)[daily["store_alias"] == store_alias].iloc[0]
     )
-    tier_rank = int(
-        tier_daily["total_sales"]
-        .rank(method="min", ascending=False)[tier_daily["store_alias"] == store_alias]
+    prefix_rank = int(
+        prefix_daily["total_sales"]
+        .rank(method="min", ascending=False)[prefix_daily["store_alias"] == store_alias]
         .iloc[0]
     )
     return {
         "store_alias": store_alias,
         "dt": dt,
-        "store_tier": tier,
+        "store_prefix_group": prefix_group,
         "store_total_sales": _round_float(row["total_sales"]),
-        "tier_avg_sales_same_day": tier_avg,
+        "prefix_group_avg_sales_same_day": prefix_avg,
         "overall_avg_sales_same_day": overall_avg,
         "overall_rank_same_day": rank,
         "overall_store_count": int(daily.shape[0]),
-        "tier_rank_same_day": tier_rank,
-        "tier_store_count": int(tier_daily.shape[0]),
+        "prefix_group_rank_same_day": prefix_rank,
+        "prefix_group_store_count": int(prefix_daily.shape[0]),
+        # Backward-compatible aliases for older prompts/tests/artifacts.
+        "store_tier": prefix_group,
+        "tier_avg_sales_same_day": prefix_avg,
+        "tier_rank_same_day": prefix_rank,
+        "tier_store_count": int(prefix_daily.shape[0]),
     }
 
 
@@ -315,7 +320,7 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
         "function": get_calendar_weather_context,
     },
     "get_peer_store_context": {
-        "description": "Compare the store against same-day peers and same-tier stores.",
+        "description": "Compare the store against same-day peers and its same-prefix peer group.",
         "parameters": {
             "type": "object",
             "properties": {
@@ -375,6 +380,9 @@ def get_tool_schemas(tool_names: list[str] | tuple[str, ...] | None = None) -> l
 
 def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
     if name not in TOOL_REGISTRY:
-        raise ValueError(f"Unknown tool: {name}")
+        return {"error": f"Unknown tool: {name}"}
     function: ToolFunction = TOOL_REGISTRY[name]["function"]
-    return function(**arguments)
+    try:
+        return function(**arguments)
+    except Exception as e:
+        return {"error": str(e)}
