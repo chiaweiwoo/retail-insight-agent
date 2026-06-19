@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import sys
 
 from rca_foundry.agent import run_rca_agent
 
@@ -13,6 +14,8 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
     args = parse_args()
     result = run_rca_agent(store_alias=args.store, dt=args.dt)
     print(result.report_markdown)

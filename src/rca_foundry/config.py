@@ -5,6 +5,7 @@ from pathlib import Path
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+ENV_FILE_PATH = PROJECT_ROOT / ".env"
 RAW_DATA_PATH = PROJECT_ROOT / "data" / "raw" / "train.parquet"
 RAW_METADATA_PATH = PROJECT_ROOT / "data" / "raw" / "train_metadata.json"
 DB_PATH = PROJECT_ROOT / "data" / "db" / "rca_foundry.duckdb"
@@ -78,6 +79,23 @@ DEFAULT_LIFT_THRESHOLD_PCT = 30.0
 DEFAULT_LLM_BASE_URL = "https://api.deepseek.com"
 DEFAULT_LLM_MODEL = "deepseek-v4-flash"
 DEFAULT_LLM_MAX_TOOL_ROUNDS = 8
+
+
+def load_env_file(env_file_path: Path = ENV_FILE_PATH) -> None:
+    if not env_file_path.exists():
+        return
+
+    for raw_line in env_file_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        os.environ.setdefault(key, value)
+
+
+load_env_file()
 
 
 def get_llm_api_key() -> str:

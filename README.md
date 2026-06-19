@@ -96,6 +96,7 @@ npm run dev
 - The agent backend uses domain-specific tool functions, not raw SQL exposure.
 - First live model target: DeepSeek via the OpenAI-compatible API.
 - Example environment file: `.env.example`
+- Local `.env` is auto-loaded by the Python runtime config and is gitignored.
 - Required environment for live agent runs:
 
 ```bash
