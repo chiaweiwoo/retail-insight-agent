@@ -49,14 +49,15 @@ flowchart TD
 
 ### Specialists
 
-| Specialist | Focus | Tools |
+| Specialist | Role | Tools |
 | --- | --- | --- |
-| `signal_analyst` | Validate signal direction and baseline comparison | `get_signal_evidence`, `get_sales_context` |
-| `inventory_analyst` | Stockout and availability assessment | `get_stockout_context`, `get_sales_context` |
-| `pricing_activity_analyst` | Discount and promotional contribution | `get_discount_context`, `get_activity_context`, `get_sales_context` |
-| `context_analyst` | Calendar, weather, and peer comparison | `get_calendar_weather_context`, `get_peer_store_context`, `get_sales_context` |
+| `sales_analyst` | Confirm the sales move is real — magnitude and baseline comparison | `get_signal_evidence`, `get_sales_context` |
+| `ops_analyst` | Stockout and product availability — did we run out of stock? | `get_stockout_context`, `get_sales_context` |
+| `commercial_analyst` | Discount depth and promotional activity — commercial/trade side | `get_discount_context`, `get_activity_context`, `get_sales_context` |
+| `market_analyst` | Calendar, weather, peer stores — store-specific or fleet-wide? | `get_calendar_weather_context`, `get_peer_store_context`, `get_sales_context` |
+| `research_analyst` | External news and events — web search for broader market context | `search_news` |
 
-The coordinator (`coordinator_analyst`) has no direct tool access — it synthesizes from specialist memos only.
+The coordinator (`coordinator_analyst`) has no direct tool access — it synthesizes specialist memos into the final RCA report.
 
 Each specialist writes a bounded memo. The coordinator synthesizes them into a final RCA report with sections: Trigger, Likely Drivers, Evidence, Caveats, Suggested Next Checks.
 

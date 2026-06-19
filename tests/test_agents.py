@@ -96,20 +96,25 @@ class FakeClient:
 
 def test_coordinator_runs_parallel_specialists_and_synthesizes(tmp_path) -> None:
     tool_by_actor = {
-        "signal_analyst": "get_signal_evidence",
-        "inventory_analyst": "get_stockout_context",
-        "pricing_activity_analyst": "get_discount_context",
-        "context_analyst": "get_calendar_weather_context",
+        "sales_analyst": "get_signal_evidence",
+        "ops_analyst": "get_stockout_context",
+        "commercial_analyst": "get_discount_context",
+        "market_analyst": "get_calendar_weather_context",
+        "research_analyst": "search_news",
     }
 
     def client_factory(actor_name: str):
         if actor_name == "coordinator_analyst":
             return FakeClient(CoordinatorCompletions())
-        return FakeClient(SpecialistCompletions(tool_by_actor[actor_name], actor_name))
+        tool = tool_by_actor.get(actor_name, "get_signal_evidence")
+        return FakeClient(SpecialistCompletions(tool, actor_name))
 
+    # Run with just the 4 core analysts (exclude research to avoid real web calls in tests)
+    core_specs = [s for s in ANALYST_SPECS if s.name != "research_analyst"]
     result = run_coordinator(
         store_alias="h555",
         dt="2024-05-16",
+        specialists=core_specs,
         settings=LLMSettings(
             api_key="test-key",
             base_url="https://api.deepseek.com",
@@ -121,14 +126,14 @@ def test_coordinator_runs_parallel_specialists_and_synthesizes(tmp_path) -> None
     )
     assert "## Trigger" in result.coordinator_report_markdown
     assert len(result.analyst_results) == 4
-    assert (tmp_path / "scenario" / "specialists" / "signal_analyst.md").exists()
-    assert (tmp_path / "scenario" / "specialists" / "signal_analyst.html").exists()
+    assert (tmp_path / "scenario" / "specialists" / "sales_analyst.md").exists()
+    assert (tmp_path / "scenario" / "specialists" / "sales_analyst.html").exists()
     assert (tmp_path / "scenario" / "report.html").exists()
 
 
-def test_coordinator_quick_mode_uses_signal_specialist_only(tmp_path) -> None:
-    """--quick mode: run_coordinator with only the signal_analyst specialist."""
-    signal_spec = next(s for s in ANALYST_SPECS if s.name == "signal_analyst")
+def test_coordinator_quick_mode_uses_sales_analyst_only(tmp_path) -> None:
+    """--quick mode: run_coordinator with only the sales_analyst specialist."""
+    sales_spec = next(s for s in ANALYST_SPECS if s.name == "sales_analyst")
 
     def client_factory(actor_name: str):
         if actor_name == "coordinator_analyst":
@@ -138,7 +143,7 @@ def test_coordinator_quick_mode_uses_signal_specialist_only(tmp_path) -> None:
     result = run_coordinator(
         store_alias="h555",
         dt="2024-05-16",
-        specialists=[signal_spec],
+        specialists=[sales_spec],
         settings=LLMSettings(
             api_key="test-key",
             base_url="https://api.deepseek.com",
@@ -149,4 +154,4 @@ def test_coordinator_quick_mode_uses_signal_specialist_only(tmp_path) -> None:
     )
     assert "## Trigger" in result.coordinator_report_markdown
     assert len(result.analyst_results) == 1
-    assert result.analyst_results[0].name == "signal_analyst"
+    assert result.analyst_results[0].name == "sales_analyst"

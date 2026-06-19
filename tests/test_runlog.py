@@ -7,7 +7,7 @@ def test_run_logger_captures_and_renders_events() -> None:
     logger = RunLogger(run_name="demo_run")
     logger.log(
         actor_type="agent",
-        actor_name="signal_analyst",
+        actor_name="sales_analyst",
         action="started",
         subject="h555:2024-05-16",
         source="system",
@@ -19,10 +19,10 @@ def test_run_logger_captures_and_renders_events() -> None:
         action="completed",
         subject="h555:2024-05-16",
         source="tool",
-        details={"called_by": "signal_analyst"},
+        details={"called_by": "sales_analyst"},
     )
     jsonl = logger.to_jsonl()
     markdown = logger.to_markdown()
-    assert '"actor_name": "signal_analyst"' in jsonl
+    assert '"actor_name": "sales_analyst"' in jsonl
     assert "| 1 |" in markdown
     assert "get_signal_evidence" in markdown

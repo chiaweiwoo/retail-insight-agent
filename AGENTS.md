@@ -7,9 +7,17 @@ Source of truth for implementation is **README.md**.
 
 Coordinator-led subagent design.
 
-`plan_specialists(store_alias, dt, signal)` is the planning seam. It selects which specialist agents to dispatch for a given store-day. Currently returns all four specialists. Future filtering by signal direction or magnitude goes here — the seam isolates that logic.
+`plan_specialists(store_alias, dt, signal)` is the planning seam. It selects which specialist agents to dispatch for a given store-day. Currently returns all five specialists. Future filtering by signal direction or magnitude goes here — the seam isolates that logic.
 
 Specialists run in parallel, each bounded to a named domain and a fixed set of tools. The coordinator synthesizes their memos into one RCA report. No specialist sees another specialist's memo.
+
+| Specialist | Domain | Tools |
+| --- | --- | --- |
+| `sales_analyst` | Sales performance — confirm signal magnitude and trend | `get_signal_evidence`, `get_sales_context` |
+| `ops_analyst` | Operations — stockout and availability | `get_stockout_context`, `get_sales_context` |
+| `commercial_analyst` | Commercial — discount depth and promotional activity | `get_discount_context`, `get_activity_context`, `get_sales_context` |
+| `market_analyst` | Market context — calendar, weather, peer stores | `get_calendar_weather_context`, `get_peer_store_context`, `get_sales_context` |
+| `research_analyst` | External research — web news search for broader events | `search_news` |
 
 Evidence is read-only over `data/rca.duckdb`. No writes to the DB during a run.
 
@@ -31,6 +39,5 @@ Evidence is read-only over `data/rca.duckdb`. No writes to the DB during a run.
 - MCP runtime
 - Skills runtime
 - Persistent memory
-- External news agent
 - Product/category drilldown
 - Customer analysis

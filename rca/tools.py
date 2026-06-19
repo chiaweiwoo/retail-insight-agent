@@ -4,6 +4,7 @@ from functools import lru_cache
 from typing import Any, Callable
 
 import pandas as pd
+from duckduckgo_search import DDGS
 
 from rca.config import (
     DEFAULT_DROP_THRESHOLD_PCT,
@@ -213,6 +214,21 @@ def get_peer_store_context(store_alias: str, dt: str) -> dict[str, Any]:
     }
 
 
+def search_news(query: str, max_results: int = 5) -> dict[str, Any]:
+    results = []
+    try:
+        with DDGS() as ddgs:
+            for r in ddgs.text(query, max_results=max_results):
+                results.append({
+                    "title": r.get("title", ""),
+                    "url": r.get("href", ""),
+                    "snippet": r.get("body", ""),
+                })
+    except Exception as exc:
+        return {"query": query, "error": str(exc), "results": []}
+    return {"query": query, "result_count": len(results), "results": results}
+
+
 TOOL_REGISTRY: dict[str, dict[str, Any]] = {
     "get_signal_evidence": {
         "description": "Get the precomputed store-day sales trigger signal and baseline comparisons.",
@@ -305,6 +321,19 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
             "additionalProperties": False,
         },
         "function": get_peer_store_context,
+    },
+    "search_news": {
+        "description": "Search the web for news or events relevant to a retail sales move. Pass a focused query such as 'retail sales China May 2024' or 'holiday shopping event May 16 2024'.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Search query string"},
+                "max_results": {"type": "integer", "minimum": 1, "maximum": 10, "default": 5},
+            },
+            "required": ["query"],
+            "additionalProperties": False,
+        },
+        "function": search_news,
     },
 }
 

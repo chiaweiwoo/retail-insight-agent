@@ -171,8 +171,8 @@ def _cmd_run(args: argparse.Namespace) -> None:
     specialists = None
     if args.quick:
         # Quick mode: signal specialist only
-        signal_spec = next(s for s in ANALYST_SPECS if s.name == "signal_analyst")
-        specialists = [signal_spec]
+        sales_spec = next(s for s in ANALYST_SPECS if s.name == "sales_analyst")
+        specialists = [sales_spec]
 
     output_dir = None
     if not args.quick:
