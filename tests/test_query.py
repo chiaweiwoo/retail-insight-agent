@@ -4,6 +4,7 @@ import pytest
 
 from rca_foundry.query import (
     export_evidence_dataset,
+    fetch_all_evidence_records,
     get_store_day_evidence,
     list_dates,
     list_store_aliases,
@@ -43,6 +44,9 @@ def test_get_store_day_evidence_rejects_unknown_date() -> None:
 
 
 def test_export_dataset_creates_expected_shape(tmp_path) -> None:
+    records = fetch_all_evidence_records()
+    assert len(records) == 1350
+
     output_path = tmp_path / "evidence_data.json"
     export_evidence_dataset(output_path)
     assert output_path.exists()

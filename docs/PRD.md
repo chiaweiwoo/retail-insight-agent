@@ -10,20 +10,20 @@ This is not a production system. It is a learning project built in phases.
 
 ## 2. Current Delivery Milestone
 
-The current implementation milestone is Phase 1 only:
+The current implementation milestones are:
 
 1. Read the raw FreshRetailNet-50K parquet file.
 2. Filter to the agreed project scope.
 3. Aggregate raw product-level data into daily store-level tables.
 4. Save the tables into a local DuckDB database.
 5. Validate table counts and basic metric integrity.
-6. Stop after the ingestion layer is complete.
+6. Expose a read-only evidence viewer over the DuckDB output.
+7. Stop before RCA logic and generated narrative.
 
-Not part of this milestone:
+Not part of the current milestones:
 
 - RCA report generation
 - deterministic RCA rules
-- UI
 - agents
 - LLM integration
 
@@ -245,9 +245,7 @@ Validation must check:
 
 ## 9. UI Direction
 
-UI is intentionally deferred until the evidence tables are stable.
-
-The first interface phase should be a simple analyst view over DuckDB, focused on:
+The first interface phase is a simple analyst view over DuckDB-derived evidence, focused on:
 
 - selecting a store and date
 - viewing sales, stockout, discount, activity, holiday, and weather context

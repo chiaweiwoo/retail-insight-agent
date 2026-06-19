@@ -7,10 +7,11 @@ Retail Insight Agent is a personal learning project to build an evidence-backed 
 Current implementation milestone:
 
 ```text
-Phase 1 only: local data ingestion into DuckDB.
+Phase 1 complete: local data ingestion into DuckDB.
+Milestone B in progress: reliability checks and a read-only evidence viewer.
 ```
 
-Do not build RCA logic, agent logic, or UI in this phase.
+Do not build RCA logic, agent logic, or generated narrative in this milestone.
 
 ## Hard Rules
 
@@ -34,7 +35,15 @@ customer analysis
 RCA report generation
 ```
 
-Only implement the local data ingestion, schema, and validation layer.
+Allowed in Milestone B:
+
+```text
+read-only evidence UI over committed DuckDB output
+tests and CI
+query/export helpers
+```
+
+Keep the implementation read-only and evidence-first.
 
 ## Package Manager
 
@@ -68,6 +77,7 @@ retail-insight-agent/
       rca_foundry.duckdb
   scripts/
     ingest_daily_tables.py
+    export_ui_data.py
     validate_daily_tables.py
   sql/
     migrations/
@@ -80,6 +90,8 @@ retail-insight-agent/
       config.py
       db.py
       ingestion.py
+      query.py
+      validation.py
 ```
 
 ## Raw Data
@@ -201,4 +213,4 @@ hourly arrays are malformed
 
 ## Stop Condition
 
-After Phase 1 ingestion and validation are complete, stop.
+After reliability, CI, and the read-only evidence viewer are complete, stop.
