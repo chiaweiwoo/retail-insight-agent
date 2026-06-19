@@ -40,6 +40,8 @@ That is the pattern used here.
 
 ## DAG
 
+![Agent Runtime DAG](C:\Users\chiaw\OneDrive\Desktop\playground\retail_insight_agent\docs\images\agent_runtime_dag.svg)
+
 ```mermaid
 flowchart TD
     A["Input: store_alias + dt"] --> B["manager_entry"]

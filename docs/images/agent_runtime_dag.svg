@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760" role="img" aria-labelledby="title desc">
+  <title id="title">Retail Insight Agent Runtime DAG</title>
+  <desc id="desc">Manager entry dispatches four parallel specialist analysts, which feed a manager analyst, followed by artifact writing.</desc>
+  <defs>
+    <style>
+      .bg { fill: #f8fafc; }
+      .node { fill: #ffffff; stroke: #334155; stroke-width: 2; rx: 10; ry: 10; }
+      .manager { fill: #dbeafe; }
+      .specialist { fill: #dcfce7; }
+      .artifact { fill: #fef3c7; }
+      .label { font-family: Arial, Helvetica, sans-serif; font-size: 20px; fill: #0f172a; text-anchor: middle; dominant-baseline: middle; }
+      .small { font-size: 16px; fill: #334155; }
+      .edge { stroke: #475569; stroke-width: 3; fill: none; marker-end: url(#arrow); }
+      .legend { font-family: Arial, Helvetica, sans-serif; font-size: 18px; fill: #0f172a; }
+    </style>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M 0 0 L 12 6 L 0 12 z" fill="#475569" />
+    </marker>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1200" height="760" />
+
+  <rect class="node manager" x="430" y="40" width="340" height="72" />
+  <text class="label" x="600" y="67">Input: store_alias + dt</text>
+  <text class="label small" x="600" y="92">single RCA request enters runtime</text>
+
+  <rect class="node manager" x="430" y="160" width="340" height="72" />
+  <text class="label" x="600" y="187">manager_entry</text>
+  <text class="label small" x="600" y="212">create context, start logging, dispatch analysts</text>
+
+  <rect class="node specialist" x="70" y="320" width="240" height="90" />
+  <text class="label" x="190" y="348">signal_analyst</text>
+  <text class="label small" x="190" y="374">tools:</text>
+  <text class="label small" x="190" y="396">get_signal_evidence</text>
+  <text class="label small" x="190" y="416">get_sales_context</text>
+
+  <rect class="node specialist" x="340" y="320" width="240" height="90" />
+  <text class="label" x="460" y="348">inventory_analyst</text>
+  <text class="label small" x="460" y="374">tools:</text>
+  <text class="label small" x="460" y="396">get_stockout_context</text>
+  <text class="label small" x="460" y="416">get_sales_context</text>
+
+  <rect class="node specialist" x="620" y="320" width="240" height="90" />
+  <text class="label" x="740" y="348">pricing_activity_analyst</text>
+  <text class="label small" x="740" y="374">tools:</text>
+  <text class="label small" x="740" y="396">get_discount_context, get_activity_context</text>
+  <text class="label small" x="740" y="416">get_sales_context</text>
+
+  <rect class="node specialist" x="890" y="320" width="240" height="90" />
+  <text class="label" x="1010" y="348">context_analyst</text>
+  <text class="label small" x="1010" y="374">tools:</text>
+  <text class="label small" x="1010" y="396">get_calendar_weather_context</text>
+  <text class="label small" x="1010" y="416">get_peer_store_context, get_sales_context</text>
+
+  <rect class="node manager" x="430" y="500" width="340" height="80" />
+  <text class="label" x="600" y="528">manager_analyst</text>
+  <text class="label small" x="600" y="554">synthesizes specialist memos into final RCA</text>
+
+  <rect class="node artifact" x="430" y="640" width="340" height="80" />
+  <text class="label" x="600" y="668">artifact_writer</text>
+  <text class="label small" x="600" y="694">save report, traces, specialist memos, event logs</text>
+
+  <path class="edge" d="M 600 112 L 600 160" />
+  <path class="edge" d="M 600 232 L 190 320" />
+  <path class="edge" d="M 600 232 L 460 320" />
+  <path class="edge" d="M 600 232 L 740 320" />
+  <path class="edge" d="M 600 232 L 1010 320" />
+  <path class="edge" d="M 190 410 L 520 500" />
+  <path class="edge" d="M 460 410 L 560 500" />
+  <path class="edge" d="M 740 410 L 640 500" />
+  <path class="edge" d="M 1010 410 L 680 500" />
+  <path class="edge" d="M 600 580 L 600 640" />
+
+  <text class="legend" x="70" y="735">Blue = manager/workflow nodes   Green = parallel specialists   Yellow = saved artifacts</text>
+</svg>
