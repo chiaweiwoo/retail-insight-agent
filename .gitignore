@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+*.pyo
+*.pyd
+*.log
+*.tmp
+*.wal
+
+# Local raw source data stays out of Git.
+data/raw/*.parquet
