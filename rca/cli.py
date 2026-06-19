@@ -220,6 +220,18 @@ def _cmd_export(args: argparse.Namespace) -> None:
     print(f"UI data exported to {output_path}")
 
 
+def _cmd_profile(args: argparse.Namespace) -> None:
+    from rca.context import build_context_pack
+    from rca.config import CONTEXT_PACK_PATH
+
+    print("Building context pack from data/rca.duckdb...")
+    build_context_pack()
+    md_path = CONTEXT_PACK_PATH.with_suffix(".md")
+    print(f"Written: {CONTEXT_PACK_PATH}")
+    print(f"Written: {md_path}")
+    print("Review context_pack.md to confirm no tier labels or ID assumptions.")
+
+
 def _cmd_runs(args: argparse.Namespace) -> None:
     import json
     import sys
@@ -336,6 +348,13 @@ def main() -> None:
         help="Refresh ui/public/evidence_data.json for the Vite evidence viewer",
     )
     export_parser.set_defaults(func=_cmd_export)
+
+    # rca profile
+    profile_parser = subparsers.add_parser(
+        "profile",
+        help="Build data/context_pack.json and context_pack.md from the local DuckDB",
+    )
+    profile_parser.set_defaults(func=_cmd_profile)
 
     # rca runs
     runs_parser = subparsers.add_parser(

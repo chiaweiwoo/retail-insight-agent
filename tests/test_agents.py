@@ -35,12 +35,15 @@ class FakeResponse:
 
 
 class SpecialistCompletions:
+    last_messages = None
+
     def __init__(self, tool_name: str, actor_name: str) -> None:
         self.calls = 0
         self.tool_name = tool_name
         self.actor_name = actor_name
 
     def create(self, **kwargs):
+        SpecialistCompletions.last_messages = kwargs.get("messages")
         self.calls += 1
         if self.calls == 1:
             return FakeResponse(
@@ -72,7 +75,10 @@ class SpecialistCompletions:
 
 
 class CoordinatorCompletions:
+    last_messages = None
+
     def create(self, **kwargs):
+        CoordinatorCompletions.last_messages = kwargs.get("messages")
         return FakeResponse(
             choices=[
                 FakeChoice(
@@ -155,3 +161,31 @@ def test_coordinator_quick_mode_uses_sales_analyst_only(tmp_path) -> None:
     assert "## Trigger" in result.coordinator_report_markdown
     assert len(result.analyst_results) == 1
     assert result.analyst_results[0].name == "sales_analyst"
+
+
+def test_context_preamble_is_injected_into_specialist_and_coordinator_prompts(tmp_path) -> None:
+    sales_spec = next(s for s in ANALYST_SPECS if s.name == "sales_analyst")
+
+    def client_factory(actor_name: str):
+        if actor_name == "coordinator_analyst":
+            return FakeClient(CoordinatorCompletions())
+        return FakeClient(SpecialistCompletions("get_signal_evidence", actor_name))
+
+    run_coordinator(
+        store_alias="h555",
+        dt="2024-05-16",
+        specialists=[sales_spec],
+        settings=LLMSettings(
+            api_key="test-key",
+            base_url="https://api.deepseek.com",
+            model="deepseek-v4-flash",
+            thinking_enabled=False,
+        ),
+        client_factory=client_factory,
+        output_dir=tmp_path / "scenario",
+    )
+    specialist_system = SpecialistCompletions.last_messages[0]["content"]
+    coordinator_system = CoordinatorCompletions.last_messages[0]["content"]
+    assert "GROUNDING CONTEXT" in specialist_system
+    assert "opaque anonymized identifiers" in specialist_system
+    assert "GROUNDING CONTEXT" in coordinator_system

@@ -1,0 +1,308 @@
+{
+  "dataset": {
+    "source": "FreshRetailNet-50K (anonymized 2024 dataset)",
+    "stores": 15,
+    "days": 90,
+    "date_min": "2024-03-28",
+    "date_max": "2024-06-25",
+    "granularity": "store-day",
+    "note": "Store aliases, city IDs, and product IDs are opaque anonymized identifiers. Do not assign business meaning to them beyond what is computed from the data. holiday_name_inferred values are themselves inferred — treat as uncertain priors."
+  },
+  "fleet": {
+    "avg_daily_sales": 103.06,
+    "weekday_avg_sales": {
+      "friday": 98.12,
+      "monday": 98.6,
+      "saturday": 117.23,
+      "sunday": 120.02,
+      "thursday": 89.55,
+      "tuesday": 103.25,
+      "wednesday": 93.94
+    },
+    "weekend_vs_weekday_avg_sales": {
+      "weekday": 96.73,
+      "weekend": 118.62
+    }
+  },
+  "store_prefix_empirical": {
+    "description": "Average daily sales grouped by the first letter of store_alias. This is a computed grouping only — the prefix is an opaque identifier and is NOT labelled as a tier or size category.",
+    "by_prefix": {
+      "h": 188.36,
+      "l": 36.71,
+      "m": 84.11
+    }
+  },
+  "per_store_normal": {
+    "h018": {
+      "store_alias": "h018",
+      "avg_daily_sales": 187.54,
+      "stddev_daily_sales": 25.85,
+      "min_daily_sales": 130.27,
+      "max_daily_sales": 253.57
+    },
+    "h182": {
+      "store_alias": "h182",
+      "avg_daily_sales": 191.89,
+      "stddev_daily_sales": 30.51,
+      "min_daily_sales": 148.2,
+      "max_daily_sales": 274.6
+    },
+    "h235": {
+      "store_alias": "h235",
+      "avg_daily_sales": 194.56,
+      "stddev_daily_sales": 30.36,
+      "min_daily_sales": 138.77,
+      "max_daily_sales": 270.8
+    },
+    "h263": {
+      "store_alias": "h263",
+      "avg_daily_sales": 193.42,
+      "stddev_daily_sales": 28.23,
+      "min_daily_sales": 141.67,
+      "max_daily_sales": 254.7
+    },
+    "h555": {
+      "store_alias": "h555",
+      "avg_daily_sales": 174.37,
+      "stddev_daily_sales": 21.29,
+      "min_daily_sales": 126.23,
+      "max_daily_sales": 220.05
+    },
+    "l164": {
+      "store_alias": "l164",
+      "avg_daily_sales": 35.5,
+      "stddev_daily_sales": 6.56,
+      "min_daily_sales": 22.6,
+      "max_daily_sales": 53.47
+    },
+    "l165": {
+      "store_alias": "l165",
+      "avg_daily_sales": 36.88,
+      "stddev_daily_sales": 7.5,
+      "min_daily_sales": 22.3,
+      "max_daily_sales": 57.2
+    },
+    "l175": {
+      "store_alias": "l175",
+      "avg_daily_sales": 34.28,
+      "stddev_daily_sales": 5.54,
+      "min_daily_sales": 23.04,
+      "max_daily_sales": 47.6
+    },
+    "l185": {
+      "store_alias": "l185",
+      "avg_daily_sales": 37.59,
+      "stddev_daily_sales": 7.97,
+      "min_daily_sales": 25.5,
+      "max_daily_sales": 55.3
+    },
+    "l260": {
+      "store_alias": "l260",
+      "avg_daily_sales": 39.28,
+      "stddev_daily_sales": 7.05,
+      "min_daily_sales": 24.55,
+      "max_daily_sales": 62.9
+    },
+    "m041": {
+      "store_alias": "m041",
+      "avg_daily_sales": 84.41,
+      "stddev_daily_sales": 20.51,
+      "min_daily_sales": 48.57,
+      "max_daily_sales": 146.4
+    },
+    "m236": {
+      "store_alias": "m236",
+      "avg_daily_sales": 82.97,
+      "stddev_daily_sales": 15.45,
+      "min_daily_sales": 53.56,
+      "max_daily_sales": 122.78
+    },
+    "m386": {
+      "store_alias": "m386",
+      "avg_daily_sales": 82.86,
+      "stddev_daily_sales": 14.85,
+      "min_daily_sales": 48.24,
+      "max_daily_sales": 112.84
+    },
+    "m648": {
+      "store_alias": "m648",
+      "avg_daily_sales": 84.99,
+      "stddev_daily_sales": 14.51,
+      "min_daily_sales": 61.68,
+      "max_daily_sales": 127.1
+    },
+    "m679": {
+      "store_alias": "m679",
+      "avg_daily_sales": 85.34,
+      "stddev_daily_sales": 13.45,
+      "min_daily_sales": 62.0,
+      "max_daily_sales": 122.5
+    }
+  },
+  "holidays_in_window": [
+    {
+      "dt": "2024-03-30",
+      "name_inferred": "weekend",
+      "note": "Inferred from project date rules; source dataset only provides holiday_flag."
+    },
+    {
+      "dt": "2024-03-31",
+      "name_inferred": "weekend",
+      "note": "Inferred from project date rules; source dataset only provides holiday_flag."
+    },
+    {
+      "dt": "2024-04-04",
+      "name_inferred": "qingming_period",
+      "note": "Inferred from project date rules; source dataset only provides holiday_flag."
+    },
+    {
+      "dt": "2024-04-05",
+      "name_inferred": "qingming_period",
+      "note": "Inferred from project date rules; source dataset only provides holiday_flag."
+    },
+    {
+      "dt": "2024-04-06",
+      "name_inferred": "qingming_period",
+      "note": "Inferred from project date rules; source dataset only provides holiday_flag."
+    },
+    {
+      "dt": "2024-04-13",
+      "name_inferred": "weekend",
+      "note": "Inferred from project date rules; source dataset only provides holiday_flag."
+    },
+    {
+      "dt": "2024-04-14",
+      "name_inferred": "weekend",
+      "note": "Inferred from project date rules; source dataset only provides holiday_flag."
+    },
+    {
+      "dt": "2024-04-20",
+      "name_inferred": "weekend",
+      "note": "Inferred from project date rules; source dataset only provides holiday_flag."
+    },
+    {
+      "dt": "2024-04-21",
+      "name_inferred": "weekend",
+      "note": "Inferred from project date rules; source dataset only provides holiday_flag."
+    },
+    {
+      "dt": "2024-04-27",
+      "name_inferred": "weekend",
+      "note": "Inferred from project date rules; source dataset only provides holiday_flag."
+    },
+    {
+      "dt": "2024-04-28",
+      "name_inferred": "weekend",
+      "note": "Inferred from project date rules; source dataset only provides holiday_flag."
+    },
+    {
+      "dt": "2024-05-01",
+      "name_inferred": "labor_day_period",
+      "note": "Inferred from project date rules; source dataset only provides holiday_flag."
+    },
+    {
+      "dt": "2024-05-02",
+      "name_inferred": "labor_day_period",
+      "note": "Inferred from project date rules; source dataset only provides holiday_flag."
+    },
+    {
+      "dt": "2024-05-03",
+      "name_inferred": "labor_day_period",
+      "note": "Inferred from project date rules; source dataset only provides holiday_flag."
+    },
+    {
+      "dt": "2024-05-04",
+      "name_inferred": "labor_day_period",
+      "note": "Inferred from project date rules; source dataset only provides holiday_flag."
+    },
+    {
+      "dt": "2024-05-05",
+      "name_inferred": "labor_day_period",
+      "note": "Inferred from project date rules; source dataset only provides holiday_flag."
+    },
+    {
+      "dt": "2024-05-11",
+      "name_inferred": "weekend",
+      "note": "Inferred from project date rules; source dataset only provides holiday_flag."
+    },
+    {
+      "dt": "2024-05-12",
+      "name_inferred": "weekend",
+      "note": "Inferred from project date rules; source dataset only provides holiday_flag."
+    },
+    {
+      "dt": "2024-05-18",
+      "name_inferred": "weekend",
+      "note": "Inferred from project date rules; source dataset only provides holiday_flag."
+    },
+    {
+      "dt": "2024-05-19",
+      "name_inferred": "weekend",
+      "note": "Inferred from project date rules; source dataset only provides holiday_flag."
+    },
+    {
+      "dt": "2024-05-25",
+      "name_inferred": "weekend",
+      "note": "Inferred from project date rules; source dataset only provides holiday_flag."
+    },
+    {
+      "dt": "2024-05-26",
+      "name_inferred": "weekend",
+      "note": "Inferred from project date rules; source dataset only provides holiday_flag."
+    },
+    {
+      "dt": "2024-06-01",
+      "name_inferred": "weekend",
+      "note": "Inferred from project date rules; source dataset only provides holiday_flag."
+    },
+    {
+      "dt": "2024-06-02",
+      "name_inferred": "weekend",
+      "note": "Inferred from project date rules; source dataset only provides holiday_flag."
+    },
+    {
+      "dt": "2024-06-08",
+      "name_inferred": "dragon_boat_period",
+      "note": "Inferred from project date rules; source dataset only provides holiday_flag."
+    },
+    {
+      "dt": "2024-06-09",
+      "name_inferred": "dragon_boat_period",
+      "note": "Inferred from project date rules; source dataset only provides holiday_flag."
+    },
+    {
+      "dt": "2024-06-10",
+      "name_inferred": "dragon_boat_period",
+      "note": "Inferred from project date rules; source dataset only provides holiday_flag."
+    },
+    {
+      "dt": "2024-06-15",
+      "name_inferred": "weekend",
+      "note": "Inferred from project date rules; source dataset only provides holiday_flag."
+    },
+    {
+      "dt": "2024-06-16",
+      "name_inferred": "weekend",
+      "note": "Inferred from project date rules; source dataset only provides holiday_flag."
+    },
+    {
+      "dt": "2024-06-22",
+      "name_inferred": "weekend",
+      "note": "Inferred from project date rules; source dataset only provides holiday_flag."
+    },
+    {
+      "dt": "2024-06-23",
+      "name_inferred": "weekend",
+      "note": "Inferred from project date rules; source dataset only provides holiday_flag."
+    }
+  ],
+  "provenance": {
+    "built_from": "C:\\Users\\chiaw\\OneDrive\\Desktop\\playground\\retail_insight_agent\\data\\rca.duckdb",
+    "limitations": [
+      "No cost, margin, or product-category data available.",
+      "No real-time or external data — this is a historical anonymized dataset.",
+      "Treat all context as a weak prior, not ground truth.",
+      "The analysis window is fixed: 2024-03-28 to 2024-06-25."
+    ]
+  }
+}

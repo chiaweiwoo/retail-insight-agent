@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from threading import Lock
@@ -75,20 +76,6 @@ class RunLogger:
 
     def write_to_db(self, db_path: Path) -> None:
         db_path.parent.mkdir(parents=True, exist_ok=True)
-        con = duckdb.connect(str(db_path))
-        con.execute("""
-            CREATE TABLE IF NOT EXISTS run_log_event (
-                seq        INTEGER NOT NULL,
-                timestamp_sgt TEXT NOT NULL,
-                run_name   TEXT NOT NULL,
-                actor_type TEXT NOT NULL,
-                actor_name TEXT NOT NULL,
-                action     TEXT NOT NULL,
-                subject    TEXT NOT NULL,
-                source     TEXT NOT NULL,
-                details_json TEXT NOT NULL
-            )
-        """)
         rows = [
             (
                 event["seq"],
@@ -103,5 +90,29 @@ class RunLogger:
             )
             for event in self.events
         ]
-        con.executemany("INSERT INTO run_log_event VALUES (?,?,?,?,?,?,?,?,?)", rows)
-        con.close()
+        for attempt in range(5):
+            con = None
+            try:
+                con = duckdb.connect(str(db_path))
+                con.execute("""
+                    CREATE TABLE IF NOT EXISTS run_log_event (
+                        seq        INTEGER NOT NULL,
+                        timestamp_sgt TEXT NOT NULL,
+                        run_name   TEXT NOT NULL,
+                        actor_type TEXT NOT NULL,
+                        actor_name TEXT NOT NULL,
+                        action     TEXT NOT NULL,
+                        subject    TEXT NOT NULL,
+                        source     TEXT NOT NULL,
+                        details_json TEXT NOT NULL
+                    )
+                """)
+                con.executemany("INSERT INTO run_log_event VALUES (?,?,?,?,?,?,?,?,?)", rows)
+                return
+            except duckdb.IOException:
+                if attempt == 4:
+                    raise
+                time.sleep(0.1 * (attempt + 1))
+            finally:
+                if con is not None:
+                    con.close()

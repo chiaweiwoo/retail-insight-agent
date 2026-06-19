@@ -12,6 +12,7 @@ from rca.config import (
     DEFAULT_LLM_MAX_TOOL_ROUNDS,
     LOG_DB_PATH,
 )
+from rca.context import build_context_preamble
 from rca.llm import (
     LLMSettings,
     build_chat_completion_kwargs,
@@ -208,7 +209,10 @@ def _run_specialist(
         details={"focus": spec.focus},
     )
     messages: list[dict[str, Any]] = [
-        {"role": "system", "content": spec.system_prompt},
+        {
+            "role": "system",
+            "content": build_context_preamble(store_alias, dt) + "\n" + spec.system_prompt,
+        },
         {
             "role": "user",
             "content": (
@@ -331,7 +335,10 @@ def _synthesize(
         for result in analyst_results
     )
     messages = [
-        {"role": "system", "content": COORDINATOR_SYSTEM_PROMPT},
+        {
+            "role": "system",
+            "content": build_context_preamble(store_alias, dt) + "\n" + COORDINATOR_SYSTEM_PROMPT,
+        },
         {
             "role": "user",
             "content": (
