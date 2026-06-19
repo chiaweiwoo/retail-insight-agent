@@ -22,69 +22,123 @@ Current implemented milestones:
 
 ```text
 retail-insight-agent/
-  AGENTS.md
-  README.md
-  docs/
-    PRD.md
-    UI_PLAN.md
-  data/
-    raw/
-      train.parquet
-      train_metadata.json
-    db/
-      rca_foundry.duckdb
-  scripts/
-    ingest_daily_tables.py
-    run_rca_agent.py
-    run_rca_manager.py
-    run_rca_benchmarks.py
-    export_ui_data.py
-    validate_daily_tables.py
-  sql/
-    migrations/
-      001_create_daily_tables.sql
-    queries/
-      preview_store_day.sql
-  src/
-    rca_foundry/
-      __init__.py
-      agent.py
-      config.py
-      db.py
-      ingestion.py
-      llm.py
-      multi_agent.py
-      query.py
-      rca_tools.py
-      run_logging.py
-      validation.py
-  tests/
-    test_agent.py
-    test_benchmarks.py
-    test_multi_agent.py
-    test_query.py
-    test_rca_tools.py
-    test_run_logging.py
-    test_validation.py
-  ui/
-    public/
-      evidence_data.json
-    src/
-      main.js
-      style.css
+│
+├── AGENTS.md                    # Agent guardrails and out-of-scope boundaries
+├── CLAUDE.md                    # AI session routing — points to README and AGENTS.md
+├── README.md                    # Primary project doc (this file)
+│
+├── data/
+│   ├── raw/
+│   │   ├── train.parquet        # Source dataset (FreshRetailNet-50K, city_id=0); not committed
+│   │   └── train_metadata.json  # Column descriptions for the raw parquet
+│   ├── db/
+│   │   ├── rca_foundry.duckdb   # Analytical DB — dimension and fact tables; committed as test artifact
+│   │   └── run_logs.duckdb      # Pipeline run event log — persisted across runs; not committed
+│   └── analysis/
+│       ├── store_day_sales_signals.csv      # Per-store per-day signal metrics (pct changes, baselines)
+│       ├── pct_trigger_by_store.csv         # Per-store trigger counts at each threshold
+│       ├── pct_trigger_by_date.csv          # Per-date trigger counts at each threshold
+│       ├── pct_trigger_overall_summary.csv  # Fleet-level summary (triggered store-days, drop/lift split)
+│       ├── signal_distribution_summary.csv  # Distribution of signal magnitudes
+│       ├── signal_threshold_grid.csv        # Grid of drop/lift counts across pct × abs threshold pairs
+│       ├── store_signal_stability.csv       # How consistently each store triggers across thresholds
+│       ├── trigger_grids/
+│       │   └── trailing_7d_pct_trigger_grid_NN.csv  # Store × date grid (D/L/.) at threshold NN%
+│       └── agent_benchmark_runs/
+│           └── <timestamp>/                 # One folder per benchmark batch run
+│               ├── README.md                #   Manifest with scenario links
+│               ├── manifest.json            #   Machine-readable summary rows
+│               └── <scenario_id>/
+│                   ├── report.md            #   Manager RCA report (markdown)
+│                   ├── report.html          #   Manager RCA report (rendered)
+│                   ├── manager_trace.json   #   Full payload: specialist memos + manager output
+│                   ├── trace.json           #   Benchmark payload including signal snapshot and metadata
+│                   └── specialists/
+│                       ├── <analyst>.md     #   Per-specialist memo (markdown)
+│                       └── <analyst>.html   #   Per-specialist memo (rendered)
+│
+├── docs/
+│   ├── PRD.md                   # Product requirements and milestone definitions
+│   ├── UI_PLAN.md               # Evidence viewer design notes
+│   ├── images/
+│   │   └── agent_runtime_dag.svg  # Visual of the manager–specialist DAG
+│   └── analysis/
+│       ├── rca_test_scenarios.md     # Fixed benchmark scenario definitions
+│       └── agent_benchmark_review.md # Qualitative review notes across benchmark runs
+│
+├── scripts/
+│   ├── ingest_daily_tables.py   # Load train.parquet → rca_foundry.duckdb (dimension + fact tables)
+│   ├── validate_daily_tables.py # Assert row counts and schema correctness against expected values
+│   ├── analyze_sales_signals.py # Compute drop/lift signals, write to data/analysis/
+│   ├── export_ui_data.py        # Export evidence JSON for the UI evidence viewer
+│   ├── build_dashboard.py       # Generate ui/dashboard.html from analysis CSVs + run_logs.duckdb
+│   ├── run_rca_agent.py         # Single-agent RCA for one store/date (quick debug path)
+│   ├── run_rca_manager.py       # Full manager–specialist pipeline for one store/date
+│   ├── run_rca_benchmarks.py    # Batch benchmark across fixed scenarios; saves artifacts to data/analysis/
+│   └── show_runs.py             # Print recent pipeline runs from run_logs.duckdb (terminal table)
+│
+├── sql/
+│   ├── migrations/
+│   │   └── 001_create_daily_tables.sql  # Schema for all dimension and fact tables in rca_foundry.duckdb
+│   └── queries/
+│       └── preview_store_day.sql        # Ad-hoc query for inspecting a store/date slice
+│
+├── src/
+│   └── rca_foundry/
+│       ├── __init__.py          # Package marker
+│       ├── config.py            # Paths, constants, env loading, LLM settings helpers
+│       ├── db.py                # DuckDB connect/rebuild helpers
+│       ├── ingestion.py         # Raw parquet → DuckDB ingestion logic
+│       ├── validation.py        # Table-level row count and schema assertions
+│       ├── signals.py           # Signal label computation (drop/lift/neutral) over sales data
+│       ├── query.py             # Read-only DuckDB query helpers for evidence retrieval
+│       ├── rca_tools.py         # LLM tool function definitions (get_signal_evidence etc.)
+│       ├── llm.py               # OpenAI-compatible client builder and chat completion helpers
+│       ├── agent.py             # Single-agent RCA loop (tool-calling agent, no manager)
+│       ├── multi_agent.py       # Manager–specialist pipeline: parallel specialists + manager synthesis
+│       ├── run_logging.py       # RunLogger — collects events during a run, writes to run_logs.duckdb
+│       └── render.py            # Markdown → HTML rendering for report artifacts
+│
+├── tests/
+│   ├── test_agent.py            # Unit tests for the single-agent loop
+│   ├── test_benchmarks.py       # Tests for benchmark scenario helpers
+│   ├── test_multi_agent.py      # Tests for the manager–specialist pipeline
+│   ├── test_query.py            # Tests for query helpers
+│   ├── test_rca_tools.py        # Tests for tool functions
+│   ├── test_run_logging.py      # Tests for RunLogger event capture and serialisation
+│   └── test_validation.py       # Tests for table validation logic
+│
+└── ui/
+    ├── dashboard.html           # Generated signal dashboard — rebuild with build_dashboard.py
+    ├── public/
+    │   └── evidence_data.json   # Exported evidence data for the evidence viewer
+    └── src/
+        ├── main.js              # Evidence viewer JS
+        └── style.css            # Evidence viewer styles
 ```
 
 ## Commands
 
 ```bash
+# Setup
 uv sync
-uv run python scripts/ingest_daily_tables.py
-uv run python scripts/validate_daily_tables.py
-uv run python scripts/analyze_sales_signals.py
+
+# Data pipeline
+uv run python scripts/ingest_daily_tables.py       # load parquet → DuckDB
+uv run python scripts/validate_daily_tables.py     # assert row counts and schema
+uv run python scripts/analyze_sales_signals.py     # compute drop/lift signals → data/analysis/
+
+# Run the agent
+uv run python scripts/run_rca_agent.py --store h555 --dt 2024-05-16    # single-agent
+uv run python scripts/run_rca_manager.py --store h555 --dt 2024-05-16  # manager pipeline
+uv run python scripts/run_rca_benchmarks.py                             # full benchmark batch
+
+# View results
+uv run python scripts/show_runs.py                 # print recent run history (terminal table)
+uv run python scripts/build_dashboard.py           # rebuild ui/dashboard.html
+
+# Tests
 uv run pytest
-uv run python scripts/run_rca_agent.py --store h555 --dt 2024-05-16
-uv run python scripts/run_rca_manager.py --store h555 --dt 2024-05-16
-uv run python scripts/run_rca_benchmarks.py
 ```
 
 ## Environment
@@ -173,37 +227,25 @@ This is the common shape people usually use for this style of agent system:
 
 ### Logs And Artifacts
 
-Live benchmark batch outputs are saved under `data/analysis/agent_benchmark_runs/`.
+Every pipeline run writes events to `data/db/run_logs.duckdb` (table `run_log_event`). The DB is created automatically on first run and persists across runs.
 
-Each scenario folder now includes:
+Each event row captures: `seq`, `timestamp_sgt`, `run_name`, `actor_type`, `actor_name`, `action`, `subject`, `source`, `details_json`.
 
-- `report.md`
-- `report.html`
-- `manager_trace.json`
-- `specialists/*.md`
-- `specialists/*.html`
-- `logs/event_log.jsonl`
-- `logs/event_log.md`
+Visible event types per run: `workflow.started`, `agent.started`, `llm.completion_requested`, `agent.tool_call_started`, `tool.completed`, `agent.completed`, `llm.completion_finished`, `workflow.completed`.
 
-Each log event captures:
+To see a summary table of recent runs in the terminal:
 
-- timestamp
-- actor type
-- actor name
-- action
-- subject
-- source
-- details
+```bash
+uv run python scripts/show_runs.py
+```
 
-So you can see:
+Benchmark runs also save file artifacts under `data/analysis/agent_benchmark_runs/<timestamp>/`:
 
-- workflow started
-- specialist started
-- LLM completion requested
-- tool call started
-- tool completed
-- specialist completed
-- manager completed
+- `<scenario_id>/report.md` and `report.html` — manager RCA report
+- `<scenario_id>/manager_trace.json` — full payload (specialist memos + manager output)
+- `<scenario_id>/trace.json` — benchmark payload (signal snapshot, model, metadata)
+- `<scenario_id>/specialists/<analyst>.md` and `.html` — per-specialist memos
+- `README.md` and `manifest.json` — run manifest with links to each scenario
 
 ### Current Limitations
 

@@ -6,7 +6,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Callable
 
-from rca_foundry.config import DEFAULT_LLM_MAX_TOOL_ROUNDS
+from rca_foundry.config import DEFAULT_LLM_MAX_TOOL_ROUNDS, LOG_DB_PATH
 from rca_foundry.llm import (
     LLMSettings,
     build_chat_completion_kwargs,
@@ -378,8 +378,12 @@ def run_manager_analyst_pipeline(
         action="completed",
         subject=subject,
         source="system",
-        details={"analyst_count": len(analyst_results)},
+        details={
+            "analyst_count": len(analyst_results),
+            "output_dir": str(output_dir) if output_dir is not None else None,
+        },
     )
+    logger.write_to_db(LOG_DB_PATH)
 
     if output_dir is not None:
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -409,7 +413,6 @@ def run_manager_analyst_pipeline(
             ),
             encoding="utf-8",
         )
-        logger.write_artifacts(output_dir / "logs")
         payload = {
             "store_alias": store_alias,
             "dt": dt,

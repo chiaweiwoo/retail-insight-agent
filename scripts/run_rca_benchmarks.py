@@ -96,18 +96,17 @@ def _build_manifest_markdown(
         "",
         "## Scenario Outputs",
         "",
-        "| scenario_id | expected_signal | observed_signal | store_alias | dt | analysts | tool_call_count | report_md | report_html | trace | logs |",
-        "| --- | --- | --- | --- | --- | ---: | ---: | --- | --- | --- | --- |",
+        "| scenario_id | expected_signal | observed_signal | store_alias | dt | analysts | tool_call_count | report_md | report_html | trace |",
+        "| --- | --- | --- | --- | --- | ---: | ---: | --- | --- | --- |",
     ]
     for row in summary_rows:
         scenario_dir = run_dir / str(row["scenario_id"])
         report_path = scenario_dir / "report.md"
         report_html_path = scenario_dir / "report.html"
         trace_path = scenario_dir / "manager_trace.json"
-        log_path = scenario_dir / "logs" / "event_log.md"
         lines.append(
             "| {scenario_id} | {expected_signal} | {observed_signal} | {store_alias} | {dt} | {analyst_count} | {tool_call_count} | "
-            "[report.md]({report}) | [report.html]({report_html}) | [trace]({trace}) | [logs]({log_path}) |".format(
+            "[report.md]({report}) | [report.html]({report_html}) | [trace]({trace}) |".format(
                 scenario_id=row["scenario_id"],
                 expected_signal=row["expected_signal"],
                 observed_signal=row["observed_signal"],
@@ -118,7 +117,6 @@ def _build_manifest_markdown(
                 report=report_path.relative_to(run_dir).as_posix(),
                 report_html=report_html_path.relative_to(run_dir).as_posix(),
                 trace=trace_path.relative_to(run_dir).as_posix(),
-                log_path=log_path.relative_to(run_dir).as_posix(),
             )
         )
     lines.extend(

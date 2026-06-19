@@ -6,6 +6,8 @@ from pathlib import Path
 from threading import Lock
 from typing import Any
 
+import duckdb
+
 from rca_foundry.config import current_timestamp_sgt_iso
 
 
@@ -71,7 +73,35 @@ class RunLogger:
         lines.append("")
         return "\n".join(lines)
 
-    def write_artifacts(self, log_dir: Path) -> None:
-        log_dir.mkdir(parents=True, exist_ok=True)
-        (log_dir / "event_log.jsonl").write_text(self.to_jsonl(), encoding="utf-8")
-        (log_dir / "event_log.md").write_text(self.to_markdown(), encoding="utf-8")
+    def write_to_db(self, db_path: Path) -> None:
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        con = duckdb.connect(str(db_path))
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS run_log_event (
+                seq        INTEGER NOT NULL,
+                timestamp_sgt TEXT NOT NULL,
+                run_name   TEXT NOT NULL,
+                actor_type TEXT NOT NULL,
+                actor_name TEXT NOT NULL,
+                action     TEXT NOT NULL,
+                subject    TEXT NOT NULL,
+                source     TEXT NOT NULL,
+                details_json TEXT NOT NULL
+            )
+        """)
+        rows = [
+            (
+                event["seq"],
+                event["timestamp_sgt"],
+                event["run_name"],
+                event["actor_type"],
+                event["actor_name"],
+                event["action"],
+                event["subject"],
+                event["source"],
+                json.dumps(event["details"], ensure_ascii=False),
+            )
+            for event in self.events
+        ]
+        con.executemany("INSERT INTO run_log_event VALUES (?,?,?,?,?,?,?,?,?)", rows)
+        con.close()

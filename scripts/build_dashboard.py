@@ -1,11 +1,14 @@
-"""Generate a self-contained dashboard HTML from analysis CSVs."""
+"""Generate a self-contained dashboard HTML from analysis CSVs and run_logs.duckdb."""
 
 import csv
 import json
 import pathlib
 
+import duckdb
+
 ROOT = pathlib.Path(__file__).parent.parent
 ANALYSIS = ROOT / "data" / "analysis"
+LOG_DB_PATH = ROOT / "data" / "db" / "run_logs.duckdb"
 OUT = ROOT / "ui" / "dashboard.html"
 
 THRESHOLD = 20
@@ -42,7 +45,7 @@ def load_summary():
     return {}
 
 
-def build_html(stores, dates, cells, store_stats, summary):
+def build_html(stores, dates, cells, store_stats, summary, recent_runs=None):
     data = {
         "threshold": THRESHOLD,
         "stores": stores,
@@ -50,6 +53,7 @@ def build_html(stores, dates, cells, store_stats, summary):
         "cells": cells,
         "store_stats": store_stats,
         "summary": summary,
+        "recent_runs": recent_runs or [],
     }
     data_json = json.dumps(data)
 
@@ -108,6 +112,14 @@ def build_html(stores, dates, cells, store_stats, summary):
   .legend {{ display: flex; gap: 16px; margin-top: 16px; align-items: center; }}
   .legend-item {{ display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }}
   .legend-swatch {{ width: 12px; height: 12px; border-radius: 2px; }}
+  /* Recent runs */
+  .runs-table {{ width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 12px; }}
+  .runs-table th {{ text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border); color: var(--muted); font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }}
+  .runs-table td {{ padding: 7px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }}
+  .runs-table tr:last-child td {{ border-bottom: none; }}
+  .run-name {{ font-family: monospace; color: var(--text); }}
+  .run-path {{ color: var(--muted); font-family: monospace; font-size: 11px; word-break: break-all; }}
+  .no-runs {{ color: var(--muted); font-size: 12px; padding: 12px 0; }}
 </style>
 </head>
 <body>
@@ -132,6 +144,9 @@ def build_html(stores, dates, cells, store_stats, summary):
     <div class="legend-item"><div class="legend-swatch" style="background:var(--lift)"></div>Lift (&gt;{THRESHOLD}% above 7d avg)</div>
     <div class="legend-item"><div class="legend-swatch" style="background:var(--neutral)"></div>No signal</div>
   </div>
+
+  <p class="section-title" style="margin-top:32px">Recent pipeline runs</p>
+  <div id="runs-section"></div>
 </div>
 
 <script>
@@ -184,6 +199,29 @@ const DATA = {data_json};
     `;
     barsEl.appendChild(row);
   }});
+
+  // Recent runs
+  const runsEl = document.getElementById("runs-section");
+  if (!DATA.recent_runs || DATA.recent_runs.length === 0) {{
+    runsEl.innerHTML = '<p class="no-runs">No runs logged yet. Run the pipeline to populate.</p>';
+  }} else {{
+    const t = document.createElement("table");
+    t.className = "runs-table";
+    t.innerHTML = `<thead><tr>
+      <th>Run</th><th>Started (SGT)</th><th>Events</th><th>Output path</th>
+    </tr></thead>`;
+    const tbody = t.createTBody();
+    DATA.recent_runs.forEach(r => {{
+      const tr = tbody.insertRow();
+      tr.innerHTML = `
+        <td class="run-name">${{r.run_name}}</td>
+        <td>${{r.started_at}}</td>
+        <td style="text-align:right">${{r.events}}</td>
+        <td class="run-path">${{r.output_dir || "—"}}</td>
+      `;
+    }});
+    runsEl.appendChild(t);
+  }}
 
   // Grid
   const table = document.getElementById("grid-table");
@@ -242,11 +280,44 @@ const DATA = {data_json};
 """
 
 
+def load_recent_runs(limit=20):
+    if not LOG_DB_PATH.exists():
+        return []
+    con = duckdb.connect(str(LOG_DB_PATH), read_only=True)
+    rows = con.execute(f"""
+        SELECT
+            run_name,
+            MIN(timestamp_sgt) AS started_at,
+            COUNT(*)           AS events,
+            MAX(CASE WHEN action = 'completed' AND actor_name = 'manager_pipeline'
+                     THEN details_json END) AS completed_json
+        FROM run_log_event
+        GROUP BY run_name
+        ORDER BY MIN(timestamp_sgt) DESC
+        LIMIT {limit}
+    """).fetchall()
+    con.close()
+    result = []
+    for run_name, started_at, events, completed_json in rows:
+        output_dir = None
+        if completed_json:
+            details = json.loads(completed_json)
+            output_dir = details.get("output_dir")
+        result.append({
+            "run_name": run_name,
+            "started_at": started_at,
+            "events": events,
+            "output_dir": output_dir,
+        })
+    return result
+
+
 def main():
     stores, dates, cells = load_grid()
     store_stats = load_store_stats()
     summary = load_summary()
-    html = build_html(stores, dates, cells, store_stats, summary)
+    recent_runs = load_recent_runs()
+    html = build_html(stores, dates, cells, store_stats, summary, recent_runs)
     OUT.write_text(html, encoding="utf-8")
     print(f"Dashboard written to {OUT}")
 
