@@ -80,6 +80,12 @@ FACT_TABLES = [
 
 CONTEXT_PACK_PATH = PROJECT_ROOT / "data" / "context_pack.json"
 
+SALES_FIELD_SEMANTICS = (
+    "sale_amount and hours_sale are normalized sales amounts multiplied by a specific "
+    "coefficient in the source dataset. Treat aggregated sales values as relative sales "
+    "amounts for comparison, not literal unit counts and not currency revenue."
+)
+
 CONFIDENCE_VOCAB = """
 Confidence levels — use these exact terms, no others:
 - HIGH: multiple independent evidence points align; the number clears its threshold with margin; alternative explanations are weak.

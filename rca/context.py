@@ -12,7 +12,7 @@ from typing import Any
 
 import duckdb
 
-from rca.config import CONTEXT_PACK_PATH, DB_PATH, DATE_START, DATE_END
+from rca.config import CONTEXT_PACK_PATH, DB_PATH, DATE_START, DATE_END, SALES_FIELD_SEMANTICS
 
 
 def build_context_pack(db_path: Path = DB_PATH, output_path: Path = CONTEXT_PACK_PATH) -> dict[str, Any]:
@@ -106,7 +106,8 @@ def build_context_pack(db_path: Path = DB_PATH, output_path: Path = CONTEXT_PACK
             "note": (
                 "Store aliases, city IDs, and product IDs are opaque anonymized identifiers. "
                 "Do not assign business meaning to them beyond what is computed from the data. "
-                "holiday_name_inferred values are themselves inferred — treat as uncertain priors."
+                "holiday_name_inferred values are themselves inferred — treat as uncertain priors. "
+                + SALES_FIELD_SEMANTICS
             ),
         },
         "fleet": {
@@ -131,6 +132,7 @@ def build_context_pack(db_path: Path = DB_PATH, output_path: Path = CONTEXT_PACK
                 "No real-time or external data — this is a historical anonymized dataset.",
                 "Treat all context as a weak prior, not ground truth.",
                 "The analysis window is fixed: 2024-03-28 to 2024-06-25.",
+                SALES_FIELD_SEMANTICS,
             ],
         },
     }
@@ -164,6 +166,7 @@ def build_context_preamble(store_alias: str, dt: str, pack: dict[str, Any] | Non
         return (
             "CONTEXT: Dataset is FreshRetailNet-50K, anonymized 2024 retail data. "
             "Store aliases and product IDs are opaque — do not assume business meaning. "
+            f"{SALES_FIELD_SEMANTICS} "
             f"Analysis date is {dt}; do not reference events after the data window.\n"
         )
 
@@ -177,6 +180,7 @@ def build_context_preamble(store_alias: str, dt: str, pack: dict[str, Any] | Non
         f"({dataset['date_min']} to {dataset['date_max']}), store-day granularity.",
         f"- Store aliases, city IDs, and product IDs are opaque anonymized identifiers. "
         f"Do not assign business meaning beyond what the numbers show.",
+        f"- {SALES_FIELD_SEMANTICS}",
         f"- Fleet average daily sales: {fleet['avg_daily_sales']}.",
     ]
 
