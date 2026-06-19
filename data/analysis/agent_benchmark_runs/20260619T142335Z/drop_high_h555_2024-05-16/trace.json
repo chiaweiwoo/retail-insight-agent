@@ -1,0 +1,280 @@
+{
+  "scenario": {
+    "scenario_id": "drop_high_h555_2024-05-16",
+    "tier": "high",
+    "expected_signal": "drop",
+    "store_alias": "h555",
+    "dt": "2024-05-16"
+  },
+  "run_started_at_utc": "20260619T142335Z",
+  "model_name": "deepseek-v4-flash",
+  "signal_snapshot": {
+    "store_alias": "h555",
+    "dt": "2024-05-16",
+    "metric": "trailing_7d_pct_change",
+    "signal_label": "drop",
+    "thresholds": {
+      "drop_lte_pct": -20.0,
+      "lift_gte_pct": 30.0
+    },
+    "current_sales": 131.91,
+    "previous_day_sales": 154.43,
+    "trailing_7d_avg_sales": 175.6329,
+    "same_weekday_4w_avg_sales": 151.03,
+    "day_over_day_pct_change": -14.5827,
+    "trailing_7d_pct_change": -24.8945,
+    "same_weekday_4w_pct_change": -12.6597,
+    "weekday": "thursday",
+    "holiday_name_inferred": "normal_weekday"
+  },
+  "tool_call_count": 8,
+  "tool_calls": [
+    {
+      "id": "call_00_21HLElp6mZ8hJwGcLcXh6078",
+      "name": "get_signal_evidence",
+      "arguments": {
+        "store_alias": "h555",
+        "dt": "2024-05-16"
+      },
+      "result": {
+        "store_alias": "h555",
+        "dt": "2024-05-16",
+        "metric": "trailing_7d_pct_change",
+        "signal_label": "drop",
+        "thresholds": {
+          "drop_lte_pct": -20.0,
+          "lift_gte_pct": 30.0
+        },
+        "current_sales": 131.91,
+        "previous_day_sales": 154.43,
+        "trailing_7d_avg_sales": 175.6329,
+        "same_weekday_4w_avg_sales": 151.03,
+        "day_over_day_pct_change": -14.5827,
+        "trailing_7d_pct_change": -24.8945,
+        "same_weekday_4w_pct_change": -12.6597,
+        "weekday": "thursday",
+        "holiday_name_inferred": "normal_weekday"
+      }
+    },
+    {
+      "id": "call_01_hhCCrHPcC9cxyNwOoowh8287",
+      "name": "get_sales_context",
+      "arguments": {
+        "store_alias": "h555",
+        "dt": "2024-05-16",
+        "history_days": 14
+      },
+      "result": {
+        "store_alias": "h555",
+        "dt": "2024-05-16",
+        "history_window_days": 14,
+        "current_total_sales": 131.91,
+        "history": [
+          {
+            "dt": "2024-05-02",
+            "total_sales": 126.23,
+            "weekday": "thursday",
+            "holiday_name_inferred": "labor_day_period"
+          },
+          {
+            "dt": "2024-05-03",
+            "total_sales": 143.16,
+            "weekday": "friday",
+            "holiday_name_inferred": "labor_day_period"
+          },
+          {
+            "dt": "2024-05-04",
+            "total_sales": 169.23,
+            "weekday": "saturday",
+            "holiday_name_inferred": "labor_day_period"
+          },
+          {
+            "dt": "2024-05-05",
+            "total_sales": 203.49,
+            "weekday": "sunday",
+            "holiday_name_inferred": "labor_day_period"
+          },
+          {
+            "dt": "2024-05-06",
+            "total_sales": 175.77,
+            "weekday": "monday",
+            "holiday_name_inferred": "normal_weekday"
+          },
+          {
+            "dt": "2024-05-07",
+            "total_sales": 176.36,
+            "weekday": "tuesday",
+            "holiday_name_inferred": "normal_weekday"
+          },
+          {
+            "dt": "2024-05-08",
+            "total_sales": 149.48,
+            "weekday": "wednesday",
+            "holiday_name_inferred": "normal_weekday"
+          },
+          {
+            "dt": "2024-05-09",
+            "total_sales": 160.0,
+            "weekday": "thursday",
+            "holiday_name_inferred": "normal_weekday"
+          },
+          {
+            "dt": "2024-05-10",
+            "total_sales": 173.59,
+            "weekday": "friday",
+            "holiday_name_inferred": "normal_weekday"
+          },
+          {
+            "dt": "2024-05-11",
+            "total_sales": 188.97,
+            "weekday": "saturday",
+            "holiday_name_inferred": "weekend"
+          },
+          {
+            "dt": "2024-05-12",
+            "total_sales": 217.71,
+            "weekday": "sunday",
+            "holiday_name_inferred": "weekend"
+          },
+          {
+            "dt": "2024-05-13",
+            "total_sales": 167.0,
+            "weekday": "monday",
+            "holiday_name_inferred": "normal_weekday"
+          },
+          {
+            "dt": "2024-05-14",
+            "total_sales": 167.73,
+            "weekday": "tuesday",
+            "holiday_name_inferred": "normal_weekday"
+          },
+          {
+            "dt": "2024-05-15",
+            "total_sales": 154.43,
+            "weekday": "wednesday",
+            "holiday_name_inferred": "normal_weekday"
+          },
+          {
+            "dt": "2024-05-16",
+            "total_sales": 131.91,
+            "weekday": "thursday",
+            "holiday_name_inferred": "normal_weekday"
+          }
+        ],
+        "sales_baselines": {
+          "previous_day_sales": 154.43,
+          "trailing_7d_avg_sales": 175.6329,
+          "same_weekday_4w_avg_sales": 151.03
+        }
+      }
+    },
+    {
+      "id": "call_02_LHBW8LnuZ8XK9RePSinG1413",
+      "name": "get_stockout_context",
+      "arguments": {
+        "store_alias": "h555",
+        "dt": "2024-05-16"
+      },
+      "result": {
+        "store_alias": "h555",
+        "dt": "2024-05-16",
+        "avg_stockout_hours": 2.9592,
+        "stockout_product_rate": 0.3673,
+        "severe_stockout_product_rate": 0.1769,
+        "full_stockout_product_rate": 0.0408,
+        "hourly_stockout_rate_peak": 0.3401,
+        "current_total_sales": 131.91,
+        "recent_avg_sales": 175.6329
+      }
+    },
+    {
+      "id": "call_03_pOcDtk0SBnx61FkD8VxG1412",
+      "name": "get_discount_context",
+      "arguments": {
+        "store_alias": "h555",
+        "dt": "2024-05-16"
+      },
+      "result": {
+        "store_alias": "h555",
+        "dt": "2024-05-16",
+        "avg_discount": 0.9239,
+        "discounted_product_rate": 0.483,
+        "deep_discount_product_rate": 0.0
+      }
+    },
+    {
+      "id": "call_04_iYdmuQB8vLbcwQ1rUeSI9889",
+      "name": "get_activity_context",
+      "arguments": {
+        "store_alias": "h555",
+        "dt": "2024-05-16"
+      },
+      "result": {
+        "store_alias": "h555",
+        "dt": "2024-05-16",
+        "activity_product_rate": 0.3878,
+        "activity_sales_share": 0.3824
+      }
+    },
+    {
+      "id": "call_05_VncquKagkOlOkBI7AZx26005",
+      "name": "get_calendar_weather_context",
+      "arguments": {
+        "store_alias": "h555",
+        "dt": "2024-05-16"
+      },
+      "result": {
+        "store_alias": "h555",
+        "dt": "2024-05-16",
+        "weekday": "thursday",
+        "is_weekend": false,
+        "holiday_name_inferred": "normal_weekday",
+        "holiday_flag": false,
+        "precpt": 1.8895,
+        "avg_temperature": 23.2042,
+        "avg_humidity": 70.3865,
+        "avg_wind_level": 1.6728
+      }
+    },
+    {
+      "id": "call_06_7AKZraU7y5pdCcNgvmVr6239",
+      "name": "get_peer_store_context",
+      "arguments": {
+        "store_alias": "h555",
+        "dt": "2024-05-16"
+      },
+      "result": {
+        "store_alias": "h555",
+        "dt": "2024-05-16",
+        "store_tier": "h",
+        "store_total_sales": 131.91,
+        "tier_avg_sales_same_day": 161.288,
+        "overall_avg_sales_same_day": 87.352,
+        "overall_rank_same_day": 5,
+        "overall_store_count": 15,
+        "tier_rank_same_day": 5,
+        "tier_store_count": 5
+      }
+    },
+    {
+      "id": "call_00_grOuzCfME3TkCKMI52iz4351",
+      "name": "get_stockout_context",
+      "arguments": {
+        "store_alias": "h555",
+        "dt": "2024-05-15"
+      },
+      "result": {
+        "store_alias": "h555",
+        "dt": "2024-05-15",
+        "avg_stockout_hours": 2.1088,
+        "stockout_product_rate": 0.381,
+        "severe_stockout_product_rate": 0.0952,
+        "full_stockout_product_rate": 0.0068,
+        "hourly_stockout_rate_peak": 0.3673,
+        "current_total_sales": 154.43,
+        "recent_avg_sales": 174.9257
+      }
+    }
+  ],
+  "report_markdown": "Here's the full analysis.\n\n---\n\n## Root Cause Analysis — Store h555, 2024-05-16\n\n### 1. Trigger\n\n**Signal: Drop.** The store's trailing-7-day sales average was $175.63 vs. $131.91 on the trigger day, yielding a **-24.89% change**, well below the -20% drop threshold. Day-over-day sales also fell -14.6% ($154.43 -> $131.91), and the same-weekday-4-week comparison shows -12.7%.\n\n### 2. Likely Drivers\n\n1. **Elevated stockouts — the most probable primary cause.** The store experienced a severe stockout day with 36.7% of products out of stock at some point, 17.7% in severe stockout, and an average stockout duration of ~3 hours per affected product. This is a marked deterioration from the prior day (May 15: 38.1% stockout rate but only 9.5% severe and ~2.1 avg hours). The severe stockout rate nearly doubled (9.5% -> 17.7%) and the average stockout hours increased by ~40%.\n\n2. **No discount or promotional lift to compensate.** Discount depth was modest (avg discount ~7.6% off, no deep discounts at 0%), and the promotional activity rate (~39% of products) was not strong enough to offset the lost availability—promo activity sales share (38.2%) roughly mirrors the activity rate, suggesting no outsized pull.\n\n3. **Weather was unfavorable.** Precipitation of ~1.89 mm and moderate temperatures (23.2°C) may have slightly dampened foot traffic, but this is weak as a standalone explanation given the peer comparison below.\n\n### 3. Evidence\n\n| Dimension | Value | Indication |\n|---|---|---|\n| **Sales trigger** | Trailing 7d: -24.9%, DoD: -14.6%, 4W-same-wkday: -12.7% | Clear drop across all baselines |\n| **Stockout (May 16)** | 36.7% products affected; avg 3.0 hrs out; 17.7% severe | **High and worsening** vs. May 15 (9.5% severe, 2.1 hrs avg) |\n| **Discounts** | Avg discount factor 0.924 (~7.6% off); 0% deep discount | No pricing lever used to offset |\n| **Promotions** | 38.8% activity product rate; 38.2% activity sales share | Promo activity matches share — no disproportionate pull |\n| **Weather** | 1.89mm precip; 23.2°C; normal Thursday | Light rain, not extreme, but possibly mildly negative |\n| **Holiday** | Normal weekday (Thursday) | No calendar effect |\n| **Peer comparison** | Store $131.91 vs. tier average $161.29 (tier rank 5/5) | **Worst in its tier**; overall rank 5/15 — peers did better |\n| **Prior-day stockout (May 15)** | 38.1% affected, 9.5% severe, 2.1 hrs avg | Stockouts existed before but **severity escalated** on May 16 |\n\n**Key peer insight:** The store was the worst performer in its own tier (5th out of 5) and below the overall average ($87.35) — but that overall average includes lower-tier stores. The tier average of $161.29 confirms most similar stores sold ~22% more. This reduces the likelihood that the drop was purely weather-driven (peers would share same weather) and points to a **local operational issue** — most likely stockouts.\n\n### 4. Caveats\n\n- **Stockout may be both cause and consequence.** Lower customer traffic could reduce the observed stockout pressure, but the increase in severe stockout rate (9.5% -> 17.7%) and longer average hours suggest a genuine product availability issue rather than a demand-driven artifact.\n- The cause of the stockouts is unknown — could be a delivery gap, a replenishment error, or supplier failure. The tools do not distinguish.\n- The prior day (May 15) already had elevated stockout rates (38.1%) but sales were $154.43, suggesting that the jump in **severity** on May 16 (not just breadth) was the critical factor.\n- Weather (light rain) could have contributed modestly, but peers in the same region who faced the same weather averaged $161.29, so weather alone is insufficient to explain the gap.\n\n### 5. Suggested Next Checks\n\n1. **Investigate replenishment/delivery records** for May 15-16. Determine if a scheduled delivery was missed or late, explaining the worsening stockout severity.\n2. **Drill into top stockout categories** — identify whether the stockouts were concentrated in high-traffic/high-margin items (e.g., perishables, key staples) which would have the largest sales impact.\n3. **Check staffing levels** on May 16. Understaffing could delay restocking from back-of-house, converting moderate stockouts into severe ones.\n4. **Review the May 15 evening close inventory** — if shelf gaps were already present overnight, the May 16 morning starting position would have been poor.\n5. **Compare stockout severity by hour** — if peak stockout hours coincide with typical high-traffic periods (e.g., late afternoon), that would amplify the sales loss."
+}
