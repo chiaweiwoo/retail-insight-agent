@@ -7,6 +7,8 @@ __pycache__/
 *.log
 *.tmp
 *.wal
+ui/node_modules/
+ui/dist/
 
 # Local raw source data stays out of Git.
 data/raw/*.parquet
