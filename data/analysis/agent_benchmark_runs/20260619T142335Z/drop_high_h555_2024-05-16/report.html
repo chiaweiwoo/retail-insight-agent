@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RCA report for drop_high_h555_2024-05-16</title>
+  <style>
+body {
+  margin: 0;
+  background: #f8fafc;
+  color: #0f172a;
+  font-family: Arial, Helvetica, sans-serif;
+}
+main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 32px 24px 48px;
+}
+article {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 32px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+h1, h2, h3 {
+  color: #0f172a;
+}
+h1 {
+  margin-top: 0;
+}
+code {
+  background: #e2e8f0;
+  border-radius: 4px;
+  padding: 0.15em 0.35em;
+}
+pre {
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 10px;
+  padding: 16px;
+  overflow-x: auto;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 16px 0;
+}
+th, td {
+  border: 1px solid #cbd5e1;
+  padding: 10px 12px;
+  text-align: left;
+  vertical-align: top;
+}
+th {
+  background: #e2e8f0;
+}
+blockquote {
+  border-left: 4px solid #94a3b8;
+  margin-left: 0;
+  padding-left: 16px;
+  color: #334155;
+}
+</style>
+</head>
+<body>
+  <main>
+    <article>
+      <p>Here's the full analysis.</p>
+<hr />
+<h2>Root Cause Analysis — Store h555, 2024-05-16</h2>
+<h3>1. Trigger</h3>
+<p><strong>Signal: Drop.</strong> The store's trailing-7-day sales average was $175.63 vs. $131.91 on the trigger day, yielding a <strong>-24.89% change</strong>, well below the -20% drop threshold. Day-over-day sales also fell -14.6% ($154.43 -&gt; $131.91), and the same-weekday-4-week comparison shows -12.7%.</p>
+<h3>2. Likely Drivers</h3>
+<ol>
+<li>
+<p><strong>Elevated stockouts — the most probable primary cause.</strong> The store experienced a severe stockout day with 36.7% of products out of stock at some point, 17.7% in severe stockout, and an average stockout duration of ~3 hours per affected product. This is a marked deterioration from the prior day (May 15: 38.1% stockout rate but only 9.5% severe and ~2.1 avg hours). The severe stockout rate nearly doubled (9.5% -&gt; 17.7%) and the average stockout hours increased by ~40%.</p>
+</li>
+<li>
+<p><strong>No discount or promotional lift to compensate.</strong> Discount depth was modest (avg discount ~7.6% off, no deep discounts at 0%), and the promotional activity rate (~39% of products) was not strong enough to offset the lost availability—promo activity sales share (38.2%) roughly mirrors the activity rate, suggesting no outsized pull.</p>
+</li>
+<li>
+<p><strong>Weather was unfavorable.</strong> Precipitation of ~1.89 mm and moderate temperatures (23.2°C) may have slightly dampened foot traffic, but this is weak as a standalone explanation given the peer comparison below.</p>
+</li>
+</ol>
+<h3>3. Evidence</h3>
+<table>
+<thead>
+<tr>
+<th>Dimension</th>
+<th>Value</th>
+<th>Indication</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Sales trigger</strong></td>
+<td>Trailing 7d: -24.9%, DoD: -14.6%, 4W-same-wkday: -12.7%</td>
+<td>Clear drop across all baselines</td>
+</tr>
+<tr>
+<td><strong>Stockout (May 16)</strong></td>
+<td>36.7% products affected; avg 3.0 hrs out; 17.7% severe</td>
+<td><strong>High and worsening</strong> vs. May 15 (9.5% severe, 2.1 hrs avg)</td>
+</tr>
+<tr>
+<td><strong>Discounts</strong></td>
+<td>Avg discount factor 0.924 (~7.6% off); 0% deep discount</td>
+<td>No pricing lever used to offset</td>
+</tr>
+<tr>
+<td><strong>Promotions</strong></td>
+<td>38.8% activity product rate; 38.2% activity sales share</td>
+<td>Promo activity matches share — no disproportionate pull</td>
+</tr>
+<tr>
+<td><strong>Weather</strong></td>
+<td>1.89mm precip; 23.2°C; normal Thursday</td>
+<td>Light rain, not extreme, but possibly mildly negative</td>
+</tr>
+<tr>
+<td><strong>Holiday</strong></td>
+<td>Normal weekday (Thursday)</td>
+<td>No calendar effect</td>
+</tr>
+<tr>
+<td><strong>Peer comparison</strong></td>
+<td>Store $131.91 vs. tier average $161.29 (tier rank 5/5)</td>
+<td><strong>Worst in its tier</strong>; overall rank 5/15 — peers did better</td>
+</tr>
+<tr>
+<td><strong>Prior-day stockout (May 15)</strong></td>
+<td>38.1% affected, 9.5% severe, 2.1 hrs avg</td>
+<td>Stockouts existed before but <strong>severity escalated</strong> on May 16</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Key peer insight:</strong> The store was the worst performer in its own tier (5th out of 5) and below the overall average ($87.35) — but that overall average includes lower-tier stores. The tier average of $161.29 confirms most similar stores sold ~22% more. This reduces the likelihood that the drop was purely weather-driven (peers would share same weather) and points to a <strong>local operational issue</strong> — most likely stockouts.</p>
+<h3>4. Caveats</h3>
+<ul>
+<li><strong>Stockout may be both cause and consequence.</strong> Lower customer traffic could reduce the observed stockout pressure, but the increase in severe stockout rate (9.5% -&gt; 17.7%) and longer average hours suggest a genuine product availability issue rather than a demand-driven artifact.</li>
+<li>The cause of the stockouts is unknown — could be a delivery gap, a replenishment error, or supplier failure. The tools do not distinguish.</li>
+<li>The prior day (May 15) already had elevated stockout rates (38.1%) but sales were $154.43, suggesting that the jump in <strong>severity</strong> on May 16 (not just breadth) was the critical factor.</li>
+<li>Weather (light rain) could have contributed modestly, but peers in the same region who faced the same weather averaged $161.29, so weather alone is insufficient to explain the gap.</li>
+</ul>
+<h3>5. Suggested Next Checks</h3>
+<ol>
+<li><strong>Investigate replenishment/delivery records</strong> for May 15-16. Determine if a scheduled delivery was missed or late, explaining the worsening stockout severity.</li>
+<li><strong>Drill into top stockout categories</strong> — identify whether the stockouts were concentrated in high-traffic/high-margin items (e.g., perishables, key staples) which would have the largest sales impact.</li>
+<li><strong>Check staffing levels</strong> on May 16. Understaffing could delay restocking from back-of-house, converting moderate stockouts into severe ones.</li>
+<li><strong>Review the May 15 evening close inventory</strong> — if shelf gaps were already present overnight, the May 16 morning starting position would have been poor.</li>
+<li><strong>Compare stockout severity by hour</strong> — if peak stockout hours coincide with typical high-traffic periods (e.g., late afternoon), that would amplify the sales loss.</li>
+</ol>
+    </article>
+  </main>
+</body>
+</html>

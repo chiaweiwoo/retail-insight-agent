@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>signal_analyst memo for lift_medium_m041_2024-05-12</title>
+  <style>
+body {
+  margin: 0;
+  background: #f8fafc;
+  color: #0f172a;
+  font-family: Arial, Helvetica, sans-serif;
+}
+main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 32px 24px 48px;
+}
+article {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 32px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+h1, h2, h3 {
+  color: #0f172a;
+}
+h1 {
+  margin-top: 0;
+}
+code {
+  background: #e2e8f0;
+  border-radius: 4px;
+  padding: 0.15em 0.35em;
+}
+pre {
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 10px;
+  padding: 16px;
+  overflow-x: auto;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 16px 0;
+}
+th, td {
+  border: 1px solid #cbd5e1;
+  padding: 10px 12px;
+  text-align: left;
+  vertical-align: top;
+}
+th {
+  background: #e2e8f0;
+}
+blockquote {
+  border-left: 4px solid #94a3b8;
+  margin-left: 0;
+  padding-left: 16px;
+  color: #334155;
+}
+</style>
+</head>
+<body>
+  <main>
+    <article>
+      <p>Here is the specialist memo.</p>
+<hr />
+<h2>1. Scope</h2>
+<p><strong>Store:</strong> m041 | <strong>Date:</strong> 2024-05-12 (Sunday) | <strong>Signal:</strong> Lift (trailing-7d % change)</p>
+<p>Review of signal validity, baseline comparisons, and recent sales shape.</p>
+<hr />
+<h2>2. Findings</h2>
+<p><strong>Signal Status — Valid Lift</strong>
+- The store fired a <strong>lift signal</strong> (trailing-7d % change = +77.3%, well above the +30% threshold).
+- Day-over-day: +64.5% ($89.0 → $146.4), the largest single-day jump in the 14-day window.
+- Same-weekday vs. 4wk average: +43.0% above the typical Sunday ($102.37 → $146.40). This is a genuine lift, not just a weekday artifact.</p>
+<p><strong>Baseline Comparisons</strong>
+| Baseline | Value | vs. Current ($146.4) |
+|---|---|---|
+| Previous Day (Sat 05/11) | $89.0 | +64.5% |
+| Trailing 7d Avg | $82.56 | +77.3% |
+| Same Weekday 4wk Avg (Sun) | $102.37 | +43.0% |</p>
+<p>All three baselines are directionally consistent — the $146.4 result is well above every reference point.</p>
+<p><strong>Recent Sales Shape</strong>
+- The store had been trading in a $57–$95 range for most of the prior 14 days.
+- A notable ramp-up occurred over the recent <strong>labor_day_period</strong> (May 1–5): sales climbed from ~$95 (May 1, Sat) to $116.48 (May 5, Sun).
+- After a mild dip May 6–10 (range $57–$84), the last two days (Sat 05/11 = $89, Sun 05/12 = $146.4) have broken upward sharply.
+- This shape suggests <strong>acceleration</strong> — a higher local peak than the prior labor-day weekend peak.</p>
+<p><strong>No signal validity concerns.</strong> The lift is broad-based across all comparison baselines and is not an artifact of a single weak comparison period.</p>
+<hr />
+<h2>3. Caveats</h2>
+<ul>
+<li>The signal does not identify <strong>what</strong> drove the lift. No evidence on stockout, discount, activity, weather, or peer behavior was examined.</li>
+<li>The labor_day_period (May 1–5) overlaps part of the trailing-7d window, which lifts the baseline slightly; however, the current day still exceeds that period's highest Sunday ($116.48) by ~26%, confirming the lift is not purely a baseline composition effect.</li>
+<li>This is a single-day observation; one more data point would clarify whether the lift sustains or reverts.</li>
+</ul>
+    </article>
+  </main>
+</body>
+</html>

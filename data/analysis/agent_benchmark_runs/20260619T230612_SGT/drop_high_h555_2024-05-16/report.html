@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RCA report for h555 on 2024-05-16</title>
+  <style>
+body {
+  margin: 0;
+  background: #f8fafc;
+  color: #0f172a;
+  font-family: Arial, Helvetica, sans-serif;
+}
+main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 32px 24px 48px;
+}
+article {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 32px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+h1, h2, h3 {
+  color: #0f172a;
+}
+h1 {
+  margin-top: 0;
+}
+code {
+  background: #e2e8f0;
+  border-radius: 4px;
+  padding: 0.15em 0.35em;
+}
+pre {
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 10px;
+  padding: 16px;
+  overflow-x: auto;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 16px 0;
+}
+th, td {
+  border: 1px solid #cbd5e1;
+  padding: 10px 12px;
+  text-align: left;
+  vertical-align: top;
+}
+th {
+  background: #e2e8f0;
+}
+blockquote {
+  border-left: 4px solid #94a3b8;
+  margin-left: 0;
+  padding-left: 16px;
+  color: #334155;
+}
+</style>
+</head>
+<body>
+  <main>
+    <article>
+      <h1>RCA Report: Store h555 — 2024-05-16</h1>
+<h2>1. Trigger</h2>
+<p>Signal DROP triggered: trailing-7-day-average sales change of <strong>−24.9%</strong> breached the −20% threshold. Current day sales <strong>$131.91</strong> is the lowest in the 14-day history window and is <strong>−12.7% below</strong> the same-weekday 4-week average ($151.03).</p>
+<h2>2. Likely Drivers</h2>
+<p><strong>Primary: Inventory availability degradation</strong>
+- Over one-third of products (36.7%) experienced stockout conditions; 17.7% had prolonged stockouts. The average product was unavailable for ~3 hours (2.96 hours).
+- At peak, 34.0% of the assortment was simultaneously unavailable.
+- Sales shortfall (~25% vs trailing avg) is directionally consistent with the breadth of stockouts.</p>
+<p><strong>Secondary but relevant: Weather headwind</strong>
+- 1.89mm precipitation, high humidity — plausible foot-traffic suppressant for a walk-in-heavy store.</p>
+<p><strong>Not supported as drivers:</strong>
+- Pricing/promotion: discounts were widespread (48.3% of SKUs) but shallow (avg 7.6% off); no deep discounts. Promotional activity (38.8% of products, 38.2% of sales) was moderate and routine.
+- Calendar: normal Thursday, no holiday.</p>
+<h2>3. Evidence</h2>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Value</th>
+<th>vs Current</th>
+<th>Gap</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Current sales</td>
+<td>$131.91</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Prior day (Wed 5/15)</td>
+<td>$154.43</td>
+<td>−14.6%</td>
+<td>−$22.52</td>
+</tr>
+<tr>
+<td>Trailing 7-day avg</td>
+<td>$175.63</td>
+<td>−24.9%</td>
+<td>−$43.72</td>
+</tr>
+<tr>
+<td>Same-weekday 4-wk avg (Thu)</td>
+<td>$151.03</td>
+<td>−12.7%</td>
+<td>−$19.12</td>
+</tr>
+<tr>
+<td>Prior Thu (5/9)</td>
+<td>$160.00</td>
+<td>−17.6%</td>
+<td>−$28.09</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>Sales trajectory</strong>: 5-day sequential decline from Sun ($217.71) → Mon ($167.00) → Tue ($167.73) → Wed ($154.43) → Thu ($131.91). Multi-day softening, not a one-day crash.</li>
+<li><strong>Peer underperformance</strong>: h555 ranks 5th of 5 in its Tier H, <strong>−18.2% below tier average</strong> ($161.29). Decline started before the rainy day (since Sunday), pointing to a store-specific issue.</li>
+<li><strong>Inventory</strong>: stockout product rate 36.7%, severe rate 17.7%, hourly peak 34.0%, full stockout 4.1%.</li>
+<li><strong>Pricing</strong>: average discount factor 0.9239 (~7.6% off), deep discount rate 0.0%. Promo sales share (38.2%) aligns with promo product rate (38.8%).</li>
+<li><strong>Weather</strong>: wet (1.89mm precipitation, ~23°C, ~70% humidity).</li>
+</ul>
+<h2>4. Caveats</h2>
+<ul>
+<li><strong>Correlation vs causation</strong>: Stockout metrics show correlation with the sales drop but cannot prove causality. Stockouts could result from unanticipated demand exceeding supply, or cause lost sales from insufficient inventory.</li>
+<li><strong>No category-level granularity</strong>: Aggregate stockout metrics may mask a specific category or top-SKU issue driving most of the revenue impact.</li>
+<li><strong>Baseline contamination</strong>: The trailing 7-day average includes days that may themselves have had stockouts — the true "unconstrained demand" gap could be larger than measured.</li>
+<li><strong>Weather is ambiguous</strong>: Precipitation likely suppressed foot traffic, but peers in the same weather region outperformed h555. The multi-day slide (starting Sunday, before the rain) suggests store-level factors dominate.</li>
+<li><strong>No staffing, local event, or competitor data</strong>: These could provide alternative explanations for the decline.</li>
+<li><strong>Residual Labor Day effects</strong>: Prior 14-day history includes Labor Day period (May 2–5), which may slightly influence trailing averages, though the recent 5-day downtrend is clear regardless.</li>
+</ul>
+<h2>5. Suggested Next Checks</h2>
+<ol>
+<li>
+<p><strong>Category/SKU-level drill-down</strong>: Identify which specific products or categories drove the 36.7% stockout rate. Is it top sellers or low-velocity items? Revenue impact attribution by category.</p>
+</li>
+<li>
+<p><strong>Inventory ordering vs demand pattern</strong>: Check whether stockouts resulted from under-ordering (chronic issue) or demand spike (transient). Compare replenishment cadence with sell-through rates.</p>
+</li>
+<li>
+<p><strong>Store operations check</strong>: Given the multi-day decline and last-in-tier performance, investigate staffing levels, operating hours compliance, or local disruptions (construction, road closures, competitor activity) at h555.</p>
+</li>
+<li>
+<p><strong>Foot traffic data</strong>: If available, validate whether the sales decline is mirrored in traffic (consistent with stockout/traffic cause) or driven by conversion drop (consistent with pricing/promotion or assortment issues).</p>
+</li>
+<li>
+<p><strong>Weather impact quantification</strong>: Compare h555's performance vs tier peers on rainy days vs dry days to isolate weather contribution from store-specific factors.</p>
+</li>
+</ol>
+    </article>
+  </main>
+</body>
+</html>

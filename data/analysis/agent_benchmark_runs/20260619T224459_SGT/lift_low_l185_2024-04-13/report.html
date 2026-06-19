@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RCA report for lift_low_l185_2024-04-13</title>
+  <style>
+body {
+  margin: 0;
+  background: #f8fafc;
+  color: #0f172a;
+  font-family: Arial, Helvetica, sans-serif;
+}
+main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 32px 24px 48px;
+}
+article {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 32px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+h1, h2, h3 {
+  color: #0f172a;
+}
+h1 {
+  margin-top: 0;
+}
+code {
+  background: #e2e8f0;
+  border-radius: 4px;
+  padding: 0.15em 0.35em;
+}
+pre {
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 10px;
+  padding: 16px;
+  overflow-x: auto;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 16px 0;
+}
+th, td {
+  border: 1px solid #cbd5e1;
+  padding: 10px 12px;
+  text-align: left;
+  vertical-align: top;
+}
+th {
+  background: #e2e8f0;
+}
+blockquote {
+  border-left: 4px solid #94a3b8;
+  margin-left: 0;
+  padding-left: 16px;
+  color: #334155;
+}
+</style>
+</head>
+<body>
+  <main>
+    <article>
+      <p>Now I have a comprehensive picture. Let me compile the report.</p>
+<hr />
+<h1>Root Cause Analysis Report</h1>
+<h2>1. Trigger</h2>
+<p><strong>Signal:</strong> Lift (trailing 7-day +54.3%, day-over-day +38.4%)<br />
+<strong>Store:</strong> l185 | <strong>Date:</strong> 2024-04-13 (Saturday)<br />
+<strong>Current Sales:</strong> $49.40<br />
+<strong>Trailing 7-day Average:</strong> $32.03<br />
+<strong>Previous Day (Friday) Sales:</strong> $35.70  </p>
+<p>The signal is a <strong>strong lift</strong>. Sales are well above both the recent trailing average and the immediate prior day.</p>
+<h2>2. Likely Drivers</h2>
+<ul>
+<li><strong>Promotional activity</strong> is the most plausible primary driver. Nearly half of sales (48.4%) came from promoted products, and 36.6% of all products were on some form of promotion.</li>
+<li><strong>Moderate discounting</strong> (avg. discount ~8%, with 46.3% of products discounted) supports the activity-driven explanation, though no deep discounts were applied.</li>
+<li><strong>Weekend effect</strong> (Saturday) may have contributed a modest natural lift, but the prior Saturday (2024-03-30) had sales of only $33.9, suggesting the weekend alone cannot explain the magnitude.</li>
+<li><strong>Stockouts are elevated</strong> (68.3% of products had stockout hours, avg. 5.85 hours out-of-stock), but this is likely a <strong>consequence</strong> of higher-than-normal sales drawing down inventory, rather than a cause of the lift.</li>
+</ul>
+<h2>3. Evidence</h2>
+<table>
+<thead>
+<tr>
+<th>Evidence Source</th>
+<th>Finding</th>
+<th>Interpretation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Signal &amp; Sales History</strong></td>
+<td>Sales $49.4 vs 7d avg $32.03 (+54%). Prior Saturdays: 2024-03-30 = $33.9, 2024-04-06 = $41.5 (both lower).</td>
+<td>Clear upward break from recent pattern; Saturday alone cannot explain the full gap.</td>
+</tr>
+<tr>
+<td><strong>Discounts</strong></td>
+<td>Avg discount 0.9209 (~8% off); 46.3% of products discounted; no deep discounts.</td>
+<td>Moderate discount breadth, not aggressive price-cutting.</td>
+</tr>
+<tr>
+<td><strong>Activity (Promotions)</strong></td>
+<td>36.6% of products on promo; <strong>48.4% of sales</strong> from promoted products.</td>
+<td>Strong promotional-pull: nearly half of revenue came from promoted items.</td>
+</tr>
+<tr>
+<td><strong>Stockouts</strong></td>
+<td>68.3% of products saw stockout; avg 5.85 hrs out-of-stock; severe stockouts on 39% of products.</td>
+<td>Elevated stockout levels are unusually high. Most consistent with inventory being depleted by strong demand rather than being a cause.</td>
+</tr>
+<tr>
+<td><strong>Peer comparison</strong></td>
+<td>Ranked #1 in its L-tier (5 stores, avg $40.06); #11 out of 15 overall (avg $116.82).</td>
+<td>l185 outperformed its tier peers substantially (+23% vs tier avg), but is a small store overall.</td>
+</tr>
+<tr>
+<td><strong>Calendar / Weather</strong></td>
+<td>Saturday (weekend); light rain (2.18mm precip); mild temp 18.4C.</td>
+<td>Weather is unremarkable — not likely a driver or detractor.</td>
+</tr>
+<tr>
+<td><strong>Prior weekend (Apr 6) comparison</strong></td>
+<td>Same promo rate ~34%, discount rate ~39%, but activity sales share was only 34.5% (vs 48.4% on Apr 13).</td>
+<td>The promotion on Apr 13 was <strong>more effective</strong> at converting promoted sales, or the promotion mix shifted.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Causal inference:</strong> The evidence is most consistent with a <strong>promotional push</strong> that succeeded in driving incremental demand. The combination of 48.4% of sales coming from promoted products, a higher activity-to-sales conversion than the prior Saturday, and a 23% outperformance versus tier peers, all point to promotional effectiveness as the root cause.</p>
+<p><strong>Stockout counter-evidence:</strong> The high stockout rate (68% of products) might seem problematic, but in the context of a sales lift, it is better interpreted as demand-driven depletion. If stockouts had caused the lift (e.g., customers panic-buying due to perceived scarcity), we would expect a different pattern. The data cannot support that causal direction without additional checks.</p>
+<h2>4. Caveats</h2>
+<ul>
+<li><strong>No same-weekday-4w baseline</strong> was available, so we cannot compare to the exact same weekday from 4 weeks prior. The comparison relies on the trailing 7-day average and the prior Saturday (Mar 30).</li>
+<li><strong>Discount depth is unknown in granular detail.</strong> The average discount of ~8% is moderate, but without knowing which categories or SKUs were discounted, we cannot say whether the lift came from a few high-volume items or broad-based promotion.</li>
+<li><strong>Stockout evidence is ambiguous.</strong> While likely a consequence, it is possible that some stockouts on high-demand items constrained what would have been even higher sales. We cannot measure lost sales from stockouts with the current data.</li>
+<li><strong>Peer context</strong> shows l185 is a small store (#11 of 15 overall); the tier outperformance is notable but the absolute sales ($49.40) is still modest versus the overall average ($116.82).</li>
+</ul>
+<h2>5. Suggested Next Checks</h2>
+<ol>
+<li><strong>Category / SKU-level drill-down</strong> — Identify which product categories or specific SKUs drove the lift (especially among promoted items) to confirm whether this was a targeted promotion or broad-based.</li>
+<li><strong>Compare the promotion calendar</strong> — Check whether 2024-04-13 coincided with a specific event or marketing campaign (e.g., seasonal push, new product launch, local event) that triggered the promotional activity.</li>
+<li><strong>Stockout impact analysis</strong> — Examine whether the most-stocked-out items were the best-sellers, and whether the stockouts began later in the day (consistent with demand depletion) or early (consistent with supply failure).</li>
+<li><strong>Repeat check on next Saturday (2024-04-20)</strong> — Determine if the lift persists, which would indicate a sustained change (e.g., new pricing, new traffic driver) vs. a one-off promotional spike.</li>
+</ol>
+    </article>
+  </main>
+</body>
+</html>

@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RCA report for drop_low_l165_2024-05-16</title>
+  <style>
+body {
+  margin: 0;
+  background: #f8fafc;
+  color: #0f172a;
+  font-family: Arial, Helvetica, sans-serif;
+}
+main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 32px 24px 48px;
+}
+article {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 32px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+h1, h2, h3 {
+  color: #0f172a;
+}
+h1 {
+  margin-top: 0;
+}
+code {
+  background: #e2e8f0;
+  border-radius: 4px;
+  padding: 0.15em 0.35em;
+}
+pre {
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 10px;
+  padding: 16px;
+  overflow-x: auto;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 16px 0;
+}
+th, td {
+  border: 1px solid #cbd5e1;
+  padding: 10px 12px;
+  text-align: left;
+  vertical-align: top;
+}
+th {
+  background: #e2e8f0;
+}
+blockquote {
+  border-left: 4px solid #94a3b8;
+  margin-left: 0;
+  padding-left: 16px;
+  color: #334155;
+}
+</style>
+</head>
+<body>
+  <main>
+    <article>
+      <p>Now I have a comprehensive picture. Let me compile the analysis.</p>
+<h2>RCA Report: Store l165 – 2024-05-16</h2>
+<h3>1. Trigger</h3>
+<p><strong>Drop</strong> – The trailing 7-day average sales declined by <strong>-31.7%</strong> (from $37.17 to $25.38), far exceeding the -20% drop threshold. The day-over-day change from 2024-05-15 was also a sharp <strong>-24.2%</strong> ($33.50 to $25.38). The same-weekday (Thursday) 4-week comparison shows a milder decline of <strong>-9.5%</strong> (from $28.05 to $25.38), indicating the current day is low even relative to its typical Thursday baseline.</p>
+<h3>2. Likely Drivers</h3>
+<ol>
+<li>
+<p><strong>Stockouts</strong> – Most probable primary driver. Stockout metrics are elevated (27.3% of products had stockout events; 11.4% severe; peak hourly rate of 36.4%). This directly suppresses sales and aligns with the sudden day-over-day drop.</p>
+</li>
+<li>
+<p><strong>Calendar / Weather</strong> – Minor contributor, not a primary cause. 2024-05-16 is a normal Thursday with no holiday. However, 1.89 mm of precipitation and moderate temperature (23.2°C) may have a small dampening effect on foot traffic, but nothing severe.</p>
+</li>
+<li>
+<p><strong>Discount &amp; Activity</strong> – Not likely a driver of the <em>drop</em>. Discount penetration is moderate (47.8% of products discounted, average discount ~8% off), and promotional activity covers 40.9% of products with 39.4% of sales share. These factors would ordinarily <em>support</em> sales, so their presence does not explain the decline.</p>
+</li>
+<li>
+<p><strong>Peer/Store-tier Context</strong> – Store l165 is in tier "L" (lowest sales tier). Its $25.38 is below the tier average of $29.84, ranking 5th out of 5 in its tier. This confirms the underperformance is not merely a tier-wide trend – peers in the same tier averaged higher sales. The store also ranks last (15th out of 15) among all stores.</p>
+</li>
+</ol>
+<h3>3. Evidence</h3>
+<table>
+<thead>
+<tr>
+<th>Evidence</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Sales signal</strong></td>
+<td>Current = $25.38; Trailing 7d avg = $37.17 (-31.7%); Prior day = $33.50 (-24.2%); Same-weekday 4wk avg = $28.05 (-9.5%)</td>
+</tr>
+<tr>
+<td><strong>Stockouts</strong></td>
+<td>27.3% product rate; 11.4% severe; avg 1.86 hours of stockout per product; peak hourly rate 36.4%</td>
+</tr>
+<tr>
+<td><strong>Weather</strong></td>
+<td>1.89 mm precipitation; 23.2°C; typical for season, no extreme conditions</td>
+</tr>
+<tr>
+<td><strong>Calendar</strong></td>
+<td>Normal Thursday; no holiday</td>
+</tr>
+<tr>
+<td><strong>Discounts</strong></td>
+<td>47.8% of products discounted; avg discount 0.92 factor (~8% off); no deep discounts</td>
+</tr>
+<tr>
+<td><strong>Promo activity</strong></td>
+<td>40.9% product rate; 39.4% sales share – moderate promo presence</td>
+</tr>
+<tr>
+<td><strong>Peer comparison</strong></td>
+<td>Tier avg = $29.84; l165 at $25.38 is 5th of 5 in tier; 15th of 15 overall</td>
+</tr>
+</tbody>
+</table>
+<p>The stockout evidence is the most salient anomaly. The store had over a quarter of its products experience stockout on this day, with more than 1 in 10 products in severe stockout. This is consistent with a demand-fulfillment failure that would suppress sales below normal levels.</p>
+<h3>4. Caveats</h3>
+<ul>
+<li><strong>Correlation vs. causation</strong>: Stockouts could be both a cause and a consequence. If there was a demand surge earlier in the day that depleted inventory, the stockouts could partially reflect strong demand rather than poor replenishment. However, the overall sales being low suggests stockouts reduced total transaction volume rather than being caused by excessive demand.</li>
+<li><strong>Stockout timing</strong>: The data shows average stockout hours and peak rates but not the sequence – whether stockouts occurred early (choking sales all day) or late (after most sales were done).</li>
+<li><strong>No deep discounts</strong>: The absence of deep discounts (0.0%) means the store did not use aggressive markdowns to clear inventory, but this is a neutral observation, not a cause of the drop.</li>
+<li><strong>Precipitation (1.89 mm)</strong>: Light rain may reduce foot traffic slightly, but it is mild enough that it is unlikely to explain a ~25% day-over-day drop on its own.</li>
+<li><strong>Historical volatility</strong>: The same weekday 4-week baseline ($28.05) is itself lower than the trailing 7d avg ($37.17), suggesting Thursdays have been a softer day historically. The drop relative to that baseline is only -9.5%, which is notable but less dramatic than the trailing-7d view.</li>
+</ul>
+<h3>5. Suggested Next Checks</h3>
+<ol>
+<li><strong>Investigate specific stockout SKUs/categories</strong> – Identify which products or categories were heavily stocked out (especially severe stockouts at 11.4%). See if high-velocity or high-margin items were affected.</li>
+<li><strong>Check stockout timing pattern</strong> – Determine whether stockouts occurred early in the day (suggesting replenishment failure) or late (suggesting demand exceeded forecast). Hourly sales-by-hour data would clarify this.</li>
+<li><strong>Review inventory replenishment logs</strong> – Look for delivery delays, order errors, or supply chain issues specific to store l165 for the days leading up to 2024-05-16.</li>
+<li><strong>Examine the previous day (2024-05-15)</strong> – Sales on the prior day were $33.50, which is near the trailing 7d avg. Checking stockouts or anomalies on the 15th could reveal if inventory issues started earlier.</li>
+<li><strong>Analyze foot traffic / POS transaction counts</strong> – If available, transaction count vs. average basket size would help distinguish between fewer customers (traffic issue) vs. lower basket value (stockout-driven substitution or reduced choice).</li>
+</ol>
+    </article>
+  </main>
+</body>
+</html>

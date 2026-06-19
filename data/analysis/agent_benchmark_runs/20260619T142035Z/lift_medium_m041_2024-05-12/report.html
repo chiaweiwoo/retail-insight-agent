@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RCA report for lift_medium_m041_2024-05-12</title>
+  <style>
+body {
+  margin: 0;
+  background: #f8fafc;
+  color: #0f172a;
+  font-family: Arial, Helvetica, sans-serif;
+}
+main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 32px 24px 48px;
+}
+article {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 32px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+h1, h2, h3 {
+  color: #0f172a;
+}
+h1 {
+  margin-top: 0;
+}
+code {
+  background: #e2e8f0;
+  border-radius: 4px;
+  padding: 0.15em 0.35em;
+}
+pre {
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 10px;
+  padding: 16px;
+  overflow-x: auto;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 16px 0;
+}
+th, td {
+  border: 1px solid #cbd5e1;
+  padding: 10px 12px;
+  text-align: left;
+  vertical-align: top;
+}
+th {
+  background: #e2e8f0;
+}
+blockquote {
+  border-left: 4px solid #94a3b8;
+  margin-left: 0;
+  padding-left: 16px;
+  color: #334155;
+}
+</style>
+</head>
+<body>
+  <main>
+    <article>
+      <p>Excellent! I now have a comprehensive picture. Let me compile the analysis.</p>
+<hr />
+<h2>Root Cause Analysis — Store m041 | 2024-05-12</h2>
+<hr />
+<h3>1. Trigger</h3>
+<p><strong>Signal: LIFT</strong> — Sales of <strong>$146.40</strong> significantly exceeded expectations:
+- <strong>Day-over-day</strong>: +64.5% vs prior day ($89.00)
+- <strong>Trailing 7-day avg</strong>: +77.3% ($82.56 → $146.40)
+- <strong>Same-weekday 4-week avg</strong>: +43.0% ($102.37 → $146.40)</p>
+<p>This is a strong positive outlier — the store's best day in the trailing 7-day window by a wide margin.</p>
+<hr />
+<h3>2. Likely Drivers</h3>
+<ol>
+<li><strong>🥇 Promotional Activity (Primary Driver)</strong> — A heavy promotional calendar is in effect with 46% of products on promotion and 39% of sales coming from promoted items. This is the strongest and most direct lever.</li>
+<li><strong>🥈 Discounting</strong> — 61% of products are discounted with an average discount depth of ~10% off (avg_discount = 0.8997). No deep discounts (0%), but broad, shallow discounting is supporting the lift.</li>
+<li><strong>🥉 Weekend / Calendar</strong> — Sunday is a naturally higher-volume day. The prior Sunday (May 5) also saw a lift ($116.48), but the current Sunday is <strong>$29.92 higher</strong> — so weekend alone doesn't explain it.</li>
+<li><strong>Weather</strong> — Mild temperature (22°C / ~72°F) and moderate rain (0.68 mm precip) — nothing extreme that would drive unusual traffic. Unlikely to be a material driver.</li>
+</ol>
+<hr />
+<h3>3. Evidence</h3>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>May 12 (Sun)</th>
+<th>May 5 (Prior Sun)</th>
+<th>Δ</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Total Sales</strong></td>
+<td><strong>$146.40</strong></td>
+<td>$116.48</td>
+<td><strong>+$29.92 (+25.7%)</strong></td>
+</tr>
+<tr>
+<td><strong>Activity Product Rate</strong></td>
+<td><strong>46.4%</strong></td>
+<td>42.0%</td>
+<td>+4.4pp</td>
+</tr>
+<tr>
+<td><strong>Activity Sales Share</strong></td>
+<td><strong>39.4%</strong></td>
+<td>35.9%</td>
+<td>+3.5pp</td>
+</tr>
+<tr>
+<td><strong>Avg Discount</strong></td>
+<td>0.8997 (~10% off)</td>
+<td>0.9156 (~8.4% off)</td>
+<td>Slightly steeper</td>
+</tr>
+<tr>
+<td><strong>Discounted Product Rate</strong></td>
+<td><strong>60.9%</strong></td>
+<td>53.6%</td>
+<td>+7.3pp</td>
+</tr>
+<tr>
+<td><strong>Stockout Product Rate</strong></td>
+<td>55.1%</td>
+<td>59.4%</td>
+<td>-4.3pp (improved)</td>
+</tr>
+<tr>
+<td><strong>Avg Stockout Hours</strong></td>
+<td>4.33 hrs</td>
+<td>4.16 hrs</td>
+<td>Slightly higher</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Key observations:</strong></p>
+<ul>
+<li><strong>Promotional coverage increased</strong> from 42.0% to 46.4% of products on activity, and the share of sales from these activities rose from 35.9% to 39.4%. This is the clearest signal of an intentional commercial push.</li>
+<li><strong>Discount breadth expanded</strong> — 60.9% of products were discounted on May 12 vs 53.6% on May 5 (the prior Sunday). The average discount also deepened slightly.</li>
+<li><strong>Stockouts improved slightly</strong> — 55.1% of products experienced a stockout vs 59.4% on May 5. This suggests better availability may have enabled the higher sales, though stockout levels are still high.</li>
+<li><strong>Sales rank context</strong> — Store m041 ranked <strong>#1 among its tier</strong> (tier "m", 5 stores) and <strong>#6 overall</strong> (15 stores) on this day, well above its tier average ($122.52).</li>
+</ul>
+<hr />
+<h3>4. Caveats</h3>
+<ul>
+<li><strong>Stockout ambiguity</strong>: The stockout rate (55%) is still very high despite being lower than prior Sunday. Some sales may have been <em>capped</em> by stockouts — the lift could have been even larger with fuller availability.</li>
+<li><strong>Activity vs discount overlap</strong>: The 60.9% discounted-product rate is broader than the 46.4% activity-product rate. This means some items were discounted outside of formal promotional activity, muddying attribution between "discount-driven" vs "activity-driven" sales.</li>
+<li><strong>No deep discounts</strong>: Deep discount rate is 0%, suggesting this is not a clearance event but rather a broad, mild promotional push.</li>
+<li><strong>Previous Sunday also elevated</strong>: May 5 was already a strong Sunday ($116.48, +28% vs its trailing 7-day avg of $77.06), so the "Sunday effect" is partly baked in. The incremental lift on May 12 is the real story.</li>
+</ul>
+<hr />
+<h3>5. Suggested Next Checks</h3>
+<ol>
+<li><strong>Check which categories drove the activity lift</strong> — Drill into category-level sales to see if a specific department (e.g., dairy, snacks, beverages) carried the promotion.</li>
+<li><strong>Check competitor calendar</strong> — See if a local competitor had a gap or closure, potentially redirecting traffic to store m041.</li>
+<li><strong>Investigate the high stockout rate</strong> — Even though it improved vs May 5, 55% stockout is high. Determine if critical top-selling items were unavailable and whether replenishment is an issue.</li>
+<li><strong>Check foot traffic / transaction count</strong> — Determine if the lift came from more customers or higher basket size. This distinguishes traffic-driven vs. price-driven lift.</li>
+<li><strong>Review 4-week same-weekday trend</strong> — Compare May 12 to the other recent Sundays (April 21, April 28, May 5) to see if this is part of a growing trend or a one-off spike.</li>
+</ol>
+    </article>
+  </main>
+</body>
+</html>

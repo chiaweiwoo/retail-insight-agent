@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>inventory_analyst memo for h235 on 2024-05-05</title>
+  <style>
+body {
+  margin: 0;
+  background: #f8fafc;
+  color: #0f172a;
+  font-family: Arial, Helvetica, sans-serif;
+}
+main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 32px 24px 48px;
+}
+article {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 32px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+h1, h2, h3 {
+  color: #0f172a;
+}
+h1 {
+  margin-top: 0;
+}
+code {
+  background: #e2e8f0;
+  border-radius: 4px;
+  padding: 0.15em 0.35em;
+}
+pre {
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 10px;
+  padding: 16px;
+  overflow-x: auto;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 16px 0;
+}
+th, td {
+  border: 1px solid #cbd5e1;
+  padding: 10px 12px;
+  text-align: left;
+  vertical-align: top;
+}
+th {
+  background: #e2e8f0;
+}
+blockquote {
+  border-left: 4px solid #94a3b8;
+  margin-left: 0;
+  padding-left: 16px;
+  color: #334155;
+}
+</style>
+</head>
+<body>
+  <main>
+    <article>
+      <h2>1. Scope</h2>
+<p><strong>Store:</strong> h235<br />
+<strong>Date:</strong> 2024-05-05 (Sunday, during Labor Day period)<br />
+<strong>Focus:</strong> Stockout severity, availability pressure, and potential inventory contribution to sales movement.</p>
+<hr />
+<h2>2. Findings</h2>
+<h3>Sales Context</h3>
+<ul>
+<li><strong>Current sales:</strong> $270.8 — <strong>47% above</strong> the trailing 7-day average ($184.5) and <strong>29% above</strong> the same-weekday-4-week average ($209.4).</li>
+<li>Sales have been elevated across the <strong>Labor Day period</strong> (May 1–5), peaking on this Sunday. The prior day (Saturday May 4) was also strong at $219.4.</li>
+<li>This is not a routine level — demand is clearly spiking during the holiday period.</li>
+</ul>
+<h3>Stockout &amp; Availability Assessment</h3>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Value</th>
+<th>Interpretation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Avg stockout hours</strong></td>
+<td>4.4 hrs</td>
+<td>Moderate-to-high duration of stockouts per affected SKU</td>
+</tr>
+<tr>
+<td><strong>Stockout product rate</strong></td>
+<td><strong>56.8%</strong></td>
+<td><strong>Very high</strong> — over half of products experienced a stockout event</td>
+</tr>
+<tr>
+<td><strong>Severe stockout rate</strong></td>
+<td><strong>30.3%</strong></td>
+<td>Nearly a third of products had severe stockout conditions</td>
+</tr>
+<tr>
+<td><strong>Full stockout rate</strong></td>
+<td>1.9%</td>
+<td>Only ~2% completely zeroed out; most got replenished eventually</td>
+</tr>
+<tr>
+<td><strong>Hourly stockout peak</strong></td>
+<td>59.3%</td>
+<td>At the worst hour, ~60% of products were unavailable</td>
+</tr>
+</tbody>
+</table>
+<h3>Key Diagnosis</h3>
+<ul>
+<li><strong>Availability was heavily pressured.</strong> The stockout product rate (56.8%) is extremely elevated. This store was operating with more than half its assortment unavailable at some point during the day.</li>
+<li>Despite this, <strong>sales still hit a high.</strong> This likely means:</li>
+<li>Demand was so strong that even constrained availability couldn't cap revenue.</li>
+<li>Customers may have substituted to available items (higher-value or different mix), possibly inflating dollar sales.</li>
+<li>The severe stockout rate (30%) suggests a meaningful portion of demand may have been <em>lost</em> — actual latent demand could have been even higher.</li>
+<li><strong>Peak hourly stockout ~59%</strong> confirms the issue was broad and not limited to a single category or aisle.</li>
+</ul>
+<h3>Cause vs. Consequence Ambiguity</h3>
+<ul>
+<li><strong>Did stockouts cause suppressed sales or did demand spike cause stockouts?</strong> Likely <strong>demand spike (Labor Day weekend)</strong> caused the stockouts. The store saw a multi-day demand surge, inventory depleted faster than replenishment could keep up, and the stockout metrics reflect a store that was selling through faster than planned.</li>
+<li><strong>However</strong>, the stockouts themselves may have <em>capped upside</em>. If not for the availability gaps, sales might have been even higher than $270.8.</li>
+<li>The <strong>4.4-hour average stockout duration</strong> suggests that replenishment cycles existed but were too slow relative to the demand rate — a classic holiday demand-inventory mismatch.</li>
+</ul>
+<hr />
+<h2>3. Caveats</h2>
+<ul>
+<li>This is a <strong>correlational</strong> assessment. Without item-level sales vs. stockout overlap data, I cannot quantify exactly how much revenue was lost to stockouts vs. how much was merely demand-driven.</li>
+<li>The elevated sales despite high stockout rates could partly reflect <strong>price/mix shifts</strong> (e.g., customers buying premium substitutes). Dollar sales alone can mask unit volume declines.</li>
+<li>The baseline period (7 trailing days) includes the start of the Labor Day period itself, so "normal" may be slightly inflated relative to a true non-holiday baseline.</li>
+<li>No supply chain data (e.g., delivery schedules, warehouse backorders) was reviewed — the root cause of stockouts (under-ordering vs. late truck vs. unexpected demand) is inferred, not confirmed.</li>
+<li>"Labor day period" in the holiday label may refer to May 1 Labor Day (observed in many countries) — actual demand patterns would vary by market.</li>
+</ul>
+    </article>
+  </main>
+</body>
+</html>

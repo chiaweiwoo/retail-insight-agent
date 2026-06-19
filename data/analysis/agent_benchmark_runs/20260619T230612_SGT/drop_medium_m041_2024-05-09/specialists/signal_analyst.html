@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>signal_analyst memo for m041 on 2024-05-09</title>
+  <style>
+body {
+  margin: 0;
+  background: #f8fafc;
+  color: #0f172a;
+  font-family: Arial, Helvetica, sans-serif;
+}
+main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 32px 24px 48px;
+}
+article {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 32px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+h1, h2, h3 {
+  color: #0f172a;
+}
+h1 {
+  margin-top: 0;
+}
+code {
+  background: #e2e8f0;
+  border-radius: 4px;
+  padding: 0.15em 0.35em;
+}
+pre {
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 10px;
+  padding: 16px;
+  overflow-x: auto;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 16px 0;
+}
+th, td {
+  border: 1px solid #cbd5e1;
+  padding: 10px 12px;
+  text-align: left;
+  vertical-align: top;
+}
+th {
+  background: #e2e8f0;
+}
+blockquote {
+  border-left: 4px solid #94a3b8;
+  margin-left: 0;
+  padding-left: 16px;
+  color: #334155;
+}
+</style>
+</head>
+<body>
+  <main>
+    <article>
+      <h2>1. Scope</h2>
+<p>Store: <strong>m041</strong> | Date: <strong>2024-05-09</strong> (Thursday, normal weekday)
+Tools used: signal evidence, 14-day sales history, and baseline comparisons.</p>
+<hr />
+<h2>2. Findings</h2>
+<p><strong>Signal Trigger: DROP</strong>
+- The trailing-7-day % change is <strong>-33.0%</strong>, well past the drop threshold of -20%.
+- Current sales: <strong>56.67</strong> (vs. trailing 7d avg: 84.64, previous day: 75.30).</p>
+<p><strong>Day-over-Day Comparison</strong>
+- Sales fell <strong>-24.7%</strong> from 75.30 yesterday (Wed) to 56.67 today (Thu). That's a sharp single-day decline.</p>
+<p><strong>vs. Trailing 7-Day Average</strong>
+- Today's sales are <strong>33.0% below</strong> the trailing 7d avg of 84.64 — a pronounced drop.</p>
+<p><strong>vs. Same Weekday (4-Week) Baseline</strong>
+- Today (Thu) beat the average Thursday from the prior 4 weeks (56.67 vs. 67.30) by <strong>-15.8%</strong>. So even compared to the 4-week Thursday norm, sales are low.</p>
+<p><strong>Recent Sales Shape</strong>
+Looking at the 14-day history:</p>
+<table>
+<thead>
+<tr>
+<th>Period</th>
+<th>Shape</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Last week (Apr 25 - May 1)</td>
+<td>Mixed, with a spike on May 1 (94.70, Labor Day period start).</td>
+</tr>
+<tr>
+<td>Labor Day period (May 1-5)</td>
+<td>Elevated sales (peaked at 116.48 on May 5). May have been holiday-driven lift.</td>
+</tr>
+<tr>
+<td>Post-holiday (May 6-9)</td>
+<td><strong>Steady decline</strong>: 83.51 → 79.94 → 75.30 → <strong>56.67</strong>.</td>
+</tr>
+</tbody>
+</table>
+<p>The pattern shows a clear <strong>downward staircase</strong> after the Labor Day period ended. Sales went from holiday-elevated levels back down, and then today dropped even further.</p>
+<p><strong>Baseline Comparisons Summary</strong></p>
+<table>
+<thead>
+<tr>
+<th>Baseline</th>
+<th>Value</th>
+<th>vs. Current (56.67)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Previous day (May 8)</td>
+<td>75.30</td>
+<td>-24.7%</td>
+</tr>
+<tr>
+<td>Trailing 7d avg</td>
+<td>84.64</td>
+<td>-33.0%</td>
+</tr>
+<tr>
+<td>Same-weekday 4w avg</td>
+<td>67.30</td>
+<td>-15.8%</td>
+</tr>
+</tbody>
+</table>
+<p>Today's sales underperform <strong>all three baselines</strong> — the drop is not an artifact of a single comparison.</p>
+<hr />
+<h2>3. Caveats</h2>
+<ul>
+<li>The trailing-7d and trailing-7d-avg baselines are <strong>skewed upward</strong> by the Labor Day period (May 1-5 had elevated sales). The % drop vs. those baselines is partly a post-holiday normalization effect.</li>
+<li>The same-weekday 4w avg (67.30) is a cleaner "normal Thursday" comparison — sales are 15.8% below it, which is notable but less extreme than the -33% headline.</li>
+<li>No evidence on stockout, discount, activity, or weather was available or used. The signal is statistically valid but causal attribution would require those inputs.</li>
+<li>The holiday flag for May 1-5 was "labor_day_period" — this is the only notable calendar effect in the window. May 9 itself is flagged as a normal weekday.</li>
+</ul>
+    </article>
+  </main>
+</body>
+</html>

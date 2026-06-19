@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>inventory_analyst memo for lift_medium_m041_2024-05-12</title>
+  <style>
+body {
+  margin: 0;
+  background: #f8fafc;
+  color: #0f172a;
+  font-family: Arial, Helvetica, sans-serif;
+}
+main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 32px 24px 48px;
+}
+article {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 32px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+h1, h2, h3 {
+  color: #0f172a;
+}
+h1 {
+  margin-top: 0;
+}
+code {
+  background: #e2e8f0;
+  border-radius: 4px;
+  padding: 0.15em 0.35em;
+}
+pre {
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 10px;
+  padding: 16px;
+  overflow-x: auto;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 16px 0;
+}
+th, td {
+  border: 1px solid #cbd5e1;
+  padding: 10px 12px;
+  text-align: left;
+  vertical-align: top;
+}
+th {
+  background: #e2e8f0;
+}
+blockquote {
+  border-left: 4px solid #94a3b8;
+  margin-left: 0;
+  padding-left: 16px;
+  color: #334155;
+}
+</style>
+</head>
+<body>
+  <main>
+    <article>
+      <p>Now I have a comprehensive picture. Here's the memo.</p>
+<hr />
+<h2>1. Scope</h2>
+<p>Store: <strong>m041</strong> | Date: <strong>2024-05-12</strong> (Sunday, classified as weekend)</p>
+<p>Analysis covers stockout severity, availability pressure, and whether inventory constraints contributed to the sales observed that day.</p>
+<hr />
+<h2>2. Findings</h2>
+<h3>Sales performance</h3>
+<ul>
+<li><strong>Current sales: $146.4</strong> — a <strong>sharp upward move</strong> vs. recent norms.</li>
+<li>Compared to trailing 7d avg ($82.6): <strong>+77%</strong>.</li>
+<li>Compared to prior Sunday (2024-05-05, also a holiday-period Sunday): $116.5 → <strong>+26%</strong>.</li>
+<li>Compared to the 4-week same-weekday average ($102.4): <strong>+43%</strong>.</li>
+<li>The prior day (Saturday 2024-05-11) was $89.0, so this is a <strong>large day-over-day jump</strong>.</li>
+<li>Historical Sunday range across the last 4 weeks: $70.5 – $116.5. $146.4 is a <strong>new high</strong> for Sundays in the lookback.</li>
+</ul>
+<h3>Stockout &amp; availability picture (this is striking)</h3>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Avg stockout hours per product</strong></td>
+<td><strong>4.33 hrs</strong> (very high for a single day)</td>
+</tr>
+<tr>
+<td><strong>Stockout product rate</strong></td>
+<td><strong>55.1%</strong> (more than half of SKUs out of stock at some point)</td>
+</tr>
+<tr>
+<td><strong>Severe stockout product rate</strong></td>
+<td><strong>27.5%</strong> (over a quarter of products out for extended period)</td>
+</tr>
+<tr>
+<td><strong>Full stockout product rate</strong></td>
+<td><strong>2.9%</strong></td>
+</tr>
+<tr>
+<td><strong>Peak hourly stockout rate</strong></td>
+<td><strong>50.7%</strong> (at worst hour, half the store was unavailable)</td>
+</tr>
+</tbody>
+</table>
+<h3>Interpretation: Cause vs. Consequence Ambiguity</h3>
+<p><strong>The high sales and the extreme stockout rates are very likely connected</strong>, but the directionality is ambiguous:</p>
+<ol>
+<li>
+<p><strong>Demand-driven stockouts (consequence hypothesis):</strong> The store saw a major demand surge on this Sunday (+77% vs. trailing average). This may have overwhelmed available inventory, causing products to sell through faster than replenishment could keep up. In this reading, <em>stockouts are the consequence of high demand,</em> not a primary cause of the sales move.</p>
+</li>
+<li>
+<p><strong>Availability-constrained sales (cause hypothesis):</strong> Despite the $146.4 being a high number, it could have been <strong>even higher</strong> if stockouts weren't so severe. With 55% of products hitting zero at some point and peak hourly unavailability at 51%, it's quite possible that demand was <em>capped</em> by poor availability. The true unmet demand could be significantly above the observed $146.4.</p>
+</li>
+<li>
+<p><strong>Pre-existing replenishment failure (independent factor):</strong> The stockout data (4.3 avg hours, 55% rate) is so extreme it might reflect a systematic replenishment or ordering failure that predates the demand surge — e.g., missed delivery, system error, or upstream supply break. If so, the high sales happened <em>despite</em> terrible availability, which would make the underlying demand even stronger.</p>
+</li>
+</ol>
+<p><strong>Bottom line: Inventory issues are a material factor in this store-day.</strong> The stockout metrics are among the worst you'd expect to see on an otherwise normal day. They likely <em>depressed</em> sales below what demand would have supported, meaning the sales figure of $146.4 probably understates true customer demand.</p>
+<hr />
+<h2>3. Caveats</h2>
+<ul>
+<li><strong>Directionality cannot be resolved from daily aggregates alone.</strong> Hourly sales vs. hourly stockout time-series would be needed to see if sales spiked first (demand-driven sellout) or stockouts were present early (replenishment failure).</li>
+<li><strong>No product-level detail</strong> is available — it's possible a few high-velocity items drove both the sales spike and the stockout count, or that many low-velocity items were already out of stock, inflating the stockout product rate without materially affecting revenue.</li>
+<li><strong>The 2024-05-05 prior Sunday</strong> fell in a "labor_day_period" holiday context. The current Sunday (2024-05-12) is labeled "weekend" — different holiday classification could mean different demand patterns.</li>
+<li><strong>No replenishment log or delivery data</strong> was available to confirm whether a truck was missed or order was shorted.</li>
+<li><strong>The "severe stockout" definition</strong> (≥X consecutive hours) could overlap with end-of-day closeout; need to rule out normal end-of-day zeroing for perishables or deli categories.</li>
+</ul>
+    </article>
+  </main>
+</body>
+</html>

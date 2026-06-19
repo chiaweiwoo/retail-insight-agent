@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>signal_analyst memo for drop_high_h555_2024-05-16</title>
+  <style>
+body {
+  margin: 0;
+  background: #f8fafc;
+  color: #0f172a;
+  font-family: Arial, Helvetica, sans-serif;
+}
+main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 32px 24px 48px;
+}
+article {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 32px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+h1, h2, h3 {
+  color: #0f172a;
+}
+h1 {
+  margin-top: 0;
+}
+code {
+  background: #e2e8f0;
+  border-radius: 4px;
+  padding: 0.15em 0.35em;
+}
+pre {
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 10px;
+  padding: 16px;
+  overflow-x: auto;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 16px 0;
+}
+th, td {
+  border: 1px solid #cbd5e1;
+  padding: 10px 12px;
+  text-align: left;
+  vertical-align: top;
+}
+th {
+  background: #e2e8f0;
+}
+blockquote {
+  border-left: 4px solid #94a3b8;
+  margin-left: 0;
+  padding-left: 16px;
+  color: #334155;
+}
+</style>
+</head>
+<body>
+  <main>
+    <article>
+      <h2>1. Scope</h2>
+<p>Store <strong>h555</strong> on <strong>2024-05-16</strong> (Thursday, normal weekday). Analyzing signal validity, baseline comparisons, and recent sales shape.</p>
+<hr />
+<h2>2. Findings</h2>
+<h3>Signal Classification: <strong>DROP (Triggered)</strong></h3>
+<p>The store fired a <strong>drop signal</strong> based on the trailing 7-day metric:</p>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Value</th>
+<th>Threshold</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Trailing 7d avg % change</td>
+<td><strong>-24.9%</strong></td>
+<td>≤ -20%</td>
+<td><strong>Triggered</strong></td>
+</tr>
+<tr>
+<td>Day-over-day % change</td>
+<td><strong>-14.6%</strong></td>
+<td>n/a</td>
+<td>Notable decline</td>
+</tr>
+<tr>
+<td>Same-weekday vs 4wk avg % change</td>
+<td><strong>-12.7%</strong></td>
+<td>n/a</td>
+<td>Below typical Thursday level</td>
+</tr>
+</tbody>
+</table>
+<h3>Baseline Comparisons</h3>
+<table>
+<thead>
+<tr>
+<th>Baseline</th>
+<th>Value</th>
+<th>Current Sales</th>
+<th>Variance</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Previous day (Wed 5/15)</td>
+<td>154.43</td>
+<td>131.91</td>
+<td><strong>-14.6%</strong></td>
+</tr>
+<tr>
+<td>Trailing 7-day avg</td>
+<td>175.63</td>
+<td>131.91</td>
+<td><strong>-24.9%</strong></td>
+</tr>
+<tr>
+<td>Same-weekday 4wk avg (Thursdays)</td>
+<td>151.03</td>
+<td>131.91</td>
+<td><strong>-12.7%</strong></td>
+</tr>
+</tbody>
+</table>
+<p>The current day's sales of <strong>131.91</strong> is below <em>all three</em> baseline measures — a broad-based shortfall.</p>
+<h3>Recent Sales Shape (last 14 days)</h3>
+<p>Looking at the history:
+- <strong>May 2–5 (Labor Day period)</strong>: Elevated sales ranging from 126–203, peaking Sunday 5/5 at <strong>203.49</strong>.
+- <strong>May 6–12</strong>: A strong week, sales running 149–218, with Sunday 5/12 hitting the 14-day peak of <strong>217.71</strong> (weekend).
+- <strong>May 13–16</strong>: A clear <strong>declining trend</strong> — 167.00 → 167.73 → 154.43 → <strong>131.91</strong>.</p>
+<p>Sales have fallen in <strong>three consecutive days</strong> and the 131.91 print is the <strong>lowest in the 14-day window</strong> (the only lower point was 126.23 on May 2, which was a Labor Day period Thursday).</p>
+<h3>Signal Validity Assessment</h3>
+<p>The <strong>drop signal is valid</strong>:
+- The decline is not an anomaly due to a holiday (5/16 is a normal weekday).
+- It represents a sustained degradation, not a one-day blip — the three-day downward slope supports this.
+- The gap vs. trailing 7d avg (-24.9%) is well past the -20% threshold.
+- The same-weekday 4wk comparison (-12.7%) confirms this Thursday is genuinely softer than recent Thursdays.</p>
+<hr />
+<h2>3. Caveats</h2>
+<ul>
+<li>No investigation into potential causes (stockout, promotion, weather, competitor activity, etc.) was performed — this memo is limited to signal and baseline interpretation only.</li>
+<li>The trailing 7d avg includes the elevated Labor Day period (May 2–5) and the high weekend of May 11–12, which may mechanically exaggerate the % decline vs. that baseline.</li>
+<li>However, the day-over-day drop (-14.6%), the three consecutive daily declines, and the below-4wk-Thursday-average performance all corroborate that the signal reflects genuine softening, not just a baseline composition artifact.</li>
+</ul>
+    </article>
+  </main>
+</body>
+</html>

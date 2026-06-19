@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>inventory_analyst memo for h555 on 2024-05-16</title>
+  <style>
+body {
+  margin: 0;
+  background: #f8fafc;
+  color: #0f172a;
+  font-family: Arial, Helvetica, sans-serif;
+}
+main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 32px 24px 48px;
+}
+article {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 32px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+h1, h2, h3 {
+  color: #0f172a;
+}
+h1 {
+  margin-top: 0;
+}
+code {
+  background: #e2e8f0;
+  border-radius: 4px;
+  padding: 0.15em 0.35em;
+}
+pre {
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 10px;
+  padding: 16px;
+  overflow-x: auto;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 16px 0;
+}
+th, td {
+  border: 1px solid #cbd5e1;
+  padding: 10px 12px;
+  text-align: left;
+  vertical-align: top;
+}
+th {
+  background: #e2e8f0;
+}
+blockquote {
+  border-left: 4px solid #94a3b8;
+  margin-left: 0;
+  padding-left: 16px;
+  color: #334155;
+}
+</style>
+</head>
+<body>
+  <main>
+    <article>
+      <p>Here is the specialist memo.</p>
+<hr />
+<h2>1. Scope</h2>
+<p>Store <strong>h555</strong>, analysis date <strong>2024-05-16</strong> (Thursday, normal weekday). Assessed inventory availability, stockout severity, and potential impact on sales.</p>
+<h2>2. Findings</h2>
+<p><strong>Sales Performance</strong>
+- Current sales: <strong>$131.91</strong>, a <strong>-25%</strong> decline vs the trailing 7-day average of <strong>$175.63</strong>.
+- Compared to the same-weekday 4-week average ($151.03), today is <strong>-12.7%</strong> below that baseline.
+- The prior day (Wed 2024-05-15) was $154.43; the prior Thursday (2024-05-09) was $160.00. Today's $131.91 is notably weaker than both.</p>
+<p><strong>Stockout / Availability Pressure</strong>
+- <strong>Avg stockout hours</strong>: 2.96 hours — meaning the average product was unavailable for ~3 hours of the trading day. This is a moderately elevated value.
+- <strong>Stockout product rate</strong>: 36.7% — over a third of products hit a stockout condition at some point during the day.
+- <strong>Severe stockout rate</strong>: 17.7% — nearly 1 in 5 products was out of stock for a prolonged period.
+- <strong>Full stockout rate</strong>: 4.1% — a small but non-trivial set of products were entirely absent.
+- <strong>Hourly peak stockout rate</strong>: 34.0% — at the worst hour, about a third of the assortment was unavailable simultaneously.</p>
+<p><strong>Interpretation</strong>
+The inventory picture shows <strong>clear availability degradation</strong> on 2024-05-16. More than a third of the product line saw interruptions, and the average product was missing for roughly 3 hours. Combined with the sales shortfall, this signals that <strong>inventory availability issues likely contributed meaningfully to the sales decline</strong>. The $43.72 drop versus the trailing weekly average is roughly <strong>25%</strong>, which is directionally consistent with the breadth of stockouts observed.</p>
+<p>That said, causality is not fully provable from this data alone — demand could have been naturally lower (Thursday vs. the weekend days in the 7-day window were stronger). However, the same-weekday 4-week average ($151.03) also exceeded today's actual by ~$19, and the prior Thursday was $160, so the downward move is real and not just a weekday artifact.</p>
+<h2>3. Caveats</h2>
+<ul>
+<li><strong>Cause vs. consequence ambiguity</strong>: Stockouts could be a symptom of unanticipated demand (if inventory was set correctly but demand spiked) or a cause of lost sales (if inventory was simply insufficient). The data here shows correlation, not causation.</li>
+<li><strong>No category-level granularity</strong>: The aggregate stockout metrics may mask a specific category or top-SKU issue that drives most of the revenue impact.</li>
+<li><strong>Baseline sales include days with varying stockout conditions</strong>: The 7-day average includes days that may themselves have had stockouts, so the true "unconstrained demand" gap could be larger than measured.</li>
+<li><strong>No promotion/marketing context</strong>: If there was a planned promotional event, the stockout rate could reflect demand exceeding supply — a different RCA path than chronic under-stocking.</li>
+<li><strong>No competitor or external demand signal</strong>: A local event, competitor opening, or weather effect could suppress traffic independently of inventory.</li>
+</ul>
+    </article>
+  </main>
+</body>
+</html>

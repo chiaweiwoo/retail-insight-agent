@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>context_analyst memo for m041 on 2024-05-09</title>
+  <style>
+body {
+  margin: 0;
+  background: #f8fafc;
+  color: #0f172a;
+  font-family: Arial, Helvetica, sans-serif;
+}
+main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 32px 24px 48px;
+}
+article {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 32px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+h1, h2, h3 {
+  color: #0f172a;
+}
+h1 {
+  margin-top: 0;
+}
+code {
+  background: #e2e8f0;
+  border-radius: 4px;
+  padding: 0.15em 0.35em;
+}
+pre {
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 10px;
+  padding: 16px;
+  overflow-x: auto;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 16px 0;
+}
+th, td {
+  border: 1px solid #cbd5e1;
+  padding: 10px 12px;
+  text-align: left;
+  vertical-align: top;
+}
+th {
+  background: #e2e8f0;
+}
+blockquote {
+  border-left: 4px solid #94a3b8;
+  margin-left: 0;
+  padding-left: 16px;
+  color: #334155;
+}
+</style>
+</head>
+<body>
+  <main>
+    <article>
+      <hr />
+<h2>1. Scope</h2>
+<p><strong>Store:</strong> m041<br />
+<strong>Date:</strong> 2024-05-09 (Thursday)<br />
+<strong>Focus:</strong> Calendar / Weather / Peer comparison context to determine if the $56.67 sales day is a store-specific issue or part of a broader contextual pattern.</p>
+<hr />
+<h2>2. Findings</h2>
+<h3>Calendar Context</h3>
+<ul>
+<li><strong>Normal weekday</strong> — no holiday observed. The prior week (May 2–5) fell within a "Labor Day period" which likely boosted sales (trailing 7d avg = $84.64). Today is a clean, non-holiday Thursday.</li>
+<li><strong>Same-weekday 4-week avg:</strong> $67.30 — meaning the typical Thursday runs about 19% higher than today's actual.</li>
+<li><strong>Recent trend:</strong> Sales have been declining steadily from $83.51 (Mon) → $79.94 (Tue) → $75.30 (Wed) → <strong>$56.67 (Thu)</strong>. That's a sharp -25% drop from yesterday alone, and the lowest day in the past 7 days by a wide margin.</li>
+</ul>
+<h3>Weather Context</h3>
+<ul>
+<li><strong>Light precipitation</strong> (0.47 inches) — not a heavy storm, but enough to deter casual foot traffic.</li>
+<li><strong>Mild temperature</strong> (~21.5°C / ~71°F) — pleasant, not extreme.</li>
+<li><strong>Moderate humidity (69%) and low wind</strong> — nothing severe. Weather alone may be a mild suppressant but unlikely to explain the full magnitude of the drop.</li>
+</ul>
+<h3>Peer Comparison</h3>
+<ul>
+<li><strong>Store Tier:</strong> "m" (mid-tier), 5 stores in tier, 15 stores overall.</li>
+<li><strong>Tier avg today:</strong> $73.12 — m041 is <strong>22% below its own tier peers</strong>.</li>
+<li><strong>Overall avg today:</strong> $92.26 — m041 is <strong>39% below the chain-wide average</strong>.</li>
+<li><strong>Rank:</strong> 10th out of 15 overall (bottom third), and <strong>last (5th) in its own tier</strong>.</li>
+<li>This is a <strong>clear underperformance relative to comparable stores</strong> on the same day with the same external conditions.</li>
+</ul>
+<hr />
+<h2>3. Caveats</h2>
+<ul>
+<li><strong>Labor Day Period overlap last week:</strong> The trailing 7-day average ($84.64) is inflated by holiday-period sales (May 2–5). Comparing today against that elevated baseline makes the drop look even steeper.</li>
+<li><strong>Same-weekday 4w avg ($67.30)</strong> is a more appropriate baseline — today's $56.67 is still ~16% below that, but less dramatic.</li>
+<li><strong>Weather was not severe</strong> — light rain only. However, if foot traffic in this store's location is particularly weather-sensitive (e.g., outdoor shopping center), that could partially explain the miss.</li>
+<li><strong>No store-closure or inventory flags</strong> were surfaced by the data tools; any local disruption (staffing, stockouts, nearby competition) would need store-level investigation.</li>
+</ul>
+<hr />
+<p><strong>Bottom line:</strong> This looks <strong>store-specific underperformance</strong>, not a broad contextual pattern. Peers in the same tier averaged 29% higher sales under the same calendar and weather conditions. Calendar and light rain are mild headwinds, but they cannot explain m041 ranking dead last in its tier.</p>
+    </article>
+  </main>
+</body>
+</html>

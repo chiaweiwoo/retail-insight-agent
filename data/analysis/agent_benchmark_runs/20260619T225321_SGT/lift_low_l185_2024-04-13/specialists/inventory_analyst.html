@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>inventory_analyst memo for lift_low_l185_2024-04-13</title>
+  <style>
+body {
+  margin: 0;
+  background: #f8fafc;
+  color: #0f172a;
+  font-family: Arial, Helvetica, sans-serif;
+}
+main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 32px 24px 48px;
+}
+article {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 32px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+h1, h2, h3 {
+  color: #0f172a;
+}
+h1 {
+  margin-top: 0;
+}
+code {
+  background: #e2e8f0;
+  border-radius: 4px;
+  padding: 0.15em 0.35em;
+}
+pre {
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 10px;
+  padding: 16px;
+  overflow-x: auto;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 16px 0;
+}
+th, td {
+  border: 1px solid #cbd5e1;
+  padding: 10px 12px;
+  text-align: left;
+  vertical-align: top;
+}
+th {
+  background: #e2e8f0;
+}
+blockquote {
+  border-left: 4px solid #94a3b8;
+  margin-left: 0;
+  padding-left: 16px;
+  color: #334155;
+}
+</style>
+</head>
+<body>
+  <main>
+    <article>
+      <h2>1. Scope</h2>
+<p>Store <strong>l185</strong> | Date <strong>2024-04-13</strong> (Saturday, weekend). Analyzed stockout intensity and sales deviation vs. recent history.</p>
+<hr />
+<h2>2. Findings</h2>
+<h3>Sales Performance</h3>
+<ul>
+<li><strong>Current sales</strong>: $49.4 — <strong>+54%</strong> above the trailing 7-day average ($32.0) and <strong>+38%</strong> vs. the prior day (Friday, $35.7).</li>
+<li>This is well above any recent daily total and suggests a demand spike (likely weekend-driven, possibly amplified by lingering Qingming-period foot traffic or a local promo).</li>
+</ul>
+<h3>Stockout Conditions (Alarming)</h3>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Value</th>
+<th>Interpretation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Avg stockout hours</td>
+<td><strong>5.85 hrs</strong></td>
+<td>Products were unavailable for nearly 6 hours on average</td>
+</tr>
+<tr>
+<td>Stockout product rate</td>
+<td><strong>68.3%</strong></td>
+<td>~68% of tracked products hit a stockout at some point</td>
+</tr>
+<tr>
+<td>Severe stockout rate</td>
+<td><strong>39.0%</strong></td>
+<td>~39% of products had severe/prolonged stockouts</td>
+</tr>
+<tr>
+<td>Full stockout rate</td>
+<td><strong>2.4%</strong></td>
+<td>Only ~2.4% were fully out all day — most eventually recovered</td>
+</tr>
+<tr>
+<td>Hourly peak stockout rate</td>
+<td><strong>65.9%</strong></td>
+<td>At peak hour(s), nearly 2/3 of products were unavailable</td>
+</tr>
+</tbody>
+</table>
+<h3>Cause vs. Consequence Ambiguity</h3>
+<ul>
+<li><strong>The sales spike ($49.4) and the stockout severity (68% of products hit) co-occurred.</strong> This creates a typical chicken-and-egg ambiguity:</li>
+<li><strong>Hypothesis A (demand-driven):</strong> Unusually high customer traffic / demand exhausted inventory faster than planned, driving stockout rates up. The inventory team may not have forecasted the Saturday + post-Qingming tail.</li>
+<li><strong>Hypothesis B (supply-driven):</strong> A pre-existing replenishment gap or delivery miss caused broad shortages, which paradoxically could have <em>depressed</em> sales further — i.e., actual demand was even higher than $49.4.</li>
+<li>Given that sales still hit $49.4 (well above the 7-day avg), Hypothesis A seems more plausible for the <em>direction</em> of the move: strong demand overwhelmed shelf availability. However, it is likely that <strong>sales would have been even higher</strong> if stockout hours were lower — meaning the true demand signal is understated.</li>
+</ul>
+<h3>Key Supporting Detail</h3>
+<ul>
+<li>The peak hourly stockout rate (65.9%) means that during the busiest hours, two out of every three products were unavailable. This is a <strong>critical service level failure</strong> and indicates a systemic availability breakdown on a high-traffic day.</li>
+</ul>
+<hr />
+<h2>3. Caveats</h2>
+<ul>
+<li><strong>No same-weekday historical baseline</strong> (4-week Saturday average is null), so we cannot say whether $49.4 is exceptional relative to other Saturdays. It <em>is</em> exceptional vs. the rolling average, but that includes lower-weekday comparisons.</li>
+<li><strong>Stockout data is product-level aggregate</strong> — we don't know which departments or top-selling items were affected. A few high-velocity SKUs being out could drive most of the sales impact.</li>
+<li><strong>Cannot infer causality</strong> from co-occurrence alone. Stockout rates may be a <em>result</em> of the sales spike rather than a root cause of it.</li>
+<li><strong>Full stockout rate is low (2.4%)</strong> — most products came back in stock during the day, suggesting the store had inventory but couldn't keep shelves filled fast enough during peak hours (replenishment/shelf-staffing issue, not a DC shortage).</li>
+<li><strong>Recommendation for deeper RCA:</strong> Drill into hourly stockout patterns vs. hourly sales; check the top-10 selling SKUs' stockout windows; review if store received a delivery that day and when it was shelved.</li>
+</ul>
+    </article>
+  </main>
+</body>
+</html>
