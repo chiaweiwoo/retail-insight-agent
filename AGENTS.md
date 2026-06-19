@@ -10,9 +10,10 @@ Current implementation milestone:
 Phase 1 complete: local data ingestion into DuckDB.
 Milestone B in progress: reliability checks and a read-only evidence viewer.
 Milestone C setup: signal exploration for daily store RCA triggers.
+Milestone D start: runnable tool-calling RCA agent over local evidence.
 ```
 
-Do not build agent logic or generated narrative in this milestone.
+Build agent logic carefully in this milestone, but keep it grounded and local-first.
 
 ## Hard Rules
 
@@ -20,12 +21,9 @@ Do not implement any of the following in this phase:
 
 ```text
 autonomous agents
-LangGraph
 MCP
 skills
-web search
 news agent
-LLM calls
 persistent memory
 FastAPI
 Streamlit
@@ -36,16 +34,19 @@ customer analysis
 RCA report generation
 ```
 
-Allowed in Milestone B:
+Allowed in the current milestone:
 
 ```text
 read-only evidence UI over committed DuckDB output
 tests and CI
 query/export helpers
 precomputed signal exploration and trigger analysis
+tool-calling LLM RCA over local evidence
+plain Python agent loop
+OpenAI-compatible model client
 ```
 
-Keep the implementation read-only and evidence-first.
+Keep the implementation read-only, evidence-first, and tool-bounded.
 
 Important project decisions should be documented when they are made:
 
@@ -65,6 +66,15 @@ drop/lift triggers are per store, not one global daily trigger
 current working metric = trailing_7d_pct_change
 current discussion thresholds = drop <= -20%, lift >= +30%
 maintain a fixed early RCA test bench in docs/analysis/rca_test_scenarios.md
+```
+
+Current agent direction:
+
+```text
+use domain-specific tool functions, not raw database access as the public tool surface
+keep runtime logic in normal Python modules
+do not introduce MCP or runtime skill systems yet
+prefer a small runnable agent loop before larger orchestration frameworks
 ```
 
 ## Package Manager
@@ -235,4 +245,4 @@ hourly arrays are malformed
 
 ## Stop Condition
 
-After signal exploration is documented and the next implementation target is clear, stop.
+After the first runnable tool-calling RCA agent is working, tested, and documented, stop.

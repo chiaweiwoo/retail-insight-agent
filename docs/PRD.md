@@ -4,7 +4,7 @@
 
 Retail Insight Agent is a personal learning project for building an evidence-backed retail root cause analysis system.
 
-The near-term priority is to create a clean, scoped local analytical database from FreshRetailNet-50K. That evidence layer will support later RCA logic and, after that, a lightweight analyst-facing UI.
+The near-term priority is to create a clean, scoped local analytical database from FreshRetailNet-50K, then use it to power a small runnable tool-calling RCA agent.
 
 This is not a production system. It is a learning project built in phases.
 
@@ -19,14 +19,15 @@ The current implementation milestones are:
 5. Validate table counts and basic metric integrity.
 6. Expose a read-only evidence viewer over the DuckDB output.
 7. Explore precomputed daily drop/lift signals for store-day RCA triggering.
-8. Stop before RCA reasoning and generated narrative.
+8. Build a small runnable RCA agent that calls bounded evidence tools over the local DuckDB-backed dataset.
 
 Not part of the current milestones:
 
 - RCA report generation
-- deterministic RCA rules
-- agents
-- LLM integration
+- LangGraph orchestration
+- MCP server runtime
+- runtime skill system
+- external research or news enrichment
 
 Decision hygiene:
 
@@ -39,7 +40,7 @@ Decision hygiene:
 
 Retail sales movement can be affected by many factors, including stockout, discount, activity, holiday and weekend effects, weather, and peer-store patterns.
 
-A useful RCA system should not give generic explanations. It should eventually produce concise explanations backed by measurable evidence. Phase 1 exists to build that evidence foundation first.
+A useful RCA system should not give generic explanations. It should eventually produce concise explanations backed by measurable evidence. Phase 1 exists to build that evidence foundation first. The next learning step is to place a thin agentic layer on top without overbuilding orchestration.
 
 ## 4. Scope
 
@@ -253,7 +254,20 @@ Validation must check:
 9. Hourly sales columns are non-negative.
 10. Validation summary is concise and readable.
 
-## 9. UI Direction
+## 9. Agent Direction
+
+The first agentic runtime should be intentionally small:
+
+- one store-day RCA request at a time
+- tool-calling LLM over local DuckDB-backed evidence
+- tools should be domain-specific functions such as signal, sales, stockout, discount, activity, calendar-weather, and peer-store context
+- no raw SQL tool exposed to the model
+- no external web or news enrichment in the first runnable version
+- no manager agent yet
+
+The goal is a runnable evidence-backed RCA note, not a production workflow engine.
+
+## 10. UI Direction
 
 The first interface phase is a simple analyst view over DuckDB-derived evidence, focused on:
 
@@ -261,7 +275,7 @@ The first interface phase is a simple analyst view over DuckDB-derived evidence,
 - viewing sales, stockout, discount, activity, holiday, and weather context
 - displaying metrics before any generated narrative
 
-## 10. Current Signal Direction
+## 11. Current Signal Direction
 
 The current trigger exploration direction is:
 
@@ -288,13 +302,12 @@ covering high, medium, and low store tiers
 used for early deterministic RCA and LLM evaluation
 ```
 
-## 11. Non-Goals For This Milestone
+## 12. Non-Goals For This Milestone
 
 Do not build:
 
 ```text
 autonomous agents
-LangGraph workflow
 MCP server
 skills
 persistent memory
@@ -308,11 +321,12 @@ production deployment
 RCA report generation
 ```
 
-## 12. Future Roadmap
+## 13. Future Roadmap
 
 After Phase 1 works:
 
 1. Add evidence query helpers over DuckDB.
 2. Add precomputed sales drop and lift signal layers.
-3. Add deterministic RCA logic.
-4. Add an LLM report writer later, if still useful.
+3. Add a small runnable tool-calling RCA agent.
+4. Strengthen tests and benchmark cases.
+5. Revisit richer orchestration only if the small agent path proves too limited.

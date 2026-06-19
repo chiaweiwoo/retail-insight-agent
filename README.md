@@ -7,7 +7,7 @@ Current implemented milestones:
 - Phase 1: scoped raw data ingested into DuckDB
 - Milestone B: reliability checks plus a read-only evidence viewer
 - Milestone C starting point: precomputed drop/lift signal exploration for daily store RCA
-- Still out of scope: RCA narrative generation, agents, LangGraph, and LLM features
+- Milestone D starting point: runnable tool-calling RCA agent over local evidence
 
 ## Current Scope
 
@@ -16,6 +16,7 @@ Current implemented milestones:
 - Store scope: 15 mapped store aliases
 - Trusted artifact for tests and UI: `data/db/rca_foundry.duckdb`
 - Read-only UI: store/date evidence viewer over exported DuckDB data
+- Runnable backend path: tool-calling RCA agent over DuckDB-backed evidence
 
 ## Project Layout
 
@@ -34,6 +35,7 @@ retail-insight-agent/
       rca_foundry.duckdb
   scripts/
     ingest_daily_tables.py
+    run_rca_agent.py
     export_ui_data.py
     validate_daily_tables.py
   sql/
@@ -44,13 +46,18 @@ retail-insight-agent/
   src/
     rca_foundry/
       __init__.py
+      agent.py
       config.py
       db.py
       ingestion.py
+      llm.py
       query.py
+      rca_tools.py
       validation.py
   tests/
+    test_agent.py
     test_query.py
+    test_rca_tools.py
     test_validation.py
   ui/
     public/
@@ -67,6 +74,7 @@ uv run python scripts/ingest_daily_tables.py
 uv run python scripts/validate_daily_tables.py
 uv run python scripts/analyze_sales_signals.py
 uv run pytest
+uv run python scripts/run_rca_agent.py --store h555 --dt 2024-05-16
 uv run python scripts/export_ui_data.py
 cd ui
 npm install
@@ -85,3 +93,14 @@ npm run dev
 - The fixed early RCA benchmark set lives in `docs/analysis/rca_test_scenarios.md`.
 - The UI is an evidence viewer only. It does not generate RCA conclusions.
 - CI runs validation, tests, UI data export, and UI build from the committed DuckDB.
+- The agent backend uses domain-specific tool functions, not raw SQL exposure.
+- First live model target: DeepSeek via the OpenAI-compatible API.
+- Required environment for live agent runs:
+
+```bash
+$env:DEEPSEEK_API_KEY="sk-..."
+$env:LLM_MODEL="deepseek-v4-flash"
+# optional
+$env:LLM_BASE_URL="https://api.deepseek.com"
+$env:DEEPSEEK_THINKING="false"
+```
