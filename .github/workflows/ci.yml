@@ -15,4 +15,4 @@ jobs:
         with:
           python-version: "3.11"
       - run: uv sync --dev
-      - run: uv run python -c "import rca_foundry; print('import ok')"
+      - run: uv run python -c "import rca; print('import ok')"

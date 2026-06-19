@@ -13,3 +13,7 @@ ui/dist/
 
 # Local raw source data stays out of Git.
 data/raw/*.parquet
+
+# Generated run logs and benchmark artifacts — not committed.
+data/runs.duckdb
+data/analysis/agent_benchmark_runs/
