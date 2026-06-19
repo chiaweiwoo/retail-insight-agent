@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 
@@ -69,3 +70,33 @@ FACT_TABLES = [
     "fact_discount_store_day",
     "fact_activity_store_day",
 ]
+
+DEFAULT_SIGNAL_METRIC = "trailing_7d_pct_change"
+DEFAULT_DROP_THRESHOLD_PCT = -20.0
+DEFAULT_LIFT_THRESHOLD_PCT = 30.0
+
+DEFAULT_LLM_BASE_URL = "https://api.deepseek.com"
+DEFAULT_LLM_MODEL = "deepseek-v4-flash"
+DEFAULT_LLM_MAX_TOOL_ROUNDS = 8
+
+
+def get_llm_api_key() -> str:
+    api_key = os.getenv("DEEPSEEK_API_KEY") or os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError(
+            "Missing API key. Set DEEPSEEK_API_KEY (preferred) or OPENAI_API_KEY."
+        )
+    return api_key
+
+
+def get_llm_base_url() -> str:
+    return os.getenv("LLM_BASE_URL", DEFAULT_LLM_BASE_URL)
+
+
+def get_llm_model() -> str:
+    return os.getenv("LLM_MODEL", DEFAULT_LLM_MODEL)
+
+
+def get_llm_thinking_enabled() -> bool:
+    value = os.getenv("DEEPSEEK_THINKING", "false").strip().lower()
+    return value in {"1", "true", "yes", "on"}
