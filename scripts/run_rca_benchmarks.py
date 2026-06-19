@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from rca_foundry.agent import AgentRunResult, run_rca_agent
@@ -29,9 +29,11 @@ SCENARIOS: tuple[BenchmarkScenario, ...] = (
     BenchmarkScenario("lift_low_l185_2024-04-13", "low", "lift", "l185", "2024-04-13"),
 )
 
+SGT = timezone(timedelta(hours=8), name="SGT")
+
 
 def _timestamp_label() -> str:
-    return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    return datetime.now(SGT).strftime("%Y%m%dT%H%M%S_SGT")
 
 
 def _scenario_dir(base_dir: Path, scenario: BenchmarkScenario) -> Path:
@@ -51,13 +53,13 @@ def _write_json(path: Path, payload: object) -> None:
 def _result_payload(
     scenario: BenchmarkScenario,
     result: AgentRunResult,
-    run_started_at_utc: str,
+    run_started_at_sgt: str,
     model_name: str,
 ) -> dict[str, object]:
     signal = get_signal_evidence(scenario.store_alias, scenario.dt)
     return {
         "scenario": asdict(scenario),
-        "run_started_at_utc": run_started_at_utc,
+        "run_started_at_sgt": run_started_at_sgt,
         "model_name": model_name,
         "signal_snapshot": signal,
         "tool_call_count": len(result.tool_calls),
@@ -90,7 +92,7 @@ def _build_manifest_markdown(
     lines = [
         "# RCA Agent Benchmark Run",
         "",
-        f"- run timestamp (UTC): `{timestamp_label}`",
+        f"- run timestamp (SGT): `{timestamp_label}`",
         f"- model: `{model_name}`",
         f"- scenario count: `{len(summary_rows)}`",
         "",
@@ -142,7 +144,7 @@ def main() -> None:
         payload = _result_payload(
             scenario=scenario,
             result=result,
-            run_started_at_utc=timestamp_label,
+            run_started_at_sgt=timestamp_label,
             model_name=settings.model,
         )
         _write_text(scenario_dir / "report.md", result.report_markdown)

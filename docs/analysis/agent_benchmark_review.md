@@ -6,10 +6,16 @@ This note captures the first benchmarked live-agent runs over the fixed six-scen
 
 - baseline run: `data/analysis/agent_benchmark_runs/20260619T142035Z/`
 - prompt-refined run: `data/analysis/agent_benchmark_runs/20260619T142335Z/`
+- first Singapore-time labeled run: `data/analysis/agent_benchmark_runs/20260619T224459_SGT/`
 
 Model used in both runs:
 
 - `deepseek-v4-flash`
+
+Folder timestamp note:
+
+- older benchmark folders used UTC-style labels ending in `Z`
+- new benchmark folders use Singapore time with the suffix `_SGT`
 
 ## Summary
 

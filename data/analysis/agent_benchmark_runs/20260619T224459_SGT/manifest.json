@@ -1,0 +1,50 @@
+[
+  {
+    "scenario_id": "drop_high_h555_2024-05-16",
+    "expected_signal": "drop",
+    "observed_signal": "drop",
+    "store_alias": "h555",
+    "dt": "2024-05-16",
+    "tool_call_count": 9
+  },
+  {
+    "scenario_id": "drop_medium_m041_2024-05-09",
+    "expected_signal": "drop",
+    "observed_signal": "drop",
+    "store_alias": "m041",
+    "dt": "2024-05-09",
+    "tool_call_count": 9
+  },
+  {
+    "scenario_id": "drop_low_l165_2024-05-16",
+    "expected_signal": "drop",
+    "observed_signal": "drop",
+    "store_alias": "l165",
+    "dt": "2024-05-16",
+    "tool_call_count": 7
+  },
+  {
+    "scenario_id": "lift_high_h235_2024-05-05",
+    "expected_signal": "lift",
+    "observed_signal": "lift",
+    "store_alias": "h235",
+    "dt": "2024-05-05",
+    "tool_call_count": 7
+  },
+  {
+    "scenario_id": "lift_medium_m041_2024-05-12",
+    "expected_signal": "lift",
+    "observed_signal": "lift",
+    "store_alias": "m041",
+    "dt": "2024-05-12",
+    "tool_call_count": 7
+  },
+  {
+    "scenario_id": "lift_low_l185_2024-04-13",
+    "expected_signal": "lift",
+    "observed_signal": "lift",
+    "store_alias": "l185",
+    "dt": "2024-04-13",
+    "tool_call_count": 9
+  }
+]
