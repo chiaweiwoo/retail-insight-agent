@@ -6,7 +6,12 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Callable
 
-from rca.config import DEFAULT_LLM_MAX_TOOL_ROUNDS, LOG_DB_PATH
+from rca.config import (
+    ASSESSMENT_FORMAT,
+    CONFIDENCE_VOCAB,
+    DEFAULT_LLM_MAX_TOOL_ROUNDS,
+    LOG_DB_PATH,
+)
 from rca.llm import (
     LLMSettings,
     build_chat_completion_kwargs,
@@ -45,93 +50,98 @@ class CoordinatorResult:
     analyst_results: list[AnalystRunResult]
 
 
+def _analyst_prompt(role: str, domain_instructions: str) -> str:
+    return f"""You are the {role} for a retail RCA team.
+
+{domain_instructions}
+
+{CONFIDENCE_VOCAB}
+
+Use only the tools provided to you. Use plain ASCII markdown. Return sections:
+1. Scope
+2. Findings
+3. Caveats
+4. Assessment (required — see format below)
+
+{ASSESSMENT_FORMAT}
+
+If your domain shows nothing material, return verdict "inconclusive" and confidence "low"
+rather than padding the findings section. Concise and honest is better than long and inflated.
+"""
+
+
 ANALYST_SPECS: tuple[AnalystSpec, ...] = (
     AnalystSpec(
         name="sales_analyst",
         focus="sales performance — confirm signal magnitude and baseline comparison",
         tool_names=("get_signal_evidence", "get_sales_context"),
-        system_prompt="""You are the Sales Analyst for a retail RCA team.
-
-Your job is to confirm whether the sales move is real and how large it is.
-Compare current sales against trailing 7-day average, previous day, and same-weekday baselines.
-Describe the recent sales trend shape.
-Do not comment on stockouts, discounts, promotions, weather, or peers unless they appear directly in your tool output.
-Use only the tools provided to you.
-Use plain ASCII markdown.
-Return sections:
-1. Scope
-2. Findings
-3. Caveats
-""",
+        system_prompt=_analyst_prompt(
+            role="Sales Analyst",
+            domain_instructions=(
+                "Confirm whether the sales move is real and how large it is. "
+                "Compare current sales against trailing 7-day average, previous day, and same-weekday baselines. "
+                "Describe the recent sales trend shape. "
+                "Do not comment on stockouts, discounts, promotions, weather, or peers "
+                "unless they appear directly in your tool output."
+            ),
+        ),
     ),
     AnalystSpec(
         name="ops_analyst",
         focus="operations — stockout and product availability assessment",
         tool_names=("get_stockout_context", "get_sales_context"),
-        system_prompt="""You are the Operations Analyst for a retail RCA team.
-
-Your job is to assess whether stockouts or product availability issues contributed to the sales move.
-Look at stockout hours, stockout rates by severity, and peak hourly pressure.
-Be explicit about cause vs consequence ambiguity — stockouts can cause drops, but drops can also precede stockouts.
-Use only the tools provided to you.
-Use plain ASCII markdown.
-Return sections:
-1. Scope
-2. Findings
-3. Caveats
-""",
+        system_prompt=_analyst_prompt(
+            role="Operations Analyst",
+            domain_instructions=(
+                "Assess whether stockouts or product availability issues contributed to the sales move. "
+                "Look at stockout hours, stockout rates by severity, and peak hourly pressure. "
+                "Be explicit about cause vs consequence ambiguity — stockouts can cause drops, "
+                "but drops can also precede stockouts."
+            ),
+        ),
     ),
     AnalystSpec(
         name="commercial_analyst",
         focus="commercial — discount and promotional activity assessment",
         tool_names=("get_discount_context", "get_activity_context", "get_sales_context"),
-        system_prompt="""You are the Commercial Analyst for a retail RCA team.
-
-Your job is to assess whether pricing or promotional activity contributed to the sales move.
-Look at discount depth, discounted product rate, promotional activity rate, and promotional sales share.
-Assess whether any lift is likely driven by promotion, or whether a drop happened despite or because of promotion.
-Use only the tools provided to you.
-Use plain ASCII markdown.
-Return sections:
-1. Scope
-2. Findings
-3. Caveats
-""",
+        system_prompt=_analyst_prompt(
+            role="Commercial Analyst",
+            domain_instructions=(
+                "Assess whether pricing or promotional activity contributed to the sales move. "
+                "Look at discount depth, discounted product rate, promotional activity rate, and promotional sales share. "
+                "Assess whether any lift is likely driven by promotion, or whether a drop happened despite or because of promotion. "
+                "IMPORTANT on margin: we have no cost or margin data. If significant promotion is present, "
+                "flag margin dilution risk explicitly under data_gaps — do not invent margin figures."
+            ),
+        ),
     ),
     AnalystSpec(
         name="market_analyst",
         focus="market context — calendar, weather, and peer store comparison",
         tool_names=("get_calendar_weather_context", "get_peer_store_context", "get_sales_context"),
-        system_prompt="""You are the Market Analyst for a retail RCA team.
-
-Your job is to assess external factors and whether the move is store-specific or broadly contextual.
-Look at calendar context (weekday, holiday), weather conditions, and how this store performed relative to peers.
-If the move is fleet-wide, that points to external factors. If it is isolated, that points to store-specific causes.
-Use only the tools provided to you.
-Use plain ASCII markdown.
-Return sections:
-1. Scope
-2. Findings
-3. Caveats
-""",
+        system_prompt=_analyst_prompt(
+            role="Market Analyst",
+            domain_instructions=(
+                "Assess external factors and whether the move is store-specific or broadly contextual. "
+                "Look at calendar context (weekday, holiday), weather conditions, and how this store performed "
+                "relative to peers. If the move is fleet-wide, that points to external factors. "
+                "If it is isolated, that points to store-specific causes."
+            ),
+        ),
     ),
     AnalystSpec(
         name="research_analyst",
         focus="external research — web news search for broader market events on the date",
         tool_names=("search_news",),
-        system_prompt="""You are the Research Analyst for a retail RCA team.
-
-Your job is to find relevant external news or events that may have influenced retail sales on this date.
-Search for news about retail conditions, economic events, or local events relevant to the store date.
-Report only what you find in search results — do not invent or infer beyond the evidence returned.
-Flag low-confidence findings plainly.
-Use only the tools provided to you.
-Use plain ASCII markdown.
-Return sections:
-1. Scope
-2. Findings
-3. Caveats
-""",
+        system_prompt=_analyst_prompt(
+            role="Research Analyst",
+            domain_instructions=(
+                "Find relevant external news or events that may have influenced retail sales on this date. "
+                "Search for news about retail conditions, economic events, or local events relevant to the store date. "
+                "Report only what you find in search results — do not invent or infer beyond the evidence returned. "
+                "This search is retrospective; findings are approximate and should be treated as LOW confidence."
+            ),
+        ),
     ),
 )
 

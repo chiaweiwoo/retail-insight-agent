@@ -78,6 +78,26 @@ FACT_TABLES = [
     "fact_activity_store_day",
 ]
 
+CONTEXT_PACK_PATH = PROJECT_ROOT / "data" / "context_pack.json"
+
+CONFIDENCE_VOCAB = """
+Confidence levels — use these exact terms, no others:
+- HIGH: multiple independent evidence points align; the number clears its threshold with margin; alternative explanations are weak.
+- MEDIUM: evidence points one way but is single-source or has a plausible alternative.
+- LOW: suggestive only; correlational; or partly contradicted by another signal.
+""".strip()
+
+ASSESSMENT_FORMAT = """
+End your memo with this exact section (fill in every field):
+
+## Assessment
+- verdict: <cause | contributing | ruled_out | inconclusive>
+- confidence: <high | medium | low>
+- key_numbers: <the 1-3 numbers that matter most, with values>
+- causal_caveat: <note on correlation vs causation, or "n/a">
+- data_gaps: <what you could not see, or "none">
+""".strip()
+
 DEFAULT_SIGNAL_METRIC = "trailing_7d_pct_change"
 DEFAULT_DROP_THRESHOLD_PCT = -20.0
 DEFAULT_LIFT_THRESHOLD_PCT = 30.0
