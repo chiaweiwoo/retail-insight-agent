@@ -64,6 +64,7 @@ retail-insight-agent/
 ```bash
 uv run python scripts/ingest_daily_tables.py
 uv run python scripts/validate_daily_tables.py
+uv run python scripts/analyze_sales_signals.py
 uv run pytest
 uv run python scripts/export_ui_data.py
 cd ui
@@ -75,5 +76,6 @@ npm run dev
 
 - The committed database artifact is the clean analytical output and the current test input.
 - The raw parquet file is expected locally at `data/raw/train.parquet` and is not committed.
+- Sales-signal exploration outputs are written to `data/analysis/` and `docs/analysis/`.
 - The UI is an evidence viewer only. It does not generate RCA conclusions.
 - CI runs validation, tests, UI data export, and UI build from the committed DuckDB.
