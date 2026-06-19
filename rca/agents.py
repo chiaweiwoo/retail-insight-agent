@@ -19,7 +19,14 @@ from rca.llm import (
     build_openai_compatible_client,
     load_llm_settings,
 )
-from rca.tools import execute_tool, get_tool_schemas
+from rca.tools import (
+    execute_tool,
+    get_activity_context,
+    get_discount_context,
+    get_signal_evidence,
+    get_stockout_context,
+    get_tool_schemas,
+)
 from rca.report import render_markdown_document
 from rca.runlog import RunLogger
 
@@ -231,14 +238,88 @@ def plan_specialists(
     store_alias: str,
     dt: str,
     signal: dict[str, Any] | None = None,
+    include_research: bool = False,
 ) -> list[AnalystSpec]:
-    """Planning seam — decides which specialists to dispatch.
+    selected, _, _ = _plan_specialists_with_reasons(
+        store_alias=store_alias,
+        dt=dt,
+        signal=signal,
+        include_research=include_research,
+    )
+    return selected
 
-    Returns all specialists. Later: filter by signal direction/magnitude.
-    research_analyst is included but runs independently; its findings are
-    additive and do not gate the core RCA.
-    """
-    return list(ANALYST_SPECS)
+
+def _plan_specialists_with_reasons(
+    store_alias: str,
+    dt: str,
+    signal: dict[str, Any] | None = None,
+    include_research: bool = False,
+) -> tuple[list[AnalystSpec], list[dict[str, Any]], dict[str, Any]]:
+    spec_by_name = {spec.name: spec for spec in ANALYST_SPECS}
+    signal_evidence = signal or get_signal_evidence(store_alias, dt)
+    stockout_context = get_stockout_context(store_alias, dt)
+    discount_context = get_discount_context(store_alias, dt)
+    activity_context = get_activity_context(store_alias, dt)
+
+    planning_inputs = {
+        "signal_evidence": signal_evidence,
+        "stockout_context": stockout_context,
+        "discount_context": discount_context,
+        "activity_context": activity_context,
+    }
+
+    selected_names = ["sales_analyst", "market_analyst"]
+    skipped: list[dict[str, Any]] = []
+
+    stockout_present = any(
+        (stockout_context.get(field) or 0) > 0
+        for field in (
+            "avg_stockout_hours",
+            "stockout_product_rate",
+            "severe_stockout_product_rate",
+            "full_stockout_product_rate",
+            "hourly_stockout_rate_peak",
+        )
+    )
+    if stockout_present:
+        selected_names.append("ops_analyst")
+    else:
+        skipped.append(
+            {
+                "analyst": "ops_analyst",
+                "reason": "No stockout signal in local evidence.",
+            }
+        )
+
+    commercial_present = any(
+        (discount_context.get(field) or 0) > 0
+        for field in ("discounted_product_rate", "deep_discount_product_rate")
+    ) or any(
+        (activity_context.get(field) or 0) > 0
+        for field in ("activity_product_rate", "activity_sales_share")
+    )
+    if commercial_present:
+        selected_names.append("commercial_analyst")
+    else:
+        skipped.append(
+            {
+                "analyst": "commercial_analyst",
+                "reason": "No discount or activity signal in local evidence.",
+            }
+        )
+
+    if include_research:
+        selected_names.append("research_analyst")
+    else:
+        skipped.append(
+            {
+                "analyst": "research_analyst",
+                "reason": "Research analyst gated off by default.",
+            }
+        )
+
+    selected = [spec_by_name[name] for name in selected_names]
+    return selected, skipped, planning_inputs
 
 
 def _default_client_factory(settings: LLMSettings) -> ClientFactory:
@@ -586,6 +667,7 @@ def run_coordinator(
     settings: LLMSettings | None = None,
     client_factory: ClientFactory | None = None,
     output_dir: Path | None = None,
+    include_research: bool = False,
 ) -> CoordinatorResult:
     settings = settings or load_llm_settings()
     client_factory = client_factory or _default_client_factory(settings)
@@ -593,8 +675,14 @@ def run_coordinator(
     logger = RunLogger(run_name=run_name)
     subject = f"{store_alias}:{dt}"
 
+    planning_inputs: dict[str, Any] | None = None
+    skipped_analysts: list[dict[str, Any]] = []
     if specialists is None:
-        specialists = plan_specialists(store_alias, dt)
+        specialists, skipped_analysts, planning_inputs = _plan_specialists_with_reasons(
+            store_alias=store_alias,
+            dt=dt,
+            include_research=include_research,
+        )
 
     logger.log(
         actor_type="workflow",
@@ -602,7 +690,22 @@ def run_coordinator(
         action="started",
         subject=subject,
         source="system",
-        details={"analyst_count": len(specialists)},
+        details={
+            "analyst_count": len(specialists),
+            "planning_inputs": planning_inputs,
+        },
+    )
+    logger.log(
+        actor_type="workflow",
+        actor_name="plan_specialists",
+        action="completed",
+        subject=subject,
+        source="system",
+        details={
+            "selected_analysts": [spec.name for spec in specialists],
+            "skipped_analysts": skipped_analysts,
+            "include_research": include_research,
+        },
     )
 
     def run_one(spec: AnalystSpec) -> AnalystRunResult:
@@ -748,6 +851,12 @@ def run_coordinator(
         payload = {
             "store_alias": store_alias,
             "dt": dt,
+            "planner": {
+                "selected_analysts": [spec.name for spec in specialists],
+                "skipped_analysts": skipped_analysts,
+                "include_research": include_research,
+                "planning_inputs": planning_inputs,
+            },
             "critic_note_markdown": critic_note,
             "controller_note_markdown": controller_note,
             "decision_card_markdown": decision_card,

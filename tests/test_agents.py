@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from rca.agents import run_coordinator, ANALYST_SPECS
+from rca import agents as agents_module
+from rca.agents import run_coordinator, ANALYST_SPECS, plan_specialists
 from rca.llm import LLMSettings
 
 
@@ -257,3 +258,47 @@ def test_context_preamble_is_injected_into_specialist_and_coordinator_prompts(tm
     assert "opaque anonymized identifiers" in specialist_system
     assert "GROUNDING CONTEXT" in coordinator_system
     assert "Critic note:" in CoordinatorCompletions.last_messages[1]["content"]
+
+
+def test_plan_specialists_skips_ops_and_research_when_local_signal_is_empty(monkeypatch) -> None:
+    monkeypatch.setattr(
+        agents_module,
+        "get_signal_evidence",
+        lambda store_alias, dt: {
+            "store_alias": store_alias,
+            "dt": dt,
+            "signal_label": "drop",
+        },
+    )
+    monkeypatch.setattr(
+        agents_module,
+        "get_stockout_context",
+        lambda store_alias, dt: {
+            "avg_stockout_hours": 0.0,
+            "stockout_product_rate": 0.0,
+            "severe_stockout_product_rate": 0.0,
+            "full_stockout_product_rate": 0.0,
+            "hourly_stockout_rate_peak": 0.0,
+        },
+    )
+    monkeypatch.setattr(
+        agents_module,
+        "get_discount_context",
+        lambda store_alias, dt: {
+            "discounted_product_rate": 0.0,
+            "deep_discount_product_rate": 0.0,
+        },
+    )
+    monkeypatch.setattr(
+        agents_module,
+        "get_activity_context",
+        lambda store_alias, dt: {
+            "activity_product_rate": 0.0,
+            "activity_sales_share": 0.0,
+        },
+    )
+
+    specialists = plan_specialists("h555", "2024-05-16")
+    names = [spec.name for spec in specialists]
+
+    assert names == ["sales_analyst", "market_analyst"]
