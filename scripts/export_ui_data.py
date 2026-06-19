@@ -9,15 +9,13 @@ SRC_PATH = PROJECT_ROOT / "src"
 if str(SRC_PATH) not in sys.path:
     sys.path.insert(0, str(SRC_PATH))
 
-from rca_foundry.config import DB_PATH
-from rca_foundry.validation import validate_database
+from rca_foundry.query import export_evidence_dataset
 
 
 def main() -> None:
-    row_counts = validate_database()
-    print(f"Validation passed: {DB_PATH}")
-    for table_name, row_count in row_counts.items():
-        print(f"{table_name}: {row_count}")
+    output_path = PROJECT_ROOT / "ui" / "public" / "evidence_data.json"
+    export_evidence_dataset(output_path)
+    print(f"UI data exported: {output_path}")
 
 
 if __name__ == "__main__":
