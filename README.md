@@ -75,6 +75,7 @@ uv run python scripts/validate_daily_tables.py
 uv run python scripts/analyze_sales_signals.py
 uv run pytest
 uv run python scripts/run_rca_agent.py --store h555 --dt 2024-05-16
+uv run python scripts/run_rca_benchmarks.py
 uv run python scripts/export_ui_data.py
 cd ui
 npm install
@@ -91,6 +92,7 @@ npm run dev
 - Current preferred discussion thresholds: `drop <= -20%` and `lift >= +30%`.
 - Trigger grids for threshold review live under `docs/analysis/trigger_grids/`.
 - The fixed early RCA benchmark set lives in `docs/analysis/rca_test_scenarios.md`.
+- Live benchmark batch outputs are saved under `data/analysis/agent_benchmark_runs/`.
 - The UI is an evidence viewer only. It does not generate RCA conclusions.
 - CI runs validation, tests, UI data export, and UI build from the committed DuckDB.
 - The agent backend uses domain-specific tool functions, not raw SQL exposure.
