@@ -90,6 +90,22 @@ class CoordinatorCompletions:
         )
 
 
+class CriticCompletions:
+    last_messages = None
+
+    def create(self, **kwargs):
+        CriticCompletions.last_messages = kwargs.get("messages")
+        return FakeResponse(
+            choices=[
+                FakeChoice(
+                    message=FakeMessage(
+                        content="## Claim Audit\n- keep sales\n\n## Gaps\n- none\n\n## Calibration Note\n- be cautious"
+                    )
+                )
+            ]
+        )
+
+
 class FakeChat:
     def __init__(self, completions) -> None:
         self.completions = completions
@@ -112,6 +128,8 @@ def test_coordinator_runs_parallel_specialists_and_synthesizes(tmp_path) -> None
     def client_factory(actor_name: str):
         if actor_name == "coordinator_analyst":
             return FakeClient(CoordinatorCompletions())
+        if actor_name == "critic":
+            return FakeClient(CriticCompletions())
         tool = tool_by_actor.get(actor_name, "get_signal_evidence")
         return FakeClient(SpecialistCompletions(tool, actor_name))
 
@@ -132,8 +150,11 @@ def test_coordinator_runs_parallel_specialists_and_synthesizes(tmp_path) -> None
     )
     assert "## Trigger" in result.coordinator_report_markdown
     assert len(result.analyst_results) == 4
+    assert "## Claim Audit" in result.critic_note_markdown
     assert (tmp_path / "scenario" / "specialists" / "sales_analyst.md").exists()
     assert (tmp_path / "scenario" / "specialists" / "sales_analyst.html").exists()
+    assert (tmp_path / "scenario" / "critique.md").exists()
+    assert (tmp_path / "scenario" / "critique.html").exists()
     assert (tmp_path / "scenario" / "report.html").exists()
 
 
@@ -144,6 +165,8 @@ def test_coordinator_quick_mode_uses_sales_analyst_only(tmp_path) -> None:
     def client_factory(actor_name: str):
         if actor_name == "coordinator_analyst":
             return FakeClient(CoordinatorCompletions())
+        if actor_name == "critic":
+            return FakeClient(CriticCompletions())
         return FakeClient(SpecialistCompletions("get_signal_evidence", actor_name))
 
     result = run_coordinator(
@@ -169,6 +192,8 @@ def test_context_preamble_is_injected_into_specialist_and_coordinator_prompts(tm
     def client_factory(actor_name: str):
         if actor_name == "coordinator_analyst":
             return FakeClient(CoordinatorCompletions())
+        if actor_name == "critic":
+            return FakeClient(CriticCompletions())
         return FakeClient(SpecialistCompletions("get_signal_evidence", actor_name))
 
     run_coordinator(
@@ -189,3 +214,4 @@ def test_context_preamble_is_injected_into_specialist_and_coordinator_prompts(tm
     assert "GROUNDING CONTEXT" in specialist_system
     assert "opaque anonymized identifiers" in specialist_system
     assert "GROUNDING CONTEXT" in coordinator_system
+    assert "Critic note:" in CoordinatorCompletions.last_messages[1]["content"]

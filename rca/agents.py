@@ -48,6 +48,7 @@ class CoordinatorResult:
     store_alias: str
     dt: str
     coordinator_report_markdown: str
+    critic_note_markdown: str
     analyst_results: list[AnalystRunResult]
 
 
@@ -165,6 +166,24 @@ Return sections:
 3. Evidence
 4. Caveats
 5. Suggested Next Checks
+"""
+
+
+CRITIC_SYSTEM_PROMPT = """You are a skeptical RCA reviewer.
+
+You review specialist memos before the coordinator synthesizes them.
+
+Rules:
+- Check whether claims are actually supported by the cited numbers.
+- Flag correlation being presented as causation.
+- Downgrade overconfident claims when evidence is thin.
+- Keep the note concise and operational.
+- Use plain ASCII markdown.
+
+Return sections:
+1. Claim Audit
+2. Gaps
+3. Calibration Note
 """
 
 
@@ -324,6 +343,7 @@ def _synthesize(
     store_alias: str,
     dt: str,
     analyst_results: list[AnalystRunResult],
+    critic_note_markdown: str,
     settings: LLMSettings,
     logger: RunLogger,
     client_factory: ClientFactory,
@@ -343,7 +363,8 @@ def _synthesize(
             "role": "user",
             "content": (
                 f"Synthesize the specialist memos for store {store_alias} on {dt}.\n\n"
-                f"{memos}"
+                f"Specialist memos:\n\n{memos}\n\n"
+                f"Critic note:\n\n{critic_note_markdown}"
             ),
         },
     ]
@@ -362,6 +383,56 @@ def _synthesize(
     logger.log(
         actor_type="llm",
         actor_name="coordinator_analyst",
+        action="completion_finished",
+        subject=subject,
+        source="llm",
+        details={"content_preview": content[:200]},
+    )
+    return content
+
+
+def _run_critic(
+    store_alias: str,
+    dt: str,
+    analyst_results: list[AnalystRunResult],
+    settings: LLMSettings,
+    logger: RunLogger,
+    client_factory: ClientFactory,
+) -> str:
+    subject = f"{store_alias}:{dt}"
+    client = client_factory("critic")
+    memos = "\n\n".join(
+        f"## {result.name}\nFocus: {result.focus}\n\n{result.memo_markdown}"
+        for result in analyst_results
+    )
+    messages = [
+        {
+            "role": "system",
+            "content": build_context_preamble(store_alias, dt) + "\n" + CRITIC_SYSTEM_PROMPT,
+        },
+        {
+            "role": "user",
+            "content": (
+                f"Review the specialist memos for store {store_alias} on {dt}.\n\n"
+                f"{memos}"
+            ),
+        },
+    ]
+    logger.log(
+        actor_type="llm",
+        actor_name="critic",
+        action="completion_requested",
+        subject=subject,
+        source="llm",
+        details={"specialist_count": len(analyst_results)},
+    )
+    response = client.chat.completions.create(
+        **build_chat_completion_kwargs(settings, messages, tools=None)
+    )
+    content = response.choices[0].message.content or ""
+    logger.log(
+        actor_type="llm",
+        actor_name="critic",
         action="completion_finished",
         subject=subject,
         source="llm",
@@ -423,10 +494,28 @@ def run_coordinator(
         },
     )
 
+    critic_note = _run_critic(
+        store_alias=store_alias,
+        dt=dt,
+        analyst_results=analyst_results,
+        settings=settings,
+        logger=logger,
+        client_factory=client_factory,
+    )
+    logger.log(
+        actor_type="workflow",
+        actor_name="coordinator_pipeline",
+        action="critic_completed",
+        subject=subject,
+        source="system",
+        details={"critic_note_preview": critic_note[:200]},
+    )
+
     coordinator_report = _synthesize(
         store_alias=store_alias,
         dt=dt,
         analyst_results=analyst_results,
+        critic_note_markdown=critic_note,
         settings=settings,
         logger=logger,
         client_factory=client_factory,
@@ -459,6 +548,16 @@ def run_coordinator(
                 ),
                 encoding="utf-8",
             )
+        critique_markdown_path = output_dir / "critique.md"
+        critique_html_path = output_dir / "critique.html"
+        critique_markdown_path.write_text(critic_note, encoding="utf-8")
+        critique_html_path.write_text(
+            render_markdown_document(
+                critic_note,
+                title=f"Critique for {store_alias} on {dt}",
+            ),
+            encoding="utf-8",
+        )
         report_markdown_path = output_dir / "report.md"
         report_html_path = output_dir / "report.html"
         report_markdown_path.write_text(coordinator_report, encoding="utf-8")
@@ -472,6 +571,7 @@ def run_coordinator(
         payload = {
             "store_alias": store_alias,
             "dt": dt,
+            "critic_note_markdown": critic_note,
             "coordinator_report_markdown": coordinator_report,
             "analyst_results": [asdict(result) for result in analyst_results],
         }
@@ -484,5 +584,6 @@ def run_coordinator(
         store_alias=store_alias,
         dt=dt,
         coordinator_report_markdown=coordinator_report,
+        critic_note_markdown=critic_note,
         analyst_results=analyst_results,
     )
