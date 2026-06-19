@@ -123,3 +123,5 @@ def test_manager_pipeline_runs_parallel_specialists_and_manager(tmp_path) -> Non
     assert len(result.analyst_results) == 4
     assert (tmp_path / "scenario" / "logs" / "event_log.jsonl").exists()
     assert (tmp_path / "scenario" / "specialists" / "signal_analyst.md").exists()
+    assert (tmp_path / "scenario" / "specialists" / "signal_analyst.html").exists()
+    assert (tmp_path / "scenario" / "report.html").exists()

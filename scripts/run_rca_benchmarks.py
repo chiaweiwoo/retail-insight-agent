@@ -96,17 +96,18 @@ def _build_manifest_markdown(
         "",
         "## Scenario Outputs",
         "",
-        "| scenario_id | expected_signal | observed_signal | store_alias | dt | analysts | tool_call_count | report | trace | logs |",
-        "| --- | --- | --- | --- | --- | ---: | ---: | --- | --- | --- |",
+        "| scenario_id | expected_signal | observed_signal | store_alias | dt | analysts | tool_call_count | report_md | report_html | trace | logs |",
+        "| --- | --- | --- | --- | --- | ---: | ---: | --- | --- | --- | --- |",
     ]
     for row in summary_rows:
         scenario_dir = run_dir / str(row["scenario_id"])
         report_path = scenario_dir / "report.md"
+        report_html_path = scenario_dir / "report.html"
         trace_path = scenario_dir / "manager_trace.json"
         log_path = scenario_dir / "logs" / "event_log.md"
         lines.append(
             "| {scenario_id} | {expected_signal} | {observed_signal} | {store_alias} | {dt} | {analyst_count} | {tool_call_count} | "
-            "[report]({report}) | [trace]({trace}) | [logs]({log_path}) |".format(
+            "[report.md]({report}) | [report.html]({report_html}) | [trace]({trace}) | [logs]({log_path}) |".format(
                 scenario_id=row["scenario_id"],
                 expected_signal=row["expected_signal"],
                 observed_signal=row["observed_signal"],
@@ -115,6 +116,7 @@ def _build_manifest_markdown(
                 analyst_count=row["analyst_count"],
                 tool_call_count=row["tool_call_count"],
                 report=report_path.relative_to(run_dir).as_posix(),
+                report_html=report_html_path.relative_to(run_dir).as_posix(),
                 trace=trace_path.relative_to(run_dir).as_posix(),
                 log_path=log_path.relative_to(run_dir).as_posix(),
             )
@@ -153,7 +155,6 @@ def main() -> None:
             run_started_at_sgt=timestamp_label,
             model_name=settings.model,
         )
-        _write_text(scenario_dir / "report.md", result.manager_report_markdown)
         _write_json(scenario_dir / "trace.json", payload)
         summary_rows.append(_summary_row(scenario, result))
 

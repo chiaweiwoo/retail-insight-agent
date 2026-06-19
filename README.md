@@ -178,8 +178,10 @@ Live benchmark batch outputs are saved under `data/analysis/agent_benchmark_runs
 Each scenario folder now includes:
 
 - `report.md`
+- `report.html`
 - `manager_trace.json`
 - `specialists/*.md`
+- `specialists/*.html`
 - `logs/event_log.jsonl`
 - `logs/event_log.md`
 

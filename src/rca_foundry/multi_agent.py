@@ -14,6 +14,7 @@ from rca_foundry.llm import (
     load_llm_settings,
 )
 from rca_foundry.rca_tools import execute_tool, get_tool_schemas
+from rca_foundry.render import render_markdown_document
 from rca_foundry.run_logging import RunLogger
 
 
@@ -385,10 +386,29 @@ def run_manager_analyst_pipeline(
         specialist_dir = output_dir / "specialists"
         specialist_dir.mkdir(parents=True, exist_ok=True)
         for result in analyst_results:
-            (specialist_dir / f"{result.name}.md").write_text(
+            markdown_path = specialist_dir / f"{result.name}.md"
+            html_path = specialist_dir / f"{result.name}.html"
+            markdown_path.write_text(
                 result.memo_markdown,
                 encoding="utf-8",
             )
+            html_path.write_text(
+                render_markdown_document(
+                    result.memo_markdown,
+                    title=f"{result.name} memo for {store_alias} on {dt}",
+                ),
+                encoding="utf-8",
+            )
+        report_markdown_path = output_dir / "report.md"
+        report_html_path = output_dir / "report.html"
+        report_markdown_path.write_text(manager_report, encoding="utf-8")
+        report_html_path.write_text(
+            render_markdown_document(
+                manager_report,
+                title=f"RCA report for {store_alias} on {dt}",
+            ),
+            encoding="utf-8",
+        )
         logger.write_artifacts(output_dir / "logs")
         payload = {
             "store_alias": store_alias,
