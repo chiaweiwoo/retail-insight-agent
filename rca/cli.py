@@ -192,7 +192,12 @@ def _cmd_run(args: argparse.Namespace) -> None:
         client_factory=client_factory,
         output_dir=output_dir,
     )
-    print(result.coordinator_report_markdown)
+    if args.quick:
+        print(result.coordinator_report_markdown)
+    else:
+        print(result.decision_card_markdown)
+        if args.full:
+            print("\n" + result.coordinator_report_markdown)
     if output_dir:
         print(f"\nArtifacts written to {output_dir}")
 
@@ -325,6 +330,11 @@ def main() -> None:
         action="store_true",
         dest="dry_run",
         help="Use stub LLM client — exercises the full pipeline with no API calls",
+    )
+    run_parser.add_argument(
+        "--full",
+        action="store_true",
+        help="Print the full RCA after the decision card",
     )
     run_parser.set_defaults(func=_cmd_run)
 

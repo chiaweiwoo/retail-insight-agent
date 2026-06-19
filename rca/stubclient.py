@@ -5,6 +5,7 @@ Used as the client_factory in run_coordinator(dry_run=True) and in unit tests.
 """
 from __future__ import annotations
 
+import re
 from typing import Any
 
 
@@ -152,7 +153,10 @@ class _StubCompletions:
         self._node_name = node_name
 
     def create(self, **kwargs: Any) -> _StubResponse:
-        content = _STUB_RESPONSES.get(self._node_name, _default_stub(self._node_name))
+        messages = kwargs.get("messages") or []
+        store, dt = _extract_store_and_dt(messages)
+        template = _STUB_RESPONSES.get(self._node_name, _default_stub(self._node_name))
+        content = template.format(store=store, dt=dt)
         return _StubResponse(content)
 
 
@@ -174,6 +178,17 @@ def _default_stub(node_name: str) -> str:
         f"## Assessment\n- verdict: inconclusive\n- confidence: low\n"
         f"- key_numbers: n/a\n- causal_caveat: n/a\n- data_gaps: dry-run\n"
     )
+
+
+def _extract_store_and_dt(messages: list[dict[str, Any]]) -> tuple[str, str]:
+    for message in reversed(messages):
+        content = message.get("content")
+        if not isinstance(content, str):
+            continue
+        match = re.search(r"store\s+([a-z]\d+)\s+on\s+(\d{4}-\d{2}-\d{2})", content, re.IGNORECASE)
+        if match:
+            return match.group(1), match.group(2)
+    return "unknown_store", "unknown_date"
 
 
 def stub_client_factory(node_name: str) -> StubClient:

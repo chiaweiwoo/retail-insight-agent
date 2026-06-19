@@ -49,6 +49,8 @@ class CoordinatorResult:
     dt: str
     coordinator_report_markdown: str
     critic_note_markdown: str
+    controller_note_markdown: str
+    decision_card_markdown: str
     analyst_results: list[AnalystRunResult]
 
 
@@ -184,6 +186,44 @@ Return sections:
 1. Claim Audit
 2. Gaps
 3. Calibration Note
+"""
+
+
+FINANCE_CONTROLLER_SYSTEM_PROMPT = """You are the finance controller for a retail RCA workflow.
+
+You do not rewrite the RCA. You add a short finance lens:
+- materiality
+- margin risk
+- one-off vs structural read
+
+Rules:
+- use only the RCA and critic note you are given
+- if margin data is missing, say so plainly
+- use plain ASCII markdown
+
+Return sections:
+1. Materiality
+2. Margin Risk
+3. One-off vs Structural
+"""
+
+
+SLT_BRIEF_SYSTEM_PROMPT = """You are writing a decision card for senior leadership.
+
+Rules:
+- compress the RCA into one screen
+- lead with confidence
+- it is allowed to say "none - monitor" and "no"
+- use plain ASCII markdown
+
+Return exactly this shape:
+## Decision Card - <store> <date>
+- headline: <one line>
+- confidence: <high | medium | low>
+- materiality: <short line>
+- pattern: <short line>
+- action: <one line>
+- escalate: <yes | no>
 """
 
 
@@ -441,6 +481,104 @@ def _run_critic(
     return content
 
 
+def _run_finance_controller(
+    store_alias: str,
+    dt: str,
+    coordinator_report_markdown: str,
+    critic_note_markdown: str,
+    settings: LLMSettings,
+    logger: RunLogger,
+    client_factory: ClientFactory,
+) -> str:
+    subject = f"{store_alias}:{dt}"
+    client = client_factory("finance_controller")
+    messages = [
+        {
+            "role": "system",
+            "content": build_context_preamble(store_alias, dt) + "\n" + FINANCE_CONTROLLER_SYSTEM_PROMPT,
+        },
+        {
+            "role": "user",
+            "content": (
+                f"Review this RCA for store {store_alias} on {dt}.\n\n"
+                f"RCA:\n\n{coordinator_report_markdown}\n\n"
+                f"Critic note:\n\n{critic_note_markdown}"
+            ),
+        },
+    ]
+    logger.log(
+        actor_type="llm",
+        actor_name="finance_controller",
+        action="completion_requested",
+        subject=subject,
+        source="llm",
+        details={},
+    )
+    response = client.chat.completions.create(
+        **build_chat_completion_kwargs(settings, messages, tools=None)
+    )
+    content = response.choices[0].message.content or ""
+    logger.log(
+        actor_type="llm",
+        actor_name="finance_controller",
+        action="completion_finished",
+        subject=subject,
+        source="llm",
+        details={"content_preview": content[:200]},
+    )
+    return content
+
+
+def _run_slt_brief(
+    store_alias: str,
+    dt: str,
+    coordinator_report_markdown: str,
+    controller_note_markdown: str,
+    critic_note_markdown: str,
+    settings: LLMSettings,
+    logger: RunLogger,
+    client_factory: ClientFactory,
+) -> str:
+    subject = f"{store_alias}:{dt}"
+    client = client_factory("slt_brief")
+    messages = [
+        {
+            "role": "system",
+            "content": build_context_preamble(store_alias, dt) + "\n" + SLT_BRIEF_SYSTEM_PROMPT,
+        },
+        {
+            "role": "user",
+            "content": (
+                f"Create the decision card for store {store_alias} on {dt}.\n\n"
+                f"RCA:\n\n{coordinator_report_markdown}\n\n"
+                f"Finance controller note:\n\n{controller_note_markdown}\n\n"
+                f"Critic note:\n\n{critic_note_markdown}"
+            ),
+        },
+    ]
+    logger.log(
+        actor_type="llm",
+        actor_name="slt_brief",
+        action="completion_requested",
+        subject=subject,
+        source="llm",
+        details={},
+    )
+    response = client.chat.completions.create(
+        **build_chat_completion_kwargs(settings, messages, tools=None)
+    )
+    content = response.choices[0].message.content or ""
+    logger.log(
+        actor_type="llm",
+        actor_name="slt_brief",
+        action="completion_finished",
+        subject=subject,
+        source="llm",
+        details={"content_preview": content[:200]},
+    )
+    return content
+
+
 def run_coordinator(
     store_alias: str,
     dt: str,
@@ -520,6 +658,25 @@ def run_coordinator(
         logger=logger,
         client_factory=client_factory,
     )
+    controller_note = _run_finance_controller(
+        store_alias=store_alias,
+        dt=dt,
+        coordinator_report_markdown=coordinator_report,
+        critic_note_markdown=critic_note,
+        settings=settings,
+        logger=logger,
+        client_factory=client_factory,
+    )
+    decision_card = _run_slt_brief(
+        store_alias=store_alias,
+        dt=dt,
+        coordinator_report_markdown=coordinator_report,
+        controller_note_markdown=controller_note,
+        critic_note_markdown=critic_note,
+        settings=settings,
+        logger=logger,
+        client_factory=client_factory,
+    )
     logger.log(
         actor_type="workflow",
         actor_name="coordinator_pipeline",
@@ -558,6 +715,26 @@ def run_coordinator(
             ),
             encoding="utf-8",
         )
+        controller_markdown_path = output_dir / "controller_note.md"
+        controller_html_path = output_dir / "controller_note.html"
+        controller_markdown_path.write_text(controller_note, encoding="utf-8")
+        controller_html_path.write_text(
+            render_markdown_document(
+                controller_note,
+                title=f"Finance controller note for {store_alias} on {dt}",
+            ),
+            encoding="utf-8",
+        )
+        decision_card_markdown_path = output_dir / "decision_card.md"
+        decision_card_html_path = output_dir / "decision_card.html"
+        decision_card_markdown_path.write_text(decision_card, encoding="utf-8")
+        decision_card_html_path.write_text(
+            render_markdown_document(
+                decision_card,
+                title=f"Decision card for {store_alias} on {dt}",
+            ),
+            encoding="utf-8",
+        )
         report_markdown_path = output_dir / "report.md"
         report_html_path = output_dir / "report.html"
         report_markdown_path.write_text(coordinator_report, encoding="utf-8")
@@ -572,6 +749,8 @@ def run_coordinator(
             "store_alias": store_alias,
             "dt": dt,
             "critic_note_markdown": critic_note,
+            "controller_note_markdown": controller_note,
+            "decision_card_markdown": decision_card,
             "coordinator_report_markdown": coordinator_report,
             "analyst_results": [asdict(result) for result in analyst_results],
         }
@@ -585,5 +764,7 @@ def run_coordinator(
         dt=dt,
         coordinator_report_markdown=coordinator_report,
         critic_note_markdown=critic_note,
+        controller_note_markdown=controller_note,
+        decision_card_markdown=decision_card,
         analyst_results=analyst_results,
     )

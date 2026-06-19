@@ -106,6 +106,32 @@ class CriticCompletions:
         )
 
 
+class FinanceControllerCompletions:
+    def create(self, **kwargs):
+        return FakeResponse(
+            choices=[
+                FakeChoice(
+                    message=FakeMessage(
+                        content="## Materiality\nSmall.\n\n## Margin Risk\nUnknown.\n\n## One-off vs Structural\nUnclear."
+                    )
+                )
+            ]
+        )
+
+
+class SltBriefCompletions:
+    def create(self, **kwargs):
+        return FakeResponse(
+            choices=[
+                FakeChoice(
+                    message=FakeMessage(
+                        content="## Decision Card - h555 2024-05-16\n- headline: Low confidence drop\n- confidence: low\n- materiality: small\n- pattern: first observed\n- action: none - monitor\n- escalate: no"
+                    )
+                )
+            ]
+        )
+
+
 class FakeChat:
     def __init__(self, completions) -> None:
         self.completions = completions
@@ -130,6 +156,10 @@ def test_coordinator_runs_parallel_specialists_and_synthesizes(tmp_path) -> None
             return FakeClient(CoordinatorCompletions())
         if actor_name == "critic":
             return FakeClient(CriticCompletions())
+        if actor_name == "finance_controller":
+            return FakeClient(FinanceControllerCompletions())
+        if actor_name == "slt_brief":
+            return FakeClient(SltBriefCompletions())
         tool = tool_by_actor.get(actor_name, "get_signal_evidence")
         return FakeClient(SpecialistCompletions(tool, actor_name))
 
@@ -151,10 +181,14 @@ def test_coordinator_runs_parallel_specialists_and_synthesizes(tmp_path) -> None
     assert "## Trigger" in result.coordinator_report_markdown
     assert len(result.analyst_results) == 4
     assert "## Claim Audit" in result.critic_note_markdown
+    assert "## Materiality" in result.controller_note_markdown
+    assert "## Decision Card" in result.decision_card_markdown
     assert (tmp_path / "scenario" / "specialists" / "sales_analyst.md").exists()
     assert (tmp_path / "scenario" / "specialists" / "sales_analyst.html").exists()
     assert (tmp_path / "scenario" / "critique.md").exists()
     assert (tmp_path / "scenario" / "critique.html").exists()
+    assert (tmp_path / "scenario" / "controller_note.md").exists()
+    assert (tmp_path / "scenario" / "decision_card.md").exists()
     assert (tmp_path / "scenario" / "report.html").exists()
 
 
@@ -167,6 +201,10 @@ def test_coordinator_quick_mode_uses_sales_analyst_only(tmp_path) -> None:
             return FakeClient(CoordinatorCompletions())
         if actor_name == "critic":
             return FakeClient(CriticCompletions())
+        if actor_name == "finance_controller":
+            return FakeClient(FinanceControllerCompletions())
+        if actor_name == "slt_brief":
+            return FakeClient(SltBriefCompletions())
         return FakeClient(SpecialistCompletions("get_signal_evidence", actor_name))
 
     result = run_coordinator(
@@ -194,6 +232,10 @@ def test_context_preamble_is_injected_into_specialist_and_coordinator_prompts(tm
             return FakeClient(CoordinatorCompletions())
         if actor_name == "critic":
             return FakeClient(CriticCompletions())
+        if actor_name == "finance_controller":
+            return FakeClient(FinanceControllerCompletions())
+        if actor_name == "slt_brief":
+            return FakeClient(SltBriefCompletions())
         return FakeClient(SpecialistCompletions("get_signal_evidence", actor_name))
 
     run_coordinator(
