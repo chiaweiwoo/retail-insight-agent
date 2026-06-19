@@ -280,6 +280,14 @@ lift trigger >= +30%
 
 These thresholds are intentionally high and asymmetric for learning-stage anomaly review. They are meant to produce stronger scenarios for discussion, not production alert coverage.
 
+Current fixed RCA benchmark set:
+
+```text
+3 drop scenarios + 3 lift scenarios
+covering high, medium, and low store tiers
+used for early deterministic RCA and LLM evaluation
+```
+
 ## 11. Non-Goals For This Milestone
 
 Do not build:

@@ -64,6 +64,7 @@ signals should be precomputed because the dataset slice is fixed
 drop/lift triggers are per store, not one global daily trigger
 current working metric = trailing_7d_pct_change
 current discussion thresholds = drop <= -20%, lift >= +30%
+maintain a fixed early RCA test bench in docs/analysis/rca_test_scenarios.md
 ```
 
 ## Package Manager

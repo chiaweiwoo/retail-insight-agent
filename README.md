@@ -82,5 +82,6 @@ npm run dev
 - Current working signal direction: precompute daily `drop`, `lift`, and `neutral` labels per store-day from `trailing_7d_pct_change`.
 - Current preferred discussion thresholds: `drop <= -20%` and `lift >= +30%`.
 - Trigger grids for threshold review live under `docs/analysis/trigger_grids/`.
+- The fixed early RCA benchmark set lives in `docs/analysis/rca_test_scenarios.md`.
 - The UI is an evidence viewer only. It does not generate RCA conclusions.
 - CI runs validation, tests, UI data export, and UI build from the committed DuckDB.

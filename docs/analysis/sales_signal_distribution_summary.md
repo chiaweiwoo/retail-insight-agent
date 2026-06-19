@@ -81,3 +81,8 @@ Current working discussion thresholds:
 - `20%` active-only grid: `docs/analysis/trigger_grids/trailing_7d_pct_trigger_grid_20_active_only.md`
 - `25%` active-only grid: `docs/analysis/trigger_grids/trailing_7d_pct_trigger_grid_25_active_only.md`
 - `30%` active-only grid: `docs/analysis/trigger_grids/trailing_7d_pct_trigger_grid_30_active_only.md`
+
+## Fixed Benchmark Set
+
+- The current early RCA benchmark set is recorded in `docs/analysis/rca_test_scenarios.md`.
+- It contains 3 drops and 3 lifts across high, medium, and low store tiers.
