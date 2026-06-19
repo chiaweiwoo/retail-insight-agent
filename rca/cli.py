@@ -292,6 +292,42 @@ def _cmd_runs(args: argparse.Namespace) -> None:
         )
 
 
+def _cmd_eval(args: argparse.Namespace) -> None:
+    from rca.config import AGENT_BENCHMARK_PATH
+    from rca.evaluator import evaluate_benchmark
+
+    client_factory = None
+    settings = None
+    if args.dry_run:
+        from rca.stubclient import stub_client_factory
+        from rca.llm import LLMSettings
+
+        client_factory = stub_client_factory
+        settings = LLMSettings(
+            api_key="dry-run",
+            base_url="https://api.deepseek.com",
+            model="deepseek-v4-flash",
+            thinking_enabled=False,
+        )
+        print("[dry-run] Using stub LLM judge.")
+
+    if args.run_dir:
+        run_dir = Path(args.run_dir)
+    else:
+        run_dirs = sorted([path for path in AGENT_BENCHMARK_PATH.iterdir() if path.is_dir()])
+        if not run_dirs:
+            raise RuntimeError("No benchmark runs found. Run `rca bench` first or pass --run-dir.")
+        run_dir = run_dirs[-1]
+
+    payload = evaluate_benchmark(run_dir=run_dir, settings=settings, client_factory=client_factory)
+    print(f"Evaluation written to {run_dir / 'eval_report.md'}")
+    print(
+        f"Scenarios: {payload['scenario_count']}, "
+        f"signal matches: {payload['signal_match_count']}, "
+        f"unsupported analyst checks: {payload['faithfulness_unsupported_count']}"
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="rca",
@@ -372,6 +408,23 @@ def main() -> None:
         help="Print recent run history from data/runs.duckdb",
     )
     runs_parser.set_defaults(func=_cmd_runs)
+
+    # rca eval
+    eval_parser = subparsers.add_parser(
+        "eval",
+        help="Evaluate a benchmark run directory with deterministic checks and an LLM judge",
+    )
+    eval_parser.add_argument(
+        "--run-dir",
+        help="Path to a benchmark run directory under data/analysis/agent_benchmark_runs/",
+    )
+    eval_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        dest="dry_run",
+        help="Use the stub LLM judge instead of a real API call",
+    )
+    eval_parser.set_defaults(func=_cmd_eval)
 
     args = parser.parse_args()
     args.func(args)

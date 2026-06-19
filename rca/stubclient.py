@@ -115,6 +115,9 @@ dilution is possible. Margin data unavailable; flag for finance review.
 **One-off vs structural:** Single-day trigger in stub mode. Insufficient history to classify
 as structural. Recommend watching the next 5 trading days.
 """,
+    "evaluator": """\
+{"groundedness": 4, "calibration": 4, "actionability": 3, "conciseness": 4, "causal_honesty": 4, "summary": "Stub evaluation only."}
+""",
     "slt_brief": "__dynamic__",
 }
 
@@ -150,6 +153,8 @@ class _StubCompletions:
         template = _STUB_RESPONSES.get(self._node_name, _default_stub(self._node_name))
         if self._node_name == "slt_brief":
             content = _build_slt_stub(messages, store, dt)
+        elif self._node_name == "evaluator":
+            content = template
         else:
             content = template.format(store=store, dt=dt)
         return _StubResponse(content)
