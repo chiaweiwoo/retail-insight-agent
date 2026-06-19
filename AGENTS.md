@@ -9,9 +9,10 @@ Current implementation milestone:
 ```text
 Phase 1 complete: local data ingestion into DuckDB.
 Milestone B in progress: reliability checks and a read-only evidence viewer.
+Milestone C setup: signal exploration for daily store RCA triggers.
 ```
 
-Do not build RCA logic, agent logic, or generated narrative in this milestone.
+Do not build agent logic or generated narrative in this milestone.
 
 ## Hard Rules
 
@@ -41,6 +42,7 @@ Allowed in Milestone B:
 read-only evidence UI over committed DuckDB output
 tests and CI
 query/export helpers
+precomputed signal exploration and trigger analysis
 ```
 
 Keep the implementation read-only and evidence-first.
@@ -52,6 +54,16 @@ update README.md for operator-facing workflow
 update AGENTS.md for implementation constraints
 update docs/PRD.md for product-level intent
 add or refresh docs/analysis notes for metric or threshold decisions
+```
+
+Current signal exploration direction:
+
+```text
+daily grain = one store on one date
+signals should be precomputed because the dataset slice is fixed
+drop/lift triggers are per store, not one global daily trigger
+current working metric = trailing_7d_pct_change
+current discussion thresholds = drop <= -20%, lift >= +30%
 ```
 
 ## Package Manager
@@ -222,4 +234,4 @@ hourly arrays are malformed
 
 ## Stop Condition
 
-After reliability, CI, and the read-only evidence viewer are complete, stop.
+After signal exploration is documented and the next implementation target is clear, stop.

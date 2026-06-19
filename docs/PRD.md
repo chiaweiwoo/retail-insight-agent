@@ -18,7 +18,8 @@ The current implementation milestones are:
 4. Save the tables into a local DuckDB database.
 5. Validate table counts and basic metric integrity.
 6. Expose a read-only evidence viewer over the DuckDB output.
-7. Stop before RCA logic and generated narrative.
+7. Explore precomputed daily drop/lift signals for store-day RCA triggering.
+8. Stop before RCA reasoning and generated narrative.
 
 Not part of the current milestones:
 
@@ -32,6 +33,7 @@ Decision hygiene:
 - important analytical decisions should be recorded in the PRD and linked analysis notes
 - trigger definitions should be data-backed, not guessed
 - fixed-snapshot derived layers can be precomputed when that improves consistency
+- early trigger windows should be treated carefully when history is still short
 
 ## 3. Problem Statement
 
@@ -92,6 +94,8 @@ Expected store-day rows:
 ```text
 15 stores x 90 days = 1,350 rows
 ```
+
+For trigger exploration, daily RCA candidates are evaluated per `store_alias + dt`, not as a single market-wide daily alert.
 
 ## 5. Required Local Database
 
@@ -257,7 +261,26 @@ The first interface phase is a simple analyst view over DuckDB-derived evidence,
 - viewing sales, stockout, discount, activity, holiday, and weather context
 - displaying metrics before any generated narrative
 
-## 10. Non-Goals For This Milestone
+## 10. Current Signal Direction
+
+The current trigger exploration direction is:
+
+```text
+signal metric = trailing_7d_pct_change
+signal labels = drop / lift / neutral
+signal storage = precomputed derived layer over the fixed DuckDB snapshot
+```
+
+Current working discussion thresholds:
+
+```text
+drop trigger <= -20%
+lift trigger >= +30%
+```
+
+These thresholds are intentionally high and asymmetric for learning-stage anomaly review. They are meant to produce stronger scenarios for discussion, not production alert coverage.
+
+## 11. Non-Goals For This Milestone
 
 Do not build:
 
@@ -277,7 +300,7 @@ production deployment
 RCA report generation
 ```
 
-## 11. Future Roadmap
+## 12. Future Roadmap
 
 After Phase 1 works:
 

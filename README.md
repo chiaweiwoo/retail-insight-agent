@@ -6,6 +6,7 @@ Current implemented milestones:
 
 - Phase 1: scoped raw data ingested into DuckDB
 - Milestone B: reliability checks plus a read-only evidence viewer
+- Milestone C starting point: precomputed drop/lift signal exploration for daily store RCA
 - Still out of scope: RCA narrative generation, agents, LangGraph, and LLM features
 
 ## Current Scope
@@ -78,5 +79,8 @@ npm run dev
 - The raw parquet file is expected locally at `data/raw/train.parquet` and is not committed.
 - Sales-signal exploration outputs are written to `data/analysis/` and `docs/analysis/`.
 - Important analytical decisions should be reflected in `README.md`, `AGENTS.md`, `docs/PRD.md`, and the detailed note under `docs/analysis/`.
+- Current working signal direction: precompute daily `drop`, `lift`, and `neutral` labels per store-day from `trailing_7d_pct_change`.
+- Current preferred discussion thresholds: `drop <= -20%` and `lift >= +30%`.
+- Trigger grids for threshold review live under `docs/analysis/trigger_grids/`.
 - The UI is an evidence viewer only. It does not generate RCA conclusions.
 - CI runs validation, tests, UI data export, and UI build from the committed DuckDB.

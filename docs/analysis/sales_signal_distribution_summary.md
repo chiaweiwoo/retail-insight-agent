@@ -2,6 +2,11 @@
 
 Recommended primary signal candidate: `trailing_7d_pct_change`
 
+Current working discussion thresholds:
+
+- `drop <= -20%`
+- `lift >= +30%`
+
 ## Distribution Snapshot
 
 | metric | rows_with_baseline | min | p10 | p25 | median | p75 | p90 | max | mean | std |
@@ -61,3 +66,18 @@ Recommended primary signal candidate: `trailing_7d_pct_change`
 - Pure `trailing_7d_pct_change` at 20% gives 242 triggered store-days across 49 calendar dates.
 - Pure `trailing_7d_pct_change` at 25% gives 136 triggered store-days across 39 calendar dates, which is a better anomaly-style discussion set.
 - The current trigger exploration is per store-day, not a single global daily alarm.
+
+## Recommended Working Interpretation
+
+- Treat the signal as a precomputed store-day label, not an on-demand query.
+- Use `trailing_7d_pct_change` as the first signal metric because it balances coverage and stability better than `day_over_day`.
+- For stronger learning-stage scenarios, use asymmetric thresholds:
+  - `drop <= -20%`
+  - `lift >= +30%`
+- This is intentionally selective and discussion-oriented rather than production-tuned.
+
+## Grid References
+
+- `20%` active-only grid: `docs/analysis/trigger_grids/trailing_7d_pct_trigger_grid_20_active_only.md`
+- `25%` active-only grid: `docs/analysis/trigger_grids/trailing_7d_pct_trigger_grid_25_active_only.md`
+- `30%` active-only grid: `docs/analysis/trigger_grids/trailing_7d_pct_trigger_grid_30_active_only.md`
