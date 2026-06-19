@@ -825,6 +825,8 @@ def run_coordinator(
 
     if output_dir is not None:
         output_dir.mkdir(parents=True, exist_ok=True)
+        (output_dir / "run_log.jsonl").write_text(logger.to_jsonl(), encoding="utf-8")
+        (output_dir / "run_log.md").write_text(logger.to_markdown(), encoding="utf-8")
         specialist_dir = output_dir / "specialists"
         specialist_dir.mkdir(parents=True, exist_ok=True)
         for result in analyst_results:
@@ -894,8 +896,13 @@ def run_coordinator(
             "coordinator_report_markdown": coordinator_report,
             "analyst_results": [asdict(result) for result in analyst_results],
         }
+        trace_json = json.dumps(payload, indent=2, ensure_ascii=False)
         (output_dir / "coordinator_trace.json").write_text(
-            json.dumps(payload, indent=2, ensure_ascii=False),
+            trace_json,
+            encoding="utf-8",
+        )
+        (output_dir / "run_trace.json").write_text(
+            trace_json,
             encoding="utf-8",
         )
 

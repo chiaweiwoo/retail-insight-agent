@@ -190,6 +190,9 @@ def test_coordinator_runs_parallel_specialists_and_synthesizes(tmp_path) -> None
     assert (tmp_path / "scenario" / "critique.html").exists()
     assert (tmp_path / "scenario" / "controller_note.md").exists()
     assert (tmp_path / "scenario" / "decision_card.md").exists()
+    assert (tmp_path / "scenario" / "run_log.md").exists()
+    assert (tmp_path / "scenario" / "run_log.jsonl").exists()
+    assert (tmp_path / "scenario" / "run_trace.json").exists()
     assert (tmp_path / "scenario" / "report.html").exists()
 
 

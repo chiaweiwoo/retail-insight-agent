@@ -1,34 +1,39 @@
 # CLAUDE.md
 
-Architecture, agent roles, commands, and data layout: **README.md**.
-Agent guardrails and out-of-scope boundaries: **AGENTS.md**.
+Read `README.md` first for the current workflow.
 
-Read both before making non-trivial changes.
-
-## Dashboard
-
-`ui/public/dashboard.html` is a generated file — do not edit it directly.
-Rebuild it with:
+## Useful Commands
 
 ```bash
-uv run python -m rca.cli dashboard
-```
-
-Source: `rca/report.py::build_dashboard_html`
-Data inputs: `data/analysis/trigger_grids/trailing_7d_pct_trigger_grid_20.csv`, related CSVs under `data/analysis/`, and `data/runs.duckdb` for the Recent Runs section.
-
-## Run Logs
-
-All pipeline runs write events to `data/runs.duckdb` (table `run_log_event`). Created automatically on first run. To view recent runs in the terminal:
-
-```bash
+uv run python -m rca.cli build
+uv run python -m rca.cli analyze
+uv run python -m rca.cli profile
+uv run python -m rca.cli run --store h555 --dt 2024-05-16 --dry-run --full
+uv run python -m rca.cli bench
+uv run python -m rca.cli eval --dry-run
 uv run python -m rca.cli runs
 ```
 
-## DB Migration
+## Important Behavior
 
-If upgrading from the old structure, copy the old database to the new path:
+- `rca run` prints the decision card by default.
+- `--full` also prints the drill-down RCA.
+- `--dry-run` uses the deterministic stub client and should exercise the whole pipeline.
+- Research is gated off by default.
 
-```bash
-cp data/db/rca_foundry.duckdb data/rca.duckdb
-```
+## Artifacts
+
+Non-quick runs write:
+
+- decision card
+- RCA report
+- critic note
+- finance controller note
+- run trace
+- run logs
+- specialist memos
+
+## Local Datastores
+
+- `data/rca.duckdb`: analytical evidence store
+- `data/runs.duckdb`: run logs and `rca_outcome` memory

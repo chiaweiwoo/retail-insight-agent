@@ -1,15 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="900" viewBox="0 0 1280 900" role="img" aria-labelledby="title desc">
   <title id="title">Retail Insight Agent Runtime DAG</title>
-  <desc id="desc">Manager entry dispatches four parallel specialist analysts, which feed a manager analyst, followed by artifact writing.</desc>
+  <desc id="desc">Context and memory feed a selective planner, which dispatches parallel specialists into critic, coordinator, finance controller, SLT brief, outcome recording, and artifact writing.</desc>
   <defs>
     <style>
       .bg { fill: #f8fafc; }
       .node { fill: #ffffff; stroke: #334155; stroke-width: 2; rx: 10; ry: 10; }
-      .manager { fill: #dbeafe; }
+      .prep { fill: #dbeafe; }
       .specialist { fill: #dcfce7; }
-      .artifact { fill: #fef3c7; }
+      .review { fill: #fde68a; }
+      .artifact { fill: #fbcfe8; }
       .label { font-family: Arial, Helvetica, sans-serif; font-size: 20px; fill: #0f172a; text-anchor: middle; dominant-baseline: middle; }
-      .small { font-size: 16px; fill: #334155; }
+      .small { font-size: 15px; fill: #334155; }
       .edge { stroke: #475569; stroke-width: 3; fill: none; marker-end: url(#arrow); }
       .legend { font-family: Arial, Helvetica, sans-serif; font-size: 18px; fill: #0f172a; }
     </style>
@@ -18,58 +19,83 @@
     </marker>
   </defs>
 
-  <rect class="bg" x="0" y="0" width="1200" height="760" />
+  <rect class="bg" x="0" y="0" width="1280" height="900" />
 
-  <rect class="node manager" x="430" y="40" width="340" height="72" />
-  <text class="label" x="600" y="67">Input: store_alias + dt</text>
-  <text class="label small" x="600" y="92">single RCA request enters runtime</text>
+  <rect class="node prep" x="430" y="30" width="420" height="70" />
+  <text class="label" x="640" y="56">Input: store_alias + dt</text>
+  <text class="label small" x="640" y="80">single RCA request</text>
 
-  <rect class="node manager" x="430" y="160" width="340" height="72" />
-  <text class="label" x="600" y="187">manager_entry</text>
-  <text class="label small" x="600" y="212">create context, start logging, dispatch analysts</text>
+  <rect class="node prep" x="150" y="140" width="300" height="80" />
+  <text class="label" x="300" y="168">context_pack</text>
+  <text class="label small" x="300" y="194">grounding from DuckDB</text>
 
-  <rect class="node specialist" x="70" y="320" width="240" height="90" />
-  <text class="label" x="190" y="348">signal_analyst</text>
-  <text class="label small" x="190" y="374">tools:</text>
-  <text class="label small" x="190" y="396">get_signal_evidence</text>
-  <text class="label small" x="190" y="416">get_sales_context</text>
+  <rect class="node prep" x="510" y="140" width="260" height="80" />
+  <text class="label" x="640" y="168">get_prior_rca</text>
+  <text class="label small" x="640" y="194">store memory from runs DB</text>
 
-  <rect class="node specialist" x="340" y="320" width="240" height="90" />
-  <text class="label" x="460" y="348">inventory_analyst</text>
-  <text class="label small" x="460" y="374">tools:</text>
-  <text class="label small" x="460" y="396">get_stockout_context</text>
-  <text class="label small" x="460" y="416">get_sales_context</text>
+  <rect class="node prep" x="830" y="140" width="300" height="80" />
+  <text class="label" x="980" y="168">plan_specialists</text>
+  <text class="label small" x="980" y="194">selective analyst dispatch</text>
 
-  <rect class="node specialist" x="620" y="320" width="240" height="90" />
-  <text class="label" x="740" y="348">pricing_activity_analyst</text>
-  <text class="label small" x="740" y="374">tools:</text>
-  <text class="label small" x="740" y="396">get_discount_context, get_activity_context</text>
-  <text class="label small" x="740" y="416">get_sales_context</text>
+  <rect class="node specialist" x="60" y="300" width="210" height="92" />
+  <text class="label" x="165" y="326">sales_analyst</text>
+  <text class="label small" x="165" y="352">signal + baselines</text>
+  <text class="label small" x="165" y="376">always runs</text>
 
-  <rect class="node specialist" x="890" y="320" width="240" height="90" />
-  <text class="label" x="1010" y="348">context_analyst</text>
-  <text class="label small" x="1010" y="374">tools:</text>
-  <text class="label small" x="1010" y="396">get_calendar_weather_context</text>
-  <text class="label small" x="1010" y="416">get_peer_store_context, get_sales_context</text>
+  <rect class="node specialist" x="300" y="300" width="210" height="92" />
+  <text class="label" x="405" y="326">ops_analyst</text>
+  <text class="label small" x="405" y="352">stockout + availability</text>
+  <text class="label small" x="405" y="376">conditional</text>
 
-  <rect class="node manager" x="430" y="500" width="340" height="80" />
-  <text class="label" x="600" y="528">manager_analyst</text>
-  <text class="label small" x="600" y="554">synthesizes specialist memos into final RCA</text>
+  <rect class="node specialist" x="540" y="300" width="210" height="92" />
+  <text class="label" x="645" y="326">commercial_analyst</text>
+  <text class="label small" x="645" y="352">discount + activity</text>
+  <text class="label small" x="645" y="376">conditional</text>
 
-  <rect class="node artifact" x="430" y="640" width="340" height="80" />
-  <text class="label" x="600" y="668">artifact_writer</text>
-  <text class="label small" x="600" y="694">save report, traces, specialist memos, event logs</text>
+  <rect class="node specialist" x="780" y="300" width="210" height="92" />
+  <text class="label" x="885" y="326">market_analyst</text>
+  <text class="label small" x="885" y="352">calendar + peers + weather</text>
+  <text class="label small" x="885" y="376">always runs</text>
 
-  <path class="edge" d="M 600 112 L 600 160" />
-  <path class="edge" d="M 600 232 L 190 320" />
-  <path class="edge" d="M 600 232 L 460 320" />
-  <path class="edge" d="M 600 232 L 740 320" />
-  <path class="edge" d="M 600 232 L 1010 320" />
-  <path class="edge" d="M 190 410 L 520 500" />
-  <path class="edge" d="M 460 410 L 560 500" />
-  <path class="edge" d="M 740 410 L 640 500" />
-  <path class="edge" d="M 1010 410 L 680 500" />
-  <path class="edge" d="M 600 580 L 600 640" />
+  <rect class="node specialist" x="1020" y="300" width="210" height="92" />
+  <text class="label" x="1125" y="326">research_analyst</text>
+  <text class="label small" x="1125" y="352">retrospective news search</text>
+  <text class="label small" x="1125" y="376">optional</text>
 
-  <text class="legend" x="70" y="735">Blue = manager/workflow nodes   Green = parallel specialists   Yellow = saved artifacts</text>
+  <rect class="node review" x="490" y="470" width="300" height="72" />
+  <text class="label" x="640" y="496">critic</text>
+  <text class="label small" x="640" y="520">claim audit + calibration pass</text>
+
+  <rect class="node review" x="490" y="590" width="300" height="72" />
+  <text class="label" x="640" y="616">coordinator</text>
+  <text class="label small" x="640" y="640">ranked RCA synthesis</text>
+
+  <rect class="node review" x="490" y="710" width="300" height="72" />
+  <text class="label" x="640" y="736">finance_controller</text>
+  <text class="label small" x="640" y="760">materiality + margin lens</text>
+
+  <rect class="node artifact" x="490" y="820" width="300" height="72" />
+  <text class="label" x="640" y="846">slt_brief + record outcome</text>
+  <text class="label small" x="640" y="870">decision card + trace + logs</text>
+
+  <path class="edge" d="M 640 100 L 300 140" />
+  <path class="edge" d="M 640 100 L 640 140" />
+  <path class="edge" d="M 640 100 L 980 140" />
+  <path class="edge" d="M 300 220 L 980 220 L 980 140" />
+  <path class="edge" d="M 640 220 L 980 220" />
+  <path class="edge" d="M 980 220 L 165 300" />
+  <path class="edge" d="M 980 220 L 405 300" />
+  <path class="edge" d="M 980 220 L 645 300" />
+  <path class="edge" d="M 980 220 L 885 300" />
+  <path class="edge" d="M 980 220 L 1125 300" />
+  <path class="edge" d="M 165 392 L 540 470" />
+  <path class="edge" d="M 405 392 L 590 470" />
+  <path class="edge" d="M 645 392 L 640 470" />
+  <path class="edge" d="M 885 392 L 690 470" />
+  <path class="edge" d="M 1125 392 L 740 470" />
+  <path class="edge" d="M 640 542 L 640 590" />
+  <path class="edge" d="M 640 662 L 640 710" />
+  <path class="edge" d="M 640 782 L 640 820" />
+
+  <text class="legend" x="60" y="60">Blue = setup and planning   Green = parallel specialists   Yellow = review/synthesis   Pink = output and memory</text>
 </svg>

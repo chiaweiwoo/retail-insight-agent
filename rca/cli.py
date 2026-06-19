@@ -6,6 +6,17 @@ import sys
 from pathlib import Path
 
 
+def _safe_print(text: str) -> None:
+    try:
+        print(text)
+    except UnicodeEncodeError:
+        sanitized = text.encode(sys.stdout.encoding or "utf-8", errors="replace").decode(
+            sys.stdout.encoding or "utf-8",
+            errors="replace",
+        )
+        print(sanitized)
+
+
 def _cmd_build(args: argparse.Namespace) -> None:
     from rca.database import ingest_to_duckdb, validate_daily_tables
     from rca.config import DB_PATH
@@ -193,11 +204,11 @@ def _cmd_run(args: argparse.Namespace) -> None:
         output_dir=output_dir,
     )
     if args.quick:
-        print(result.coordinator_report_markdown)
+        _safe_print(result.coordinator_report_markdown)
     else:
-        print(result.decision_card_markdown)
+        _safe_print(result.decision_card_markdown)
         if args.full:
-            print("\n" + result.coordinator_report_markdown)
+            _safe_print("\n" + result.coordinator_report_markdown)
     if output_dir:
         print(f"\nArtifacts written to {output_dir}")
 

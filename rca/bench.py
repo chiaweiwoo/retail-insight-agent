@@ -53,6 +53,9 @@ def _result_payload(
         "analyst_count": len(result.analyst_results),
         "tool_call_count": int(sum(len(item.tool_calls) for item in result.analyst_results)),
         "analyst_results": [asdict(item) for item in result.analyst_results],
+        "decision_card_markdown": result.decision_card_markdown,
+        "critic_note_markdown": result.critic_note_markdown,
+        "controller_note_markdown": result.controller_note_markdown,
         "report_markdown": result.coordinator_report_markdown,
     }
 
@@ -88,17 +91,18 @@ def _build_manifest_markdown(
         "",
         "## Scenario Outputs",
         "",
-        "| scenario_id | expected_signal | observed_signal | store_alias | dt | analysts | tool_call_count | report_md | report_html | trace |",
-        "| --- | --- | --- | --- | --- | ---: | ---: | --- | --- | --- |",
+        "| scenario_id | expected_signal | observed_signal | store_alias | dt | analysts | tool_call_count | decision_card | report_html | run_trace | run_log |",
+        "| --- | --- | --- | --- | --- | ---: | ---: | --- | --- | --- | --- |",
     ]
     for row in summary_rows:
         scenario_dir = run_dir / str(row["scenario_id"])
-        report_path = scenario_dir / "report.md"
+        decision_card_path = scenario_dir / "decision_card.html"
         report_html_path = scenario_dir / "report.html"
-        trace_path = scenario_dir / "coordinator_trace.json"
+        trace_path = scenario_dir / "run_trace.json"
+        run_log_path = scenario_dir / "run_log.md"
         lines.append(
             "| {scenario_id} | {expected_signal} | {observed_signal} | {store_alias} | {dt} | {analyst_count} | {tool_call_count} | "
-            "[report.md]({report}) | [report.html]({report_html}) | [trace]({trace}) |".format(
+            "[decision_card.html]({decision_card}) | [report.html]({report_html}) | [run_trace.json]({trace}) | [run_log.md]({run_log}) |".format(
                 scenario_id=row["scenario_id"],
                 expected_signal=row["expected_signal"],
                 observed_signal=row["observed_signal"],
@@ -106,9 +110,10 @@ def _build_manifest_markdown(
                 dt=row["dt"],
                 analyst_count=row["analyst_count"],
                 tool_call_count=row["tool_call_count"],
-                report=report_path.relative_to(run_dir).as_posix(),
+                decision_card=decision_card_path.relative_to(run_dir).as_posix(),
                 report_html=report_html_path.relative_to(run_dir).as_posix(),
                 trace=trace_path.relative_to(run_dir).as_posix(),
+                run_log=run_log_path.relative_to(run_dir).as_posix(),
             )
         )
     lines.extend(
@@ -118,7 +123,7 @@ def _build_manifest_markdown(
             "",
             "- compare `expected_signal` vs `observed_signal` for trigger alignment",
             "- review `tool_call_count` for prompt/tool efficiency drift",
-            "- inspect markdown tone and evidence strength in each report",
+            "- inspect the decision card first, then drill down into report, trace, and run log",
         ]
     )
     return "\n".join(lines) + "\n"
