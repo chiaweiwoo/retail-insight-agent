@@ -3,7 +3,7 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from rca_foundry.signals import (
+from rca.signals import (
     build_pct_trigger_grid,
     build_sales_signal_frame,
     load_sales_history,
