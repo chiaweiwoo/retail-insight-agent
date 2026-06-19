@@ -28,7 +28,7 @@ from rca.tools import (
     get_stockout_context,
     get_tool_schemas,
 )
-from rca.report import render_markdown_document
+from rca.report import render_markdown_document, sanitize_generated_markdown
 from rca.runlog import RunLogger
 
 
@@ -112,6 +112,9 @@ ANALYST_SPECS: tuple[AnalystSpec, ...] = (
             ),
         ),
     ),
+
+
+
     AnalystSpec(
         name="commercial_analyst",
         focus="commercial — discount and promotional activity assessment",
@@ -136,8 +139,10 @@ ANALYST_SPECS: tuple[AnalystSpec, ...] = (
             domain_instructions=(
                 "Assess external factors and whether the move is store-specific or broadly contextual. "
                 "Look at calendar context (weekday, holiday), weather conditions, and how this store performed "
-                "relative to peers. If the move is fleet-wide, that points to external factors. "
-                "If it is isolated, that points to store-specific causes."
+                "relative to peers. WARNING: The dataset is a tiny sandbox of only 15 stores. Peer groups only contain 2-4 stores. "
+                "Therefore, peer comparisons are statistically noisy. Do NOT confidently claim a store is 'underperforming its peers' as a root cause. "
+                "If the move is fleet-wide, that points to external factors. "
+                "If it is isolated, that points to store-specific causes, but temper your confidence regarding peer comparisons."
             ),
         ),
     ),
@@ -159,10 +164,6 @@ ANALYST_SPECS: tuple[AnalystSpec, ...] = (
 
 
 COORDINATOR_SYSTEM_PROMPT = """You are the RCA coordinator analyst.
-
-You receive specialist memos from independent analysts.
-Your job is to synthesize them into one evidence-backed RCA report.
-
 Rules:
 - Do not invent evidence beyond the specialist memos.
 - Distinguish observed evidence from inference.
@@ -187,6 +188,7 @@ Rules:
 - Check whether claims are actually supported by the cited numbers.
 - Flag correlation being presented as causation.
 - Downgrade overconfident claims when evidence is thin.
+- Severely downgrade any claims that rely heavily on peer group comparisons, as the local dataset only contains 15 stores (peer groups of 2-4 stores are mathematically noisy).
 - Keep the note concise and operational.
 - Use plain ASCII markdown.
 
@@ -380,7 +382,7 @@ def _run_specialist(
         message = response.choices[0].message
         tool_calls = getattr(message, "tool_calls", None)
         if not tool_calls:
-            memo = getattr(message, "content", None) or ""
+            memo = sanitize_generated_markdown(getattr(message, "content", None) or "")
             logger.log(
                 actor_type="llm",
                 actor_name=spec.name,
@@ -510,7 +512,7 @@ def _synthesize(
         source="llm",
         details={"content_preview": content[:200]},
     )
-    return content
+    return sanitize_generated_markdown(content)
 
 
 def _run_critic(
@@ -560,7 +562,7 @@ def _run_critic(
         source="llm",
         details={"content_preview": content[:200]},
     )
-    return content
+    return sanitize_generated_markdown(content)
 
 
 def _run_finance_controller(
@@ -608,7 +610,7 @@ def _run_finance_controller(
         source="llm",
         details={"content_preview": content[:200]},
     )
-    return content
+    return sanitize_generated_markdown(content)
 
 
 def _run_slt_brief(
@@ -660,7 +662,7 @@ def _run_slt_brief(
         source="llm",
         details={"content_preview": content[:200]},
     )
-    return content
+    return sanitize_generated_markdown(content)
 
 
 def run_coordinator(
@@ -787,6 +789,13 @@ def run_coordinator(
         logger=logger,
         client_factory=client_factory,
     )
+
+    coordinator_report = sanitize_generated_markdown(coordinator_report)
+    critic_note = sanitize_generated_markdown(critic_note)
+    controller_note = sanitize_generated_markdown(controller_note)
+    decision_card = sanitize_generated_markdown(decision_card)
+    for result in analyst_results:
+        result.memo_markdown = sanitize_generated_markdown(result.memo_markdown)
     logger.log(
         actor_type="workflow",
         actor_name="coordinator_pipeline",
