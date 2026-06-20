@@ -176,7 +176,8 @@ def _cmd_analyze(args: argparse.Namespace) -> None:
 
 
 def _cmd_run(args: argparse.Namespace) -> None:
-    from rca.agents import run_coordinator, ANALYST_SPECS
+    from rca.graph import run_rca_graph
+    from rca.agents import ANALYST_SPECS
     from rca.config import AGENT_BENCHMARK_PATH, current_timestamp_sgt_label
 
     client_factory = None
@@ -196,7 +197,7 @@ def _cmd_run(args: argparse.Namespace) -> None:
         label = "dry_run" if args.dry_run else current_timestamp_sgt_label()
         output_dir = PROJECT_ROOT / "data" / "analysis" / "agent_benchmark_runs" / f"{args.store}_{args.dt}_{label}"
 
-    result = run_coordinator(
+    result = run_rca_graph(
         store_alias=args.store,
         dt=args.dt,
         specialists=specialists,

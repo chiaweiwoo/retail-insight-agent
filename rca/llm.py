@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Callable
 
 from openai import OpenAI
 
@@ -10,7 +10,28 @@ from rca.config import (
     get_llm_base_url,
     get_llm_model,
     get_llm_thinking_enabled,
+    get_model_fast,
+    get_model_deep,
 )
+
+
+ClientFactory = Callable[[str], Any]
+
+NODE_MODEL_MAP: dict[str, str] = {
+    # specialists and story → fast model
+    "sales_analyst": "fast",
+    "ops_analyst": "fast",
+    "commercial_analyst": "fast",
+    "market_analyst": "fast",
+    "research_analyst": "fast",
+    "story_writer": "fast",
+    # synthesis and oversight → deep model
+    "coordinator_analyst": "deep",
+    "critic": "deep",
+    "finance_controller": "deep",
+    "slt_brief": "deep",
+    "evaluator": "deep",
+}
 
 
 @dataclass(frozen=True)
@@ -33,6 +54,18 @@ def load_llm_settings() -> LLMSettings:
 def build_openai_compatible_client(settings: LLMSettings | None = None) -> OpenAI:
     settings = settings or load_llm_settings()
     return OpenAI(api_key=settings.api_key, base_url=settings.base_url)
+
+
+def make_routed_settings(base_settings: LLMSettings, node_name: str) -> LLMSettings:
+    """Return settings with the right model for the given node."""
+    tier = NODE_MODEL_MAP.get(node_name, "deep")
+    model = get_model_fast() if tier == "fast" else get_model_deep()
+    return LLMSettings(
+        api_key=base_settings.api_key,
+        base_url=base_settings.base_url,
+        model=model,
+        thinking_enabled=base_settings.thinking_enabled,
+    )
 
 
 def build_chat_completion_kwargs(

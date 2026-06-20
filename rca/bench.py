@@ -131,7 +131,7 @@ def _build_manifest_markdown(
 
 def run_benchmark(client_factory=None) -> None:
     from rca.llm import load_llm_settings, LLMSettings
-    from rca.agents import run_coordinator
+    from rca.graph import run_rca_graph
 
     if client_factory is not None:
         settings = LLMSettings(
@@ -149,7 +149,7 @@ def run_benchmark(client_factory=None) -> None:
     summary_rows: list[dict[str, object]] = []
     for scenario in SCENARIOS:
         scenario_dir = run_dir / scenario.scenario_id
-        result = run_coordinator(
+        result = run_rca_graph(
             store_alias=scenario.store_alias,
             dt=scenario.dt,
             settings=settings,
