@@ -53,7 +53,7 @@ class AnalystRunResult:
 
 @dataclass
 class CoordinatorResult:
-    store_alias: str
+    city_id: int
     dt: str
     coordinator_report_markdown: str
     critic_note_markdown: str
@@ -137,8 +137,8 @@ ANALYST_SPECS: tuple[AnalystSpec, ...] = (
         system_prompt=_analyst_prompt(
             role="Market Analyst",
             domain_instructions=(
-                "Assess external factors and whether the move is store-specific or broadly contextual. "
-                "Look at calendar context (weekday, holiday), weather conditions, and how this store performed "
+                "Assess external factors and whether the move is city-specific or broadly macro-regional. "
+                "Look at calendar context (weekday, holiday), weather conditions, and how this city performed "
                 "relative to peers. "
                 "PEER COMPARISON CAUTION: The peer group tool groups stores by their alias prefix (h/m/l) "
                 "or store type. For the well-known city-0 stores, each prefix group contains only ~5 stores — "
@@ -146,7 +146,7 @@ ANALYST_SPECS: tuple[AnalystSpec, ...] = (
                 "cities with different demand patterns, making fleet-average comparisons unreliable as root-cause evidence. "
                 "In either case: peer comparison can support a hypothesis but CANNOT be the primary root cause. "
                 "If the move appears fleet-wide across the same calendar date, that supports external factors. "
-                "If isolated, flag it as store-specific but LOW confidence without corroborating evidence."
+                "If isolated, flag it as city-specific but LOW confidence without corroborating evidence."
             ),
         ),
     ),
@@ -158,7 +158,7 @@ ANALYST_SPECS: tuple[AnalystSpec, ...] = (
             role="Research Analyst",
             domain_instructions=(
                 "Find relevant external news or events that may have influenced retail sales on this date. "
-                "Search for news about retail conditions, economic events, or local events relevant to the store date. "
+                "Search for news about retail conditions, economic events, or local events relevant to the city date. "
                 "Report only what you find in search results — do not invent or infer beyond the evidence returned. "
                 "This search is retrospective; findings are approximate and should be treated as LOW confidence."
             ),
@@ -192,7 +192,7 @@ Rules:
 - Check whether claims are actually supported by the cited numbers.
 - Flag correlation being presented as causation.
 - Downgrade overconfident claims when evidence is thin.
-- Severely downgrade any claims that rely heavily on peer group comparisons. The dataset covers 677 stores across 5 cities, but alias-prefix peer groups (h/m/l) are still only ~5 stores each — mathematically noisy. Cross-city 's'-prefix groups are large but heterogeneous and not a valid peer comparison.
+- Severely downgrade any claims that rely heavily on peer group comparisons. The dataset covers multiple cities, but inter-city peer comparisons are noisy.
 - Keep the note concise and operational.
 - Use plain ASCII markdown.
 
@@ -215,8 +215,8 @@ CRITICAL DATA CONTEXT — read before writing:
   sale_amount and hours_sale are index-like values multiplied by a source coefficient.
   They are NOT dollars, RMB, or any monetary unit.
 - NEVER write a $ sign, currency symbol, or currency amount. Do not say "$28K", "28K USD", etc.
-- Quantify materiality as a MULTIPLE of the store's normal baseline or as a % of fleet mean.
-  Example: "the drop is 1.4x the store's typical day-to-day variance" or "this represents ~8% below
+- Quantify materiality as a MULTIPLE of the city's normal baseline or as a % of fleet mean.
+  Example: "the drop is 1.4x the city's typical day-to-day variance" or "this represents ~8% below
   the fleet median for the date". Never invent a monetary figure.
 - We have NO margin or cost data. Do not invent margin estimates. Flag margin visibility as a data gap.
 
@@ -226,7 +226,7 @@ Rules:
 - use plain ASCII markdown
 
 Return sections:
-1. Materiality (relative to store baseline and fleet — no currency)
+1. Materiality (relative to city baseline and fleet — no currency)
 2. Margin Risk (flag absence of cost data if relevant)
 3. One-off vs Structural
 """
@@ -241,7 +241,7 @@ Rules:
 - use plain ASCII markdown
 
 Return exactly this shape:
-## Decision Card - <store> <date>
+## Regional Decision Card - <city> <date>
 - headline: <one line>
 - confidence: <high | medium | low>
 - materiality: <short line>
@@ -252,13 +252,13 @@ Return exactly this shape:
 
 
 def plan_specialists(
-    store_alias: str,
+    city_id: int,
     dt: str,
     signal: dict[str, Any] | None = None,
     include_research: bool = False,
 ) -> list[AnalystSpec]:
     selected, _, _ = _plan_specialists_with_reasons(
-        store_alias=store_alias,
+        city_id=city_id,
         dt=dt,
         signal=signal,
         include_research=include_research,
@@ -267,16 +267,16 @@ def plan_specialists(
 
 
 def _plan_specialists_with_reasons(
-    store_alias: str,
+    city_id: int,
     dt: str,
     signal: dict[str, Any] | None = None,
     include_research: bool = False,
 ) -> tuple[list[AnalystSpec], list[dict[str, Any]], dict[str, Any]]:
     spec_by_name = {spec.name: spec for spec in ANALYST_SPECS}
-    signal_evidence = signal or get_signal_evidence(store_alias, dt)
-    stockout_context = get_stockout_context(store_alias, dt)
-    discount_context = get_discount_context(store_alias, dt)
-    activity_context = get_activity_context(store_alias, dt)
+    signal_evidence = signal or get_signal_evidence(city_id, dt)
+    stockout_context = get_stockout_context(city_id, dt)
+    discount_context = get_discount_context(city_id, dt)
+    activity_context = get_activity_context(city_id, dt)
 
     planning_inputs = {
         "signal_evidence": signal_evidence,
@@ -348,7 +348,7 @@ def _default_client_factory(settings: LLMSettings) -> ClientFactory:
 
 def _run_specialist(
     spec: AnalystSpec,
-    store_alias: str,
+    city_id: int,
     dt: str,
     settings: LLMSettings,
     logger: RunLogger,
@@ -356,7 +356,7 @@ def _run_specialist(
     max_tool_rounds: int = DEFAULT_LLM_MAX_TOOL_ROUNDS,
     profile_text: str | None = None,
 ) -> AnalystRunResult:
-    subject = f"{store_alias}:{dt}"
+    subject = f"{city_id}:{dt}"
     client = client_factory(spec.name)
     logger.log(
         actor_type="agent",
@@ -369,12 +369,12 @@ def _run_specialist(
     messages: list[dict[str, Any]] = [
         {
             "role": "system",
-            "content": build_context_preamble(store_alias, dt, profile_text=profile_text) + "\n" + spec.system_prompt,
+            "content": build_context_preamble(city_id, dt, profile_text=profile_text) + "\n" + spec.system_prompt,
         },
         {
             "role": "user",
             "content": (
-                f"Analyze store {store_alias} on {dt}. "
+                f"Analyze city {city_id} on {dt}. "
                 f"Your focus is {spec.focus}. Produce a short specialist memo."
             ),
         },
@@ -479,7 +479,7 @@ def _run_specialist(
 
 
 def _synthesize(
-    store_alias: str,
+    city_id: int,
     dt: str,
     analyst_results: list[AnalystRunResult],
     critic_note_markdown: str,
@@ -488,7 +488,7 @@ def _synthesize(
     client_factory: ClientFactory,
     profile_text: str | None = None,
 ) -> str:
-    subject = f"{store_alias}:{dt}"
+    subject = f"{city_id}:{dt}"
     client = client_factory("coordinator_analyst")
     memos = "\n\n".join(
         f"## {result.name}\nFocus: {result.focus}\n\n{result.memo_markdown}"
@@ -497,12 +497,12 @@ def _synthesize(
     messages = [
         {
             "role": "system",
-            "content": build_context_preamble(store_alias, dt, profile_text=profile_text) + "\n" + COORDINATOR_SYSTEM_PROMPT,
+            "content": build_context_preamble(city_id, dt, profile_text=profile_text) + "\n" + COORDINATOR_SYSTEM_PROMPT,
         },
         {
             "role": "user",
             "content": (
-                f"Synthesize the specialist memos for store {store_alias} on {dt}.\n\n"
+                f"Synthesize the specialist memos for city {city_id} on {dt}.\n\n"
                 f"Specialist memos:\n\n{memos}\n\n"
                 f"Critic note:\n\n{critic_note_markdown}"
             ),
@@ -532,7 +532,7 @@ def _synthesize(
 
 
 def _run_critic(
-    store_alias: str,
+    city_id: int,
     dt: str,
     analyst_results: list[AnalystRunResult],
     settings: LLMSettings,
@@ -540,7 +540,7 @@ def _run_critic(
     client_factory: ClientFactory,
     profile_text: str | None = None,
 ) -> str:
-    subject = f"{store_alias}:{dt}"
+    subject = f"{city_id}:{dt}"
     client = client_factory("critic")
     memos = "\n\n".join(
         f"## {result.name}\nFocus: {result.focus}\n\n{result.memo_markdown}"
@@ -549,12 +549,12 @@ def _run_critic(
     messages = [
         {
             "role": "system",
-            "content": build_context_preamble(store_alias, dt, profile_text=profile_text) + "\n" + CRITIC_SYSTEM_PROMPT,
+            "content": build_context_preamble(city_id, dt, profile_text=profile_text) + "\n" + CRITIC_SYSTEM_PROMPT,
         },
         {
             "role": "user",
             "content": (
-                f"Review the specialist memos for store {store_alias} on {dt}.\n\n"
+                f"Review the specialist memos for city {city_id} on {dt}.\n\n"
                 f"{memos}"
             ),
         },
@@ -583,7 +583,7 @@ def _run_critic(
 
 
 def _run_finance_controller(
-    store_alias: str,
+    city_id: int,
     dt: str,
     coordinator_report_markdown: str,
     critic_note_markdown: str,
@@ -592,17 +592,17 @@ def _run_finance_controller(
     client_factory: ClientFactory,
     profile_text: str | None = None,
 ) -> str:
-    subject = f"{store_alias}:{dt}"
+    subject = f"{city_id}:{dt}"
     client = client_factory("finance_controller")
     messages = [
         {
             "role": "system",
-            "content": build_context_preamble(store_alias, dt, profile_text=profile_text) + "\n" + FINANCE_CONTROLLER_SYSTEM_PROMPT,
+            "content": build_context_preamble(city_id, dt, profile_text=profile_text) + "\n" + FINANCE_CONTROLLER_SYSTEM_PROMPT,
         },
         {
             "role": "user",
             "content": (
-                f"Review this RCA for store {store_alias} on {dt}.\n\n"
+                f"Review this RCA for city {city_id} on {dt}.\n\n"
                 f"RCA:\n\n{coordinator_report_markdown}\n\n"
                 f"Critic note:\n\n{critic_note_markdown}"
             ),
@@ -632,7 +632,7 @@ def _run_finance_controller(
 
 
 def _run_slt_brief(
-    store_alias: str,
+    city_id: int,
     dt: str,
     coordinator_report_markdown: str,
     controller_note_markdown: str,
@@ -643,17 +643,17 @@ def _run_slt_brief(
     client_factory: ClientFactory,
     profile_text: str | None = None,
 ) -> str:
-    subject = f"{store_alias}:{dt}"
+    subject = f"{city_id}:{dt}"
     client = client_factory("slt_brief")
     messages = [
         {
             "role": "system",
-            "content": build_context_preamble(store_alias, dt, profile_text=profile_text) + "\n" + SLT_BRIEF_SYSTEM_PROMPT,
+            "content": build_context_preamble(city_id, dt, profile_text=profile_text) + "\n" + SLT_BRIEF_SYSTEM_PROMPT,
         },
         {
             "role": "user",
             "content": (
-                f"Create the decision card for store {store_alias} on {dt}.\n\n"
+                f"Create the regional decision card for city {city_id} on {dt}.\n\n"
                 f"RCA:\n\n{coordinator_report_markdown}\n\n"
                 f"Finance controller note:\n\n{controller_note_markdown}\n\n"
                 f"Critic note:\n\n{critic_note_markdown}\n\n"
@@ -685,7 +685,7 @@ def _run_slt_brief(
 
 
 def run_coordinator(
-    store_alias: str,
+    city_id: int,
     dt: str,
     specialists: list[AnalystSpec] | None = None,
     settings: LLMSettings | None = None,
@@ -695,16 +695,16 @@ def run_coordinator(
 ) -> CoordinatorResult:
     settings = settings or load_llm_settings()
     client_factory = client_factory or _default_client_factory(settings)
-    run_name = f"{store_alias}_{dt}"
+    run_name = f"{city_id}_{dt}"
     logger = RunLogger(run_name=run_name)
-    subject = f"{store_alias}:{dt}"
+    subject = f"{city_id}:{dt}"
 
     planning_inputs: dict[str, Any] | None = None
     skipped_analysts: list[dict[str, Any]] = []
-    prior_rca_summary = get_prior_rca(store_alias)
+    prior_rca_summary = get_prior_rca(city_id)
     if specialists is None:
         specialists, skipped_analysts, planning_inputs = _plan_specialists_with_reasons(
-            store_alias=store_alias,
+            city_id=city_id,
             dt=dt,
             include_research=include_research,
         )
@@ -738,7 +738,7 @@ def run_coordinator(
     def run_one(spec: AnalystSpec) -> AnalystRunResult:
         return _run_specialist(
             spec=spec,
-            store_alias=store_alias,
+            city_id=city_id,
             dt=dt,
             settings=settings,
             logger=logger,
@@ -763,7 +763,7 @@ def run_coordinator(
     )
 
     critic_note = _run_critic(
-        store_alias=store_alias,
+        city_id=city_id,
         dt=dt,
         analyst_results=analyst_results,
         settings=settings,
@@ -780,7 +780,7 @@ def run_coordinator(
     )
 
     coordinator_report = _synthesize(
-        store_alias=store_alias,
+        city_id=city_id,
         dt=dt,
         analyst_results=analyst_results,
         critic_note_markdown=critic_note,
@@ -789,7 +789,7 @@ def run_coordinator(
         client_factory=client_factory,
     )
     controller_note = _run_finance_controller(
-        store_alias=store_alias,
+        city_id=city_id,
         dt=dt,
         coordinator_report_markdown=coordinator_report,
         critic_note_markdown=critic_note,
@@ -798,7 +798,7 @@ def run_coordinator(
         client_factory=client_factory,
     )
     decision_card = _run_slt_brief(
-        store_alias=store_alias,
+        city_id=city_id,
         dt=dt,
         coordinator_report_markdown=coordinator_report,
         controller_note_markdown=controller_note,
@@ -828,9 +828,9 @@ def run_coordinator(
     )
     outcome_record = build_outcome_record(
         run_name=run_name,
-        store_alias=store_alias,
+        city_id=city_id,
         dt=dt,
-        signal_evidence=(planning_inputs or {}).get("signal_evidence") or get_signal_evidence(store_alias, dt),
+        signal_evidence=(planning_inputs or {}).get("signal_evidence") or get_signal_evidence(city_id, dt),
         coordinator_report_markdown=coordinator_report,
         decision_card_markdown=decision_card,
     )
@@ -864,7 +864,7 @@ def run_coordinator(
             html_path.write_text(
                 render_markdown_document(
                     result.memo_markdown,
-                    title=f"{result.name} memo for {store_alias} on {dt}",
+                    title=f"{result.name} memo for {city_id} on {dt}",
                 ),
                 encoding="utf-8",
             )
@@ -874,7 +874,7 @@ def run_coordinator(
         critique_html_path.write_text(
             render_markdown_document(
                 critic_note,
-                title=f"Critique for {store_alias} on {dt}",
+                title=f"Critique for {city_id} on {dt}",
             ),
             encoding="utf-8",
         )
@@ -884,7 +884,7 @@ def run_coordinator(
         controller_html_path.write_text(
             render_markdown_document(
                 controller_note,
-                title=f"Finance controller note for {store_alias} on {dt}",
+                title=f"Finance controller note for {city_id} on {dt}",
             ),
             encoding="utf-8",
         )
@@ -894,7 +894,7 @@ def run_coordinator(
         decision_card_html_path.write_text(
             render_markdown_document(
                 decision_card,
-                title=f"Decision card for {store_alias} on {dt}",
+                title=f"Decision card for {city_id} on {dt}",
             ),
             encoding="utf-8",
         )
@@ -904,12 +904,12 @@ def run_coordinator(
         report_html_path.write_text(
             render_markdown_document(
                 coordinator_report,
-                title=f"RCA report for {store_alias} on {dt}",
+                title=f"RCA report for {city_id} on {dt}",
             ),
             encoding="utf-8",
         )
         payload = {
-            "store_alias": store_alias,
+            "city_id": city_id,
             "dt": dt,
             "planner": {
                 "selected_analysts": [spec.name for spec in specialists],
@@ -935,7 +935,7 @@ def run_coordinator(
         )
 
     return CoordinatorResult(
-        store_alias=store_alias,
+        city_id=city_id,
         dt=dt,
         coordinator_report_markdown=coordinator_report,
         critic_note_markdown=critic_note,

@@ -12,7 +12,7 @@ from rca.config import make_supabase_client
 @dataclass(frozen=True)
 class OutcomeRecord:
     run_name: str
-    store_alias: str
+    city_id: int
     dt: str
     signal_label: str
     top_driver: str
@@ -32,7 +32,7 @@ def record_outcome(record: OutcomeRecord, dry_run: bool = False) -> None:
     client.table("rca_outcome").upsert(
         {
             "run_name": record.run_name,
-            "store_id": record.store_alias,
+            "store_id": record.city_id,
             "dt": record.dt,
             "signal_label": record.signal_label,
             "top_driver": record.top_driver,
@@ -47,12 +47,12 @@ def record_outcome(record: OutcomeRecord, dry_run: bool = False) -> None:
 
 
 def get_prior_rca(
-    store_alias: str,
+    city_id: int,
     limit: int = 5,
 ) -> dict[str, Any]:
     """Read prior RCA outcomes for a store from Supabase."""
     if not os.getenv("SUPABASE_URL"):
-        return _empty_prior(store_alias)
+        return _empty_prior(city_id)
 
     try:
         client = make_supabase_client()
@@ -60,14 +60,14 @@ def get_prior_rca(
             client
             .table("rca_outcome")
             .select("dt,signal_label,top_driver,driver_class,confidence,escalated,brief_headline")
-            .eq("store_id", store_alias)
+            .eq("store_id", city_id)
             .order("dt", desc=True)
             .limit(limit)
             .execute()
         )
         data = rows.data or []
     except Exception:
-        return _empty_prior(store_alias)
+        return _empty_prior(city_id)
 
     # Aggregate top drivers
     driver_counts: dict[str, int] = {}
@@ -76,7 +76,7 @@ def get_prior_rca(
         driver_counts[d] = driver_counts.get(d, 0) + 1
 
     return {
-        "store_alias": store_alias,
+        "city_id": city_id,
         "previous_trigger_count": len(data),
         "top_driver_counts": [
             {"top_driver": d, "trigger_count": c}
@@ -97,9 +97,9 @@ def get_prior_rca(
     }
 
 
-def _empty_prior(store_alias: str) -> dict[str, Any]:
+def _empty_prior(city_id: int) -> dict[str, Any]:
     return {
-        "store_alias": store_alias,
+        "city_id": city_id,
         "previous_trigger_count": 0,
         "top_driver_counts": [],
         "recent_outcomes": [],
@@ -109,7 +109,7 @@ def _empty_prior(store_alias: str) -> dict[str, Any]:
 def build_outcome_record(
     *,
     run_name: str,
-    store_alias: str,
+    city_id: int,
     dt: str,
     signal_evidence: dict[str, Any],
     coordinator_report_markdown: str,
@@ -117,7 +117,7 @@ def build_outcome_record(
 ) -> OutcomeRecord:
     return OutcomeRecord(
         run_name=run_name,
-        store_alias=store_alias,
+        city_id=city_id,
         dt=dt,
         signal_label=str(signal_evidence.get("signal_label", "unknown")),
         top_driver=_extract_top_driver(coordinator_report_markdown),

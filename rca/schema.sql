@@ -1,6 +1,6 @@
-CREATE TABLE dim_store (
-    store_alias TEXT PRIMARY KEY,
-    city_id INTEGER NOT NULL DEFAULT 0
+CREATE TABLE dim_city (
+    city_id INTEGER PRIMARY KEY,
+    store_count INTEGER NOT NULL DEFAULT 1
 );
 
 CREATE TABLE dim_holiday_day (
@@ -20,8 +20,8 @@ CREATE TABLE dim_weather_day (
     avg_wind_level DOUBLE NOT NULL
 );
 
-CREATE TABLE fact_sales_store_day (
-    store_alias TEXT NOT NULL,
+CREATE TABLE fact_sales_city_day (
+    city_id INTEGER NOT NULL,
     dt DATE NOT NULL,
     product_count INTEGER NOT NULL,
     active_product_count INTEGER NOT NULL,
@@ -51,11 +51,11 @@ CREATE TABLE fact_sales_store_day (
     hour_21_sales DOUBLE NOT NULL,
     hour_22_sales DOUBLE NOT NULL,
     hour_23_sales DOUBLE NOT NULL,
-    PRIMARY KEY (store_alias, dt)
+    PRIMARY KEY (city_id, dt)
 );
 
-CREATE TABLE fact_stockout_store_day (
-    store_alias TEXT NOT NULL,
+CREATE TABLE fact_stockout_city_day (
+    city_id INTEGER NOT NULL,
     dt DATE NOT NULL,
     avg_stockout_hours DOUBLE NOT NULL,
     stockout_product_rate DOUBLE NOT NULL,
@@ -85,22 +85,22 @@ CREATE TABLE fact_stockout_store_day (
     hour_21_stockout_rate DOUBLE NOT NULL,
     hour_22_stockout_rate DOUBLE NOT NULL,
     hour_23_stockout_rate DOUBLE NOT NULL,
-    PRIMARY KEY (store_alias, dt)
+    PRIMARY KEY (city_id, dt)
 );
 
-CREATE TABLE fact_discount_store_day (
-    store_alias TEXT NOT NULL,
+CREATE TABLE fact_discount_city_day (
+    city_id INTEGER NOT NULL,
     dt DATE NOT NULL,
     avg_discount DOUBLE NOT NULL,
     discounted_product_rate DOUBLE NOT NULL,
     deep_discount_product_rate DOUBLE NOT NULL,
-    PRIMARY KEY (store_alias, dt)
+    PRIMARY KEY (city_id, dt)
 );
 
-CREATE TABLE fact_activity_store_day (
-    store_alias TEXT NOT NULL,
+CREATE TABLE fact_activity_city_day (
+    city_id INTEGER NOT NULL,
     dt DATE NOT NULL,
     activity_product_rate DOUBLE NOT NULL,
     activity_sales_share DOUBLE NOT NULL,
-    PRIMARY KEY (store_alias, dt)
+    PRIMARY KEY (city_id, dt)
 );

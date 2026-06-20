@@ -13,7 +13,7 @@ Working notes and strict guardrails for the RCA agent system.
 ## Data Scale Limitations
 
 - **Dataset**: `FreshRetailNet-50K` heavily normalizes sales figures.
-- **Sandbox**: Local dataset contains only 15 stores. "Peer group" comparisons are statistically noisy. Analysts must acknowledge this small sample size.
+- **Sandbox**: Local dataset aggregates data to the City level. "Peer group" comparisons between cities are statistically noisy. Analysts must acknowledge this.
 - **Source of Truth**: Supabase is the system of record. DuckDB is just an ETL/Compute engine.
 
 ## The LangGraph Pipeline
@@ -21,7 +21,7 @@ Working notes and strict guardrails for the RCA agent system.
 Orchestration is handled by LangGraph via `RcaState`.
 
 1. **Build context**: Fetch from Supabase.
-2. **Retrieve memory**: Fetch `rca_store_profile` and recent `rca_outcome` rows.
+2. **Retrieve memory**: Fetch `rca_store_profile` (now mapping cities) and recent `rca_outcome` rows.
 3. **Plan (Fast Model)**: Dispatch specialists.
 4. **Specialists (Fast Model, Parallel)**: Run `sales_analyst`, `ops_analyst`, `commercial_analyst`, `market_analyst`.
 5. **Critic (Deep Model)**: Downgrades claims, flags correlation-as-cause.
@@ -45,9 +45,9 @@ All tools read directly from Supabase `rca_` tables.
 
 The UI is a Next.js App Router deployed on Vercel (`dashboard/`). It uses a premium glassmorphism design system built with pure Tailwind CSS v4, Lucide icons, and Recharts.
 - `/` -> Fleet Overview with a 14-day trailing signal heatmap grid and drop/lift badges.
-- `/stores/[storeId]` -> Detailed telemetry featuring a responsive Recharts AreaChart with RCA triggers overlaid.
-- `/stores/[storeId]/rca` -> Historical Decision Cards rendered in elegant glass panels.
-- `/stores/[storeId]/profile` -> Distilled semantic memory displayed in a rich icon grid.
+- `/cities/[storeId]` -> Detailed regional telemetry featuring a responsive Recharts AreaChart with RCA triggers overlaid.
+- `/cities/[storeId]/rca` -> Historical Decision Cards rendered in elegant glass panels.
+- `/cities/[storeId]/profile` -> Distilled semantic memory displayed in a rich icon grid.
 The dashboard reads securely from Supabase using Row Level Security (RLS) and the anon key.
 
 ## Shipped Ecosystem Features

@@ -51,7 +51,7 @@ from rca.tools import get_signal_evidence
 
 
 class RcaState(TypedDict):
-    store_alias: str
+    city_id: int
     dt: str
     run_name: str
     output_dir_str: str | None
@@ -114,14 +114,14 @@ def plan_node(state: RcaState, config: RunnableConfig) -> dict:
     cfg = _cfg(config)
     logger: RunLogger = cfg["logger"]
     observer: RcaObserver = cfg["observer"]
-    store_alias = state["store_alias"]
+    city_id = state["city_id"]
     dt = state["dt"]
     include_research = state.get("include_research", False)
-    subject = f"{store_alias}:{dt}"
+    subject = f"{city_id}:{dt}"
 
     with observer.node_span("plan"):
-        prior_rca_summary = get_prior_rca(store_alias)
-        store_profile = get_store_profile(store_alias)
+        prior_rca_summary = get_prior_rca(city_id)
+        store_profile = get_store_profile(city_id)
 
         if state.get("specialists"):
             # Pre-specified by caller — skip re-planning, use as-is
@@ -133,7 +133,7 @@ def plan_node(state: RcaState, config: RunnableConfig) -> dict:
             return {"prior_rca_summary": prior_rca_summary, "planning_inputs": None, "skipped_analysts": [], "store_profile": store_profile}
 
         specialists, skipped_analysts, planning_inputs = _plan_specialists_with_reasons(
-            store_alias=store_alias, dt=dt, include_research=include_research
+            city_id=city_id, dt=dt, include_research=include_research
         )
 
         logger.log(
@@ -167,7 +167,7 @@ def route_specialists(state: RcaState) -> list[Send]:
             "run_specialist",
             {
                 "spec_dict": spec_dict,
-                "store_alias": state["store_alias"],
+                "city_id": state["city_id"],
                 "dt": state["dt"],
             },
         )
@@ -194,7 +194,7 @@ def run_specialist_node(state: dict, config: RunnableConfig) -> dict:
     with observer.node_span(spec.name):
         result = _run_specialist(
             spec=spec,
-            store_alias=state["store_alias"],
+            city_id=state["city_id"],
             dt=state["dt"],
             settings=node_settings,
             logger=logger,
@@ -212,7 +212,7 @@ def critic_node(state: RcaState, config: RunnableConfig) -> dict:
     client_factory: ClientFactory = cfg["client_factory"]
     logger: RunLogger = cfg["logger"]
     observer: RcaObserver = cfg["observer"]
-    subject = f"{state['store_alias']}:{state['dt']}"
+    subject = f"{state['city_id']}:{state['dt']}"
 
     analyst_results = _restore_analyst_results(state)
     logger.log(
@@ -227,7 +227,7 @@ def critic_node(state: RcaState, config: RunnableConfig) -> dict:
     node_settings = make_routed_settings(base_settings, "critic")
     with observer.node_span("critic"):
         critic_note = _run_critic(
-            store_alias=state["store_alias"],
+            city_id=state["city_id"],
             dt=state["dt"],
             analyst_results=analyst_results,
             settings=node_settings,
@@ -255,7 +255,7 @@ def synthesize_node(state: RcaState, config: RunnableConfig) -> dict:
 
     with observer.node_span("synthesize"):
         coordinator_report = _synthesize(
-            store_alias=state["store_alias"],
+            city_id=state["city_id"],
             dt=state["dt"],
             analyst_results=analyst_results,
             critic_note_markdown=state["critic_note"],
@@ -277,7 +277,7 @@ def controller_node(state: RcaState, config: RunnableConfig) -> dict:
 
     with observer.node_span("controller"):
         controller_note = _run_finance_controller(
-            store_alias=state["store_alias"],
+            city_id=state["city_id"],
             dt=state["dt"],
             coordinator_report_markdown=state["coordinator_report"],
             critic_note_markdown=state["critic_note"],
@@ -299,7 +299,7 @@ def slt_node(state: RcaState, config: RunnableConfig) -> dict:
 
     with observer.node_span("slt"):
         decision_card = _run_slt_brief(
-            store_alias=state["store_alias"],
+            city_id=state["city_id"],
             dt=state["dt"],
             coordinator_report_markdown=state["coordinator_report"],
             controller_note_markdown=state["controller_note"],
@@ -340,7 +340,7 @@ def reflect_node(state: RcaState, config: RunnableConfig) -> dict:
     client_factory: ClientFactory = cfg["client_factory"]
     logger: RunLogger = cfg["logger"]
     observer: RcaObserver = cfg["observer"]
-    subject = f"{state['store_alias']}:{state['dt']}"
+    subject = f"{state['city_id']}:{state['dt']}"
 
     node_settings = make_routed_settings(base_settings, "reflect")
     client = client_factory("reflect")
@@ -390,15 +390,15 @@ def record_node(state: RcaState, config: RunnableConfig) -> dict:
     cfg = _cfg(config)
     logger: RunLogger = cfg["logger"]
     is_dry_run: bool = cfg.get("is_dry_run", False)
-    subject = f"{state['store_alias']}:{state['dt']}"
+    subject = f"{state['city_id']}:{state['dt']}"
 
     signal_evidence = (
         (state.get("planning_inputs") or {}).get("signal_evidence")
-        or get_signal_evidence(state["store_alias"], state["dt"])
+        or get_signal_evidence(state["city_id"], state["dt"])
     )
     outcome_record = build_outcome_record(
         run_name=state["run_name"],
-        store_alias=state["store_alias"],
+        city_id=state["city_id"],
         dt=state["dt"],
         signal_evidence=signal_evidence,
         coordinator_report_markdown=state["coordinator_report"],
@@ -440,7 +440,7 @@ def artifacts_node(state: RcaState, config: RunnableConfig) -> dict:
     (output_dir / "run_log.jsonl").write_text(logger.to_jsonl(), encoding="utf-8")
     (output_dir / "run_log.md").write_text(logger.to_markdown(), encoding="utf-8")
 
-    store_alias = state["store_alias"]
+    city_id = state["city_id"]
     dt = state["dt"]
 
     specialist_dir = output_dir / "specialists"
@@ -450,7 +450,7 @@ def artifacts_node(state: RcaState, config: RunnableConfig) -> dict:
         memo = r["memo_markdown"]
         (specialist_dir / f"{name}.md").write_text(memo, encoding="utf-8")
         (specialist_dir / f"{name}.html").write_text(
-            render_markdown_document(memo, title=f"{name} memo for {store_alias} on {dt}"),
+            render_markdown_document(memo, title=f"{name} memo for {city_id} on {dt}"),
             encoding="utf-8",
         )
 
@@ -460,16 +460,16 @@ def artifacts_node(state: RcaState, config: RunnableConfig) -> dict:
             render_markdown_document(content, title=title), encoding="utf-8"
         )
 
-    _write_pair("critique", state["critic_note"], f"Critique for {store_alias} on {dt}")
-    _write_pair("controller_note", state["controller_note"], f"Finance controller note for {store_alias} on {dt}")
-    _write_pair("decision_card", state["decision_card"], f"Decision card for {store_alias} on {dt}")
-    _write_pair("report", state["coordinator_report"], f"RCA report for {store_alias} on {dt}")
+    _write_pair("critique", state["critic_note"], f"Critique for {city_id} on {dt}")
+    _write_pair("controller_note", state["controller_note"], f"Finance controller note for {city_id} on {dt}")
+    _write_pair("decision_card", state["decision_card"], f"Decision card for {city_id} on {dt}")
+    _write_pair("report", state["coordinator_report"], f"RCA report for {city_id} on {dt}")
     reflection_note = state.get("reflection_note", "")
     if reflection_note:
-        _write_pair("reflection", reflection_note, f"Reflection for {store_alias} on {dt}")
+        _write_pair("reflection", reflection_note, f"Reflection for {city_id} on {dt}")
 
     trace_payload = {
-        "store_alias": store_alias,
+        "city_id": city_id,
         "dt": dt,
         "planner": {
             "selected_analysts": [s["name"] for s in state["specialists"]],
@@ -531,7 +531,7 @@ def build_rca_graph() -> Any:
 
 
 def run_rca_graph(
-    store_alias: str,
+    city_id: int,
     dt: str,
     specialists: list[AnalystSpec] | None = None,
     settings: LLMSettings | None = None,
@@ -542,15 +542,15 @@ def run_rca_graph(
 ) -> CoordinatorResult:
     settings = settings or load_llm_settings()
     is_dry_run = client_factory is not None
-    run_name = f"{store_alias}_{dt}"
+    run_name = f"{city_id}_{dt}"
     logger = RunLogger(run_name=run_name)
 
     base_factory: ClientFactory = client_factory or (lambda node_name: build_openai_compatible_client(settings))
-    observer = RcaObserver(store_alias=store_alias, dt=dt, run_name=run_name, is_dry_run=is_dry_run)
+    observer = RcaObserver(city_id=city_id, dt=dt, run_name=run_name, is_dry_run=is_dry_run)
     traced_factory = observer.wrap_client_factory(base_factory)
 
     initial_state: dict = {
-        "store_alias": store_alias,
+        "city_id": city_id,
         "dt": dt,
         "run_name": run_name,
         "output_dir_str": str(output_dir) if output_dir is not None else None,
@@ -581,11 +581,11 @@ def run_rca_graph(
 
     graph = build_rca_graph()
     final_state: RcaState = graph.invoke(initial_state, config=graph_config)
-    observer.finalize(output={"store_alias": store_alias, "dt": dt})
+    observer.finalize(output={"city_id": city_id, "dt": dt})
 
     analyst_results = _restore_analyst_results(final_state)
     return CoordinatorResult(
-        store_alias=final_state["store_alias"],
+        city_id=final_state["city_id"],
         dt=final_state["dt"],
         coordinator_report_markdown=final_state["coordinator_report"],
         critic_note_markdown=final_state["critic_note"],

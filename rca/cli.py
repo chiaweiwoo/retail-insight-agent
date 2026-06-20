@@ -83,9 +83,9 @@ def _cmd_analyze(args: argparse.Namespace) -> None:
             pct_trigger_tables["per_store"]
             .loc[
                 pct_trigger_tables["per_store"]["pct_threshold"] == 20,
-                ["store_alias", "triggered_days", "trigger_rate_pct"],
+                ["city_id", "triggered_days", "trigger_rate_pct"],
             ]
-            .sort_values(["triggered_days", "store_alias"], ascending=[False, True])
+            .sort_values(["triggered_days", "city_id"], ascending=[False, True])
             .head(8)
         )
 
@@ -198,7 +198,7 @@ def _cmd_run(args: argparse.Namespace) -> None:
         output_dir = PROJECT_ROOT / "data" / "analysis" / "agent_benchmark_runs" / f"{args.store}_{args.dt}_{label}"
 
     result = run_rca_graph(
-        store_alias=args.store,
+        city_id=args.store,
         dt=args.dt,
         specialists=specialists,
         client_factory=client_factory,
@@ -411,17 +411,17 @@ def _cmd_distil(args: argparse.Namespace) -> None:
         print(f"Profile for {args.store}:")
         print(profile)
         if not dry_run:
-            print(f"\nWritten to Supabase rca_store_profile.")
+            print(f"\nWritten to Supabase rca_city_profile.")
     else:
         results = distil_all_stores(settings=settings, client_factory=client_factory, dry_run=dry_run)
         if not results:
             print("No stores with prior outcomes found.")
             return
-        for store_alias, profile in results:
-            print(f"\n--- {store_alias} ---")
+        for city_id, profile in results:
+            print(f"\n--- {city_id} ---")
             print(profile)
         if not dry_run:
-            print(f"\nWritten {len(results)} profiles to Supabase rca_store_profile.")
+            print(f"\nWritten {len(results)} profiles to Supabase rca_city_profile.")
 
 
 def _cmd_reset_memory(args: argparse.Namespace) -> None:
@@ -436,7 +436,7 @@ def _cmd_reset_memory(args: argparse.Namespace) -> None:
         count = reset_store_profile(args.store)
         print(f"Deleted profile for {args.store} ({count} row(s) removed).")
     elif args.all:
-        count = reset_store_profile(store_alias=None)
+        count = reset_store_profile(city_id=None)
         print(f"Deleted all store profiles ({count} row(s) removed).")
     else:
         print("Specify --store ALIAS or --all.")
@@ -566,7 +566,7 @@ def main() -> None:
     # rca reset-memory
     reset_mem_parser = subparsers.add_parser(
         "reset-memory",
-        help="Delete stored episodic profiles from Supabase rca_store_profile",
+        help="Delete stored episodic profiles from Supabase rca_city_profile",
     )
     reset_mem_parser.add_argument("--store", help="Store alias to reset")
     reset_mem_parser.add_argument(

@@ -33,23 +33,23 @@ def _signal_frame() -> pd.DataFrame:
     return signals
 
 
-def _get_signal_row(store_alias: str, dt: str) -> pd.Series:
+def _get_signal_row(city_id: int, dt: str) -> pd.Series:
     frame = _signal_frame()
     matched = frame[
-        (frame["store_alias"] == store_alias)
+        (frame["city_id"] == city_id)
         & (frame["dt_label"] == dt)
     ]
     if matched.empty:
-        raise ValueError(f"No signal row found for store_alias={store_alias} dt={dt}")
+        raise ValueError(f"No signal row found for city_id={city_id} dt={dt}")
     return matched.iloc[0]
 
 
-def _get_history_slice(store_alias: str, dt: str, days: int = 7) -> pd.DataFrame:
+def _get_history_slice(city_id: int, dt: str, days: int = 7) -> pd.DataFrame:
     frame = _signal_frame()
-    store_frame = frame[frame["store_alias"] == store_alias].sort_values("dt")
+    store_frame = frame[frame["city_id"] == city_id].sort_values("dt")
     matched = store_frame.index[store_frame["dt_label"] == dt]
     if len(matched) != 1:
-        raise ValueError(f"No history row found for store_alias={store_alias} dt={dt}")
+        raise ValueError(f"No history row found for city_id={city_id} dt={dt}")
     store_frame = store_frame.reset_index(drop=True)
     pos = int(store_frame.index[store_frame["dt_label"] == dt][0])
     start = max(0, pos - days)
@@ -71,16 +71,16 @@ def _signal_label(
 
 
 def get_signal_evidence(
-    store_alias: str,
+    city_id: int,
     dt: str,
     metric: str = DEFAULT_SIGNAL_METRIC,
     drop_threshold_pct: float = DEFAULT_DROP_THRESHOLD_PCT,
     lift_threshold_pct: float = DEFAULT_LIFT_THRESHOLD_PCT,
 ) -> dict[str, Any]:
-    row = _get_signal_row(store_alias, dt)
+    row = _get_signal_row(city_id, dt)
     signal_value = row.get(metric)
     return {
-        "store_alias": store_alias,
+        "city_id": city_id,
         "dt": dt,
         "metric": metric,
         "signal_label": _signal_label(signal_value, drop_threshold_pct, lift_threshold_pct),
@@ -100,9 +100,9 @@ def get_signal_evidence(
     }
 
 
-def get_sales_context(store_alias: str, dt: str, history_days: int = 7) -> dict[str, Any]:
-    signal_row = _get_signal_row(store_alias, dt)
-    history = _get_history_slice(store_alias, dt, days=history_days)
+def get_sales_context(city_id: int, dt: str, history_days: int = 7) -> dict[str, Any]:
+    signal_row = _get_signal_row(city_id, dt)
+    history = _get_history_slice(city_id, dt, days=history_days)
     rows = [
         {
             "dt": str(row.dt.strftime("%Y-%m-%d")),
@@ -113,7 +113,7 @@ def get_sales_context(store_alias: str, dt: str, history_days: int = 7) -> dict[
         for row in history.itertuples(index=False)
     ]
     return {
-        "store_alias": store_alias,
+        "city_id": city_id,
         "dt": dt,
         "history_window_days": history_days,
         "current_total_sales": _round_float(signal_row["total_sales"]),
@@ -126,13 +126,13 @@ def get_sales_context(store_alias: str, dt: str, history_days: int = 7) -> dict[
     }
 
 
-def get_stockout_context(store_alias: str, dt: str) -> dict[str, Any]:
-    record = get_store_day_evidence(store_alias, dt)
-    history = _get_history_slice(store_alias, dt, days=7)
+def get_stockout_context(city_id: int, dt: str) -> dict[str, Any]:
+    record = get_store_day_evidence(city_id, dt)
+    history = _get_history_slice(city_id, dt, days=7)
     matched = history[history["dt_label"] == dt].iloc[0]
     trailing_avg = _round_float(history["total_sales"].iloc[:-1].mean()) if len(history) > 1 else None
     return {
-        "store_alias": store_alias,
+        "city_id": city_id,
         "dt": dt,
         "avg_stockout_hours": _round_float(record["stockout"]["avg_stockout_hours"]),
         "stockout_product_rate": _round_float(record["stockout"]["stockout_product_rate"]),
@@ -147,7 +147,7 @@ def get_stockout_context(store_alias: str, dt: str) -> dict[str, Any]:
 
 
 def get_stockout_baseline(
-    store_alias: str,
+    city_id: int,
     dt: str,
     window: int = 30,
 ) -> dict[str, Any]:
@@ -168,27 +168,27 @@ def get_stockout_baseline(
                 AVG(full_stockout_product_rate)   AS avg_full_stockout_product_rate,
                 AVG(avg_stockout_hours)           AS avg_stockout_hours,
                 COUNT(*)                          AS days_in_window
-            FROM fact_stockout_store_day
-            WHERE store_alias = ?
+            FROM fact_stockout_city_day
+            WHERE city_id = ?
               AND dt < CAST(? AS DATE)
               AND dt >= CAST(? AS DATE) - INTERVAL (?) DAY
             """,
-            [store_alias, dt, dt, window],
+            [city_id, dt, dt, window],
         ).fetchone()
         con.close()
     except Exception as exc:
-        return {"store_alias": store_alias, "dt": dt, "window_days": window, "error": str(exc)}
+        return {"city_id": city_id, "dt": dt, "window_days": window, "error": str(exc)}
 
     if row is None or row[4] == 0:
         return {
-            "store_alias": store_alias,
+            "city_id": city_id,
             "dt": dt,
             "window_days": window,
             "baseline_available": False,
             "note": "No prior stockout data in window.",
         }
 
-    current = get_store_day_evidence(store_alias, dt)
+    current = get_store_day_evidence(city_id, dt)
     cur_rate = current["stockout"]["stockout_product_rate"]
     baseline_rate = float(row[0]) if row[0] is not None else None
 
@@ -197,7 +197,7 @@ def get_stockout_baseline(
         ratio = _round_float(cur_rate / baseline_rate)
 
     return {
-        "store_alias": store_alias,
+        "city_id": city_id,
         "dt": dt,
         "window_days": int(row[4]),
         "baseline_available": True,
@@ -223,10 +223,10 @@ def get_stockout_baseline(
     }
 
 
-def get_discount_context(store_alias: str, dt: str) -> dict[str, Any]:
-    record = get_store_day_evidence(store_alias, dt)
+def get_discount_context(city_id: int, dt: str) -> dict[str, Any]:
+    record = get_store_day_evidence(city_id, dt)
     return {
-        "store_alias": store_alias,
+        "city_id": city_id,
         "dt": dt,
         "avg_discount": _round_float(record["discount"]["avg_discount"]),
         "discounted_product_rate": _round_float(record["discount"]["discounted_product_rate"]),
@@ -236,20 +236,20 @@ def get_discount_context(store_alias: str, dt: str) -> dict[str, Any]:
     }
 
 
-def get_activity_context(store_alias: str, dt: str) -> dict[str, Any]:
-    record = get_store_day_evidence(store_alias, dt)
+def get_activity_context(city_id: int, dt: str) -> dict[str, Any]:
+    record = get_store_day_evidence(city_id, dt)
     return {
-        "store_alias": store_alias,
+        "city_id": city_id,
         "dt": dt,
         "activity_product_rate": _round_float(record["activity"]["activity_product_rate"]),
         "activity_sales_share": _round_float(record["activity"]["activity_sales_share"]),
     }
 
 
-def get_calendar_weather_context(store_alias: str, dt: str) -> dict[str, Any]:
-    record = get_store_day_evidence(store_alias, dt)
+def get_calendar_weather_context(city_id: int, dt: str) -> dict[str, Any]:
+    record = get_store_day_evidence(city_id, dt)
     return {
-        "store_alias": store_alias,
+        "city_id": city_id,
         "dt": dt,
         "weekday": record["holiday"]["weekday"],
         "is_weekend": record["holiday"]["is_weekend"],
@@ -262,38 +262,53 @@ def get_calendar_weather_context(store_alias: str, dt: str) -> dict[str, Any]:
     }
 
 
-def get_peer_store_context(store_alias: str, dt: str) -> dict[str, Any]:
-    row = _get_signal_row(store_alias, dt)
+def get_peer_city_context(city_id: int, dt: str) -> dict[str, Any]:
+    import duckdb
+    from rca.config import DB_PATH
+    
+    row = _get_signal_row(city_id, dt)
     frame = _signal_frame()
-    prefix_group = store_alias[0]
     daily = frame[frame["dt_label"] == dt].copy()
-    prefix_daily = daily[daily["store_alias"].str.startswith(prefix_group)]
+    
+    try:
+        con = duckdb.connect(str(DB_PATH), read_only=True)
+        store_count_res = con.execute("SELECT store_count FROM dim_city WHERE city_id = ?", [city_id]).fetchone()
+        store_count = int(store_count_res[0]) if store_count_res else 1
+        
+        # Get all cities in the same tier
+        tier = 1 if store_count >= 100 else 2 if store_count >= 20 else 3
+        
+        if tier == 1:
+            tier_condition = "store_count >= 100"
+        elif tier == 2:
+            tier_condition = "store_count >= 20 AND store_count < 100"
+        else:
+            tier_condition = "store_count < 20"
+            
+        tier_cities = [r[0] for r in con.execute(f"SELECT city_id FROM dim_city WHERE {tier_condition}").fetchall()]
+        con.close()
+    except Exception:
+        tier = 3
+        tier_cities = [city_id]
+        
+    tier_daily = daily[daily["city_id"].isin(tier_cities)]
     overall_avg = _round_float(daily["total_sales"].mean())
-    prefix_avg = _round_float(prefix_daily["total_sales"].mean())
-    rank = int(
-        daily["total_sales"].rank(method="min", ascending=False)[daily["store_alias"] == store_alias].iloc[0]
-    )
-    prefix_rank = int(
-        prefix_daily["total_sales"]
-        .rank(method="min", ascending=False)[prefix_daily["store_alias"] == store_alias]
-        .iloc[0]
-    )
+    tier_avg = _round_float(tier_daily["total_sales"].mean())
+    
+    rank = int(daily["total_sales"].rank(method="min", ascending=False)[daily["city_id"] == city_id].iloc[0])
+    tier_rank = int(tier_daily["total_sales"].rank(method="min", ascending=False)[tier_daily["city_id"] == city_id].iloc[0])
+    
     return {
-        "store_alias": store_alias,
+        "city_id": city_id,
         "dt": dt,
-        "store_prefix_group": prefix_group,
-        "store_total_sales": _round_float(row["total_sales"]),
-        "prefix_group_avg_sales_same_day": prefix_avg,
+        "density_tier": tier,
+        "city_total_sales": _round_float(row["total_sales"]),
+        "tier_avg_sales_same_day": tier_avg,
         "overall_avg_sales_same_day": overall_avg,
         "overall_rank_same_day": rank,
-        "overall_store_count": int(daily.shape[0]),
-        "prefix_group_rank_same_day": prefix_rank,
-        "prefix_group_store_count": int(prefix_daily.shape[0]),
-        # Backward-compatible aliases for older prompts/tests/artifacts.
-        "store_tier": prefix_group,
-        "tier_avg_sales_same_day": prefix_avg,
-        "tier_rank_same_day": prefix_rank,
-        "tier_store_count": int(prefix_daily.shape[0]),
+        "overall_city_count": int(daily.shape[0]),
+        "tier_rank_same_day": tier_rank,
+        "tier_city_count": int(tier_daily.shape[0]),
     }
 
 
@@ -312,8 +327,8 @@ def search_news(query: str, max_results: int = 5) -> dict[str, Any]:
     return {"query": query, "result_count": len(results), "results": results}
 
 
-def get_prior_rca(store_alias: str) -> dict[str, Any]:
-    return load_prior_rca(store_alias)
+def get_prior_rca(city_id: int) -> dict[str, Any]:
+    return load_prior_rca(city_id)
 
 
 TOOL_REGISTRY: dict[str, dict[str, Any]] = {
@@ -322,10 +337,10 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
         "parameters": {
             "type": "object",
             "properties": {
-                "store_alias": {"type": "string"},
+                "city_id": {"type": "string"},
                 "dt": {"type": "string"},
             },
-            "required": ["store_alias", "dt"],
+            "required": ["city_id", "dt"],
             "additionalProperties": False,
         },
         "function": get_signal_evidence,
@@ -335,11 +350,11 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
         "parameters": {
             "type": "object",
             "properties": {
-                "store_alias": {"type": "string"},
+                "city_id": {"type": "string"},
                 "dt": {"type": "string"},
                 "history_days": {"type": "integer", "minimum": 3, "maximum": 14},
             },
-            "required": ["store_alias", "dt"],
+            "required": ["city_id", "dt"],
             "additionalProperties": False,
         },
         "function": get_sales_context,
@@ -349,10 +364,10 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
         "parameters": {
             "type": "object",
             "properties": {
-                "store_alias": {"type": "string"},
+                "city_id": {"type": "string"},
                 "dt": {"type": "string"},
             },
-            "required": ["store_alias", "dt"],
+            "required": ["city_id", "dt"],
             "additionalProperties": False,
         },
         "function": get_stockout_context,
@@ -366,7 +381,7 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
         "parameters": {
             "type": "object",
             "properties": {
-                "store_alias": {"type": "string"},
+                "city_id": {"type": "string"},
                 "dt": {"type": "string"},
                 "window": {
                     "type": "integer",
@@ -376,7 +391,7 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
                     "description": "Number of days before dt to average over.",
                 },
             },
-            "required": ["store_alias", "dt"],
+            "required": ["city_id", "dt"],
             "additionalProperties": False,
         },
         "function": get_stockout_baseline,
@@ -386,10 +401,10 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
         "parameters": {
             "type": "object",
             "properties": {
-                "store_alias": {"type": "string"},
+                "city_id": {"type": "string"},
                 "dt": {"type": "string"},
             },
-            "required": ["store_alias", "dt"],
+            "required": ["city_id", "dt"],
             "additionalProperties": False,
         },
         "function": get_discount_context,
@@ -399,10 +414,10 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
         "parameters": {
             "type": "object",
             "properties": {
-                "store_alias": {"type": "string"},
+                "city_id": {"type": "string"},
                 "dt": {"type": "string"},
             },
-            "required": ["store_alias", "dt"],
+            "required": ["city_id", "dt"],
             "additionalProperties": False,
         },
         "function": get_activity_context,
@@ -412,26 +427,26 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
         "parameters": {
             "type": "object",
             "properties": {
-                "store_alias": {"type": "string"},
+                "city_id": {"type": "string"},
                 "dt": {"type": "string"},
             },
-            "required": ["store_alias", "dt"],
+            "required": ["city_id", "dt"],
             "additionalProperties": False,
         },
         "function": get_calendar_weather_context,
     },
-    "get_peer_store_context": {
-        "description": "Compare the store against same-day peers and its same-prefix peer group.",
+    "get_peer_city_context": {
+        "description": "Compare the city against same-day peers and its density tier group.",
         "parameters": {
             "type": "object",
             "properties": {
-                "store_alias": {"type": "string"},
+                "city_id": {"type": "integer"},
                 "dt": {"type": "string"},
             },
-            "required": ["store_alias", "dt"],
+            "required": ["city_id", "dt"],
             "additionalProperties": False,
         },
-        "function": get_peer_store_context,
+        "function": get_peer_city_context,
     },
     "search_news": {
         "description": "Search the web for news or events relevant to a retail sales move. Pass a focused query such as 'retail sales China May 2024' or 'holiday shopping event May 16 2024'.",
@@ -451,9 +466,9 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
         "parameters": {
             "type": "object",
             "properties": {
-                "store_alias": {"type": "string"},
+                "city_id": {"type": "string"},
             },
-            "required": ["store_alias"],
+            "required": ["city_id"],
             "additionalProperties": False,
         },
         "function": get_prior_rca,

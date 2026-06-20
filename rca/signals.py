@@ -20,15 +20,15 @@ def load_sales_history(db_path: Path = DB_PATH) -> pd.DataFrame:
         frame = connection.execute(
             """
             SELECT
-                s.store_alias,
+                s.city_id,
                 s.dt,
                 s.total_sales,
                 h.weekday,
                 h.is_weekend,
                 h.holiday_name_inferred
-            FROM fact_sales_store_day AS s
+            FROM fact_sales_city_day AS s
             JOIN dim_holiday_day AS h USING (dt)
-            ORDER BY s.store_alias, s.dt
+            ORDER BY s.city_id, s.dt
             """
         ).df()
     finally:
@@ -44,15 +44,15 @@ def _safe_pct_change(current: pd.Series, baseline: pd.Series) -> pd.Series:
 
 
 def build_sales_signal_frame(frame: pd.DataFrame) -> pd.DataFrame:
-    signals = frame.copy().sort_values(["store_alias", "dt"]).reset_index(drop=True)
+    signals = frame.copy().sort_values(["city_id", "dt"]).reset_index(drop=True)
 
-    by_store = signals.groupby("store_alias", group_keys=False)
+    by_store = signals.groupby("city_id", group_keys=False)
     signals["previous_day_sales"] = by_store["total_sales"].shift(1)
     signals["trailing_7d_avg_sales"] = by_store["total_sales"].transform(
         lambda series: series.shift(1).rolling(window=7, min_periods=MIN_BASELINE_OBSERVATIONS).mean()
     )
 
-    by_store_weekday = signals.groupby(["store_alias", "weekday"], group_keys=False)
+    by_store_weekday = signals.groupby(["city_id", "weekday"], group_keys=False)
     signals["same_weekday_4w_avg_sales"] = by_store_weekday["total_sales"].transform(
         lambda series: series.shift(1).rolling(window=4, min_periods=MIN_BASELINE_OBSERVATIONS).mean()
     )
@@ -147,10 +147,10 @@ def summarize_signal_distribution(signals: pd.DataFrame) -> dict[str, pd.DataFra
                 )
 
     store_rows: list[dict[str, float | str | int]] = []
-    for store_alias, store_frame in signals.groupby("store_alias"):
+    for city_id, store_frame in signals.groupby("city_id"):
         store_rows.append(
             {
-                "store_alias": str(store_alias),
+                "city_id": str(city_id),
                 "avg_sales": float(store_frame["total_sales"].mean()),
                 "sales_std": float(store_frame["total_sales"].std()),
                 "day_over_day_pct_std": float(store_frame["day_over_day_pct_change"].dropna().std()),
@@ -194,11 +194,11 @@ def summarize_pct_trigger_distribution(
                 "drop_store_days": int(drop_mask.sum()),
                 "lift_store_days": int(lift_mask.sum()),
                 "triggered_dates": int(triggered["dt"].nunique()),
-                "triggered_stores": int(triggered["store_alias"].nunique()),
+                "triggered_stores": int(triggered["city_id"].nunique()),
             }
         )
 
-        for store_alias, store_frame in eligible.groupby("store_alias"):
+        for city_id, store_frame in eligible.groupby("city_id"):
             store_drop_mask = store_frame[metric] <= -pct_threshold
             store_lift_mask = store_frame[metric] >= pct_threshold
             store_trigger_count = int((store_drop_mask | store_lift_mask).sum())
@@ -206,7 +206,7 @@ def summarize_pct_trigger_distribution(
                 {
                     "metric": metric,
                     "pct_threshold": pct_threshold,
-                    "store_alias": str(store_alias),
+                    "city_id": str(city_id),
                     "eligible_days": int(store_frame.shape[0]),
                     "drop_days": int(store_drop_mask.sum()),
                     "lift_days": int(store_lift_mask.sum()),
@@ -218,7 +218,7 @@ def summarize_pct_trigger_distribution(
         if not triggered.empty:
             per_date = (
                 triggered.groupby("dt", as_index=False)
-                .agg(triggered_store_days=("store_alias", "count"))
+                .agg(triggered_store_days=("city_id", "count"))
                 .sort_values(["triggered_store_days", "dt"], ascending=[False, True])
             )
             for row in per_date.itertuples(index=False):
@@ -250,7 +250,7 @@ def build_pct_trigger_grid(
     eligible["dt_label"] = eligible["dt"].dt.strftime("%Y-%m-%d")
 
     grid = eligible.pivot(
-        index="store_alias",
+        index="city_id",
         columns="dt_label",
         values="trigger_flag",
     ).fillna(".")

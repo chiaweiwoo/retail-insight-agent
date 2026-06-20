@@ -14,7 +14,7 @@ class BenchmarkScenario:
     scenario_id: str
     signal_strength: str  # high / medium / low — how strong the signal was
     expected_signal: str
-    store_alias: str
+    city_id: int
     dt: str
 
 
@@ -44,7 +44,7 @@ def _result_payload(
     run_started_at_sgt: str,
     model_name: str,
 ) -> dict[str, object]:
-    signal = get_signal_evidence(scenario.store_alias, scenario.dt)
+    signal = get_signal_evidence(scenario.city_id, scenario.dt)
     return {
         "scenario": asdict(scenario),
         "run_started_at_sgt": run_started_at_sgt,
@@ -64,12 +64,12 @@ def _summary_row(
     scenario: BenchmarkScenario,
     result: CoordinatorResult,
 ) -> dict[str, object]:
-    signal = get_signal_evidence(scenario.store_alias, scenario.dt)
+    signal = get_signal_evidence(scenario.city_id, scenario.dt)
     return {
         "scenario_id": scenario.scenario_id,
         "expected_signal": scenario.expected_signal,
         "observed_signal": signal["signal_label"],
-        "store_alias": scenario.store_alias,
+        "city_id": scenario.city_id,
         "dt": scenario.dt,
         "analyst_count": len(result.analyst_results),
         "tool_call_count": int(sum(len(item.tool_calls) for item in result.analyst_results)),
@@ -91,7 +91,7 @@ def _build_manifest_markdown(
         "",
         "## Scenario Outputs",
         "",
-        "| scenario_id | expected_signal | observed_signal | store_alias | dt | analysts | tool_call_count | decision_card | report_html | run_trace | run_log |",
+        "| scenario_id | expected_signal | observed_signal | city_id | dt | analysts | tool_call_count | decision_card | report_html | run_trace | run_log |",
         "| --- | --- | --- | --- | --- | ---: | ---: | --- | --- | --- | --- |",
     ]
     for row in summary_rows:
@@ -101,12 +101,12 @@ def _build_manifest_markdown(
         trace_path = scenario_dir / "run_trace.json"
         run_log_path = scenario_dir / "run_log.md"
         lines.append(
-            "| {scenario_id} | {expected_signal} | {observed_signal} | {store_alias} | {dt} | {analyst_count} | {tool_call_count} | "
+            "| {scenario_id} | {expected_signal} | {observed_signal} | {city_id} | {dt} | {analyst_count} | {tool_call_count} | "
             "[decision_card.html]({decision_card}) | [report.html]({report_html}) | [run_trace.json]({trace}) | [run_log.md]({run_log}) |".format(
                 scenario_id=row["scenario_id"],
                 expected_signal=row["expected_signal"],
                 observed_signal=row["observed_signal"],
-                store_alias=row["store_alias"],
+                city_id=row["city_id"],
                 dt=row["dt"],
                 analyst_count=row["analyst_count"],
                 tool_call_count=row["tool_call_count"],
@@ -150,7 +150,7 @@ def run_benchmark(client_factory=None) -> None:
     for scenario in SCENARIOS:
         scenario_dir = run_dir / scenario.scenario_id
         result = run_rca_graph(
-            store_alias=scenario.store_alias,
+            city_id=scenario.city_id,
             dt=scenario.dt,
             settings=settings,
             client_factory=client_factory,

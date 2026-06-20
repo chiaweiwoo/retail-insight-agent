@@ -9,10 +9,10 @@ It utilizes LangGraph, Supabase, Next.js, and FastMCP to provide an end-to-end f
 
 **Shipped:**
 - Read the raw FreshRetailNet-50K parquet file and filter scope.
-- Aggregate into daily store-level tables (local DuckDB ETL).
-- Push analytical foundations to Supabase (`rca_` schemas).
-- Implement a LangGraph multi-agent orchestration (Planner -> Specialists -> Critic -> Coordinator -> Controller -> SLT).
-- Record traceable episodic memory and distil semantic store profiles.
+- Aggregate into daily city-level tables (local DuckDB ETL).
+- Surface signals (anomaly triggers) based on trailing standard deviations.
+- Use LangGraph to orchestrate analyst agents that query context and write a synthesized RCA.
+- Record traceable episodic memory and distil semantic city profiles.
 - Stand up an LLM-as-judge Evaluator (9 dimensions).
 - Stand up a FastMCP server exposing RCA tools.
 - Build and deploy the Next.js App Router Dashboard to Vercel.
@@ -29,12 +29,13 @@ It utilizes LangGraph, Supabase, Next.js, and FastMCP to provide an end-to-end f
 
 **Date Range**: `2024-03-28` to `2024-06-25` (90 days).
 **City Scope**: 5 cities (0, 12, 3, 13, 16)
-**Store Scope**: 15 sampled stores (h235, h263, m679, etc).
-**Analysis Grain**: One analytical row represents one store on one date.
+**City Scope**: 5 sampled cities (city_0, city_3, etc).
+**Analysis Grain**: One analytical row represents one city on one date.
 
-## 5. Architecture
+## Target Stack
 
-- **Supabase (Postgres)**: System of record. `rca_store_series`, `rca_store_normals`, `rca_outcome`, `rca_store_profile`.
+- **DuckDB**: Local OLAP for fast ETL grouping and standard deviation baseline generation.
+- **Supabase (Postgres)**: System of record. `rca_store_series`, `rca_store_normals`, `rca_outcome`, `rca_store_profile` (Stores legacy data, but now represents city aggregates).
 - **DuckDB**: Local ETL compute engine only.
 - **LangGraph**: Python-based DAG orchestration defining the analyst pipeline.
 - **Next.js Dashboard**: Vercel-hosted readonly viewer securely consuming the Supabase data via RLS. Features a premium glassmorphism UI built with Tailwind CSS v4, Recharts, and a dynamic 14-day signal heatmap.

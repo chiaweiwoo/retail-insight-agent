@@ -2,7 +2,7 @@
 
 Conservative rule: include ONLY things computed from the data.
 Omit anything uncertain, do not interpret anonymized IDs, do not assign business meaning
-to opaque prefixes (h/m/l store aliases) unless empirically supported in the numbers.
+to opaque prefixes (h/m/l city IDes) unless empirically supported in the numbers.
 """
 from __future__ import annotations
 
@@ -25,26 +25,26 @@ def build_context_pack(db_path: Path = DB_PATH, output_path: Path = CONTEXT_PACK
 
     con = duckdb.connect(str(db_path), read_only=True)
 
-    store_count = con.execute("SELECT COUNT(DISTINCT store_alias) FROM fact_sales_store_day").fetchone()[0]
-    day_count = con.execute("SELECT COUNT(DISTINCT dt) FROM fact_sales_store_day").fetchone()[0]
+    store_count = con.execute("SELECT COUNT(DISTINCT city_id) FROM fact_sales_city_day").fetchone()[0]
+    day_count = con.execute("SELECT COUNT(DISTINCT dt) FROM fact_sales_city_day").fetchone()[0]
     date_min, date_max = con.execute(
-        "SELECT MIN(CAST(dt AS VARCHAR)), MAX(CAST(dt AS VARCHAR)) FROM fact_sales_store_day"
+        "SELECT MIN(CAST(dt AS VARCHAR)), MAX(CAST(dt AS VARCHAR)) FROM fact_sales_city_day"
     ).fetchone()
 
     per_store = con.execute("""
         SELECT
-            store_alias,
+            city_id,
             ROUND(AVG(total_sales), 2) AS avg_daily_sales,
             ROUND(STDDEV(total_sales), 2) AS stddev_daily_sales,
             ROUND(MIN(total_sales), 2) AS min_daily_sales,
             ROUND(MAX(total_sales), 2) AS max_daily_sales
-        FROM fact_sales_store_day
-        GROUP BY store_alias
-        ORDER BY store_alias
+        FROM fact_sales_city_day
+        GROUP BY city_id
+        ORDER BY city_id
     """).fetchall()
     per_store_rows = [
         {
-            "store_alias": row[0],
+            "city_id": row[0],
             "avg_daily_sales": row[1],
             "stddev_daily_sales": row[2],
             "min_daily_sales": row[3],
@@ -53,11 +53,11 @@ def build_context_pack(db_path: Path = DB_PATH, output_path: Path = CONTEXT_PACK
         for row in per_store
     ]
 
-    fleet_avg = con.execute("SELECT ROUND(AVG(total_sales), 2) FROM fact_sales_store_day").fetchone()[0]
+    fleet_avg = con.execute("SELECT ROUND(AVG(total_sales), 2) FROM fact_sales_city_day").fetchone()[0]
 
     weekday_avg = con.execute("""
         SELECT h.weekday, ROUND(AVG(s.total_sales), 2) AS avg_sales
-        FROM fact_sales_store_day AS s
+        FROM fact_sales_city_day AS s
         JOIN dim_holiday_day AS h USING (dt)
         GROUP BY h.weekday
         ORDER BY h.weekday
@@ -66,7 +66,7 @@ def build_context_pack(db_path: Path = DB_PATH, output_path: Path = CONTEXT_PACK
 
     weekend_avg = con.execute("""
         SELECT h.is_weekend, ROUND(AVG(s.total_sales), 2) AS avg_sales
-        FROM fact_sales_store_day AS s
+        FROM fact_sales_city_day AS s
         JOIN dim_holiday_day AS h USING (dt)
         GROUP BY h.is_weekend
         ORDER BY h.is_weekend
@@ -86,8 +86,8 @@ def build_context_pack(db_path: Path = DB_PATH, output_path: Path = CONTEXT_PACK
 
     # Empirical prefix grouping — stated as a computed observation, not a tier label
     prefix_avg = con.execute("""
-        SELECT SUBSTRING(store_alias, 1, 1) AS prefix, ROUND(AVG(total_sales), 2) AS avg_daily_sales
-        FROM fact_sales_store_day
+        SELECT SUBSTRING(city_id, 1, 1) AS prefix, ROUND(AVG(total_sales), 2) AS avg_daily_sales
+        FROM fact_sales_city_day
         GROUP BY prefix
         ORDER BY prefix
     """).fetchall()
@@ -117,13 +117,13 @@ def build_context_pack(db_path: Path = DB_PATH, output_path: Path = CONTEXT_PACK
         },
         "store_prefix_empirical": {
             "description": (
-                "Average daily sales grouped by the first letter of store_alias. "
+                "Average daily sales grouped by the first letter of city_id. "
                 "This is a computed grouping only — the prefix is an opaque identifier "
                 "and is NOT labelled as a tier or size category."
             ),
             "by_prefix": prefix_empirical,
         },
-        "per_store_normal": {row["store_alias"]: row for row in per_store_rows},
+        "per_store_normal": {row["city_id"]: row for row in per_store_rows},
         "holidays_in_window": holidays,
         "provenance": {
             "built_from": str(db_path),
@@ -154,7 +154,7 @@ def load_context_pack(pack_path: Path = CONTEXT_PACK_PATH) -> dict[str, Any] | N
 
 
 def build_context_preamble(
-    store_alias: str,
+    city_id: int,
     dt: str,
     pack: dict[str, Any] | None = None,
     profile_text: str | None = None,
@@ -176,12 +176,12 @@ def build_context_preamble(
             f"Analysis date is {dt}; do not reference events after the data window.\n"
         )
         if profile_text:
-            base += f"\nSTORE MEMORY ({store_alias}) — treat as context, not ground truth:\n{profile_text}\n"
+            base += f"\nSTORE MEMORY ({city_id}) — treat as context, not ground truth:\n{profile_text}\n"
         return base
 
     dataset = pack["dataset"]
     fleet = pack["fleet"]
-    store_normal = pack.get("per_store_normal", {}).get(store_alias)
+    store_normal = pack.get("per_store_normal", {}).get(city_id)
 
     lines = [
         f"GROUNDING CONTEXT (factual, computed from data — treat as weak prior):",
@@ -195,12 +195,12 @@ def build_context_preamble(
 
     if store_normal:
         lines.append(
-            f"- {store_alias} normal: avg {store_normal['avg_daily_sales']} / day, "
+            f"- {city_id} normal: avg {store_normal['avg_daily_sales']} / day, "
             f"stddev {store_normal['stddev_daily_sales']} "
             f"(range {store_normal['min_daily_sales']}–{store_normal['max_daily_sales']})."
         )
 
-    prefix = store_alias[0] if store_alias else ""
+    prefix = city_id[0] if city_id else ""
     prefix_data = pack.get("store_prefix_empirical", {}).get("by_prefix", {})
     if prefix in prefix_data:
         lines.append(
@@ -217,7 +217,7 @@ def build_context_preamble(
 
     if profile_text:
         lines.append(f"")
-        lines.append(f"STORE MEMORY ({store_alias}) — distilled from prior RCA runs, treat as context not ground truth:")
+        lines.append(f"STORE MEMORY ({city_id}) — distilled from prior RCA runs, treat as context not ground truth:")
         lines.append(profile_text)
 
     return "\n".join(lines) + "\n"

@@ -22,15 +22,12 @@ DATE_END = "2024-06-25"
 EXPECTED_DAY_COUNT = 90
 HOURLY_LENGTH = 24
 
-# Top-5 cities by store count from FreshRetailNet-50K:
-# city 0=290, city 12=107, city 3=101, city 13=90, city 16=89 stores
-CITY_IDS = [0, 3, 12, 13, 16]
+# Processing all 18 cities in the dataset
+CITY_IDS = list(range(18)) # 0 to 17
 
-# Backward-compatible alias — tools/signals still reference single city builds.
-# Use CITY_IDS for multi-city ingestion.
-CITY_ID = CITY_IDS[0]
+CITY_ID = 0 # default fallback
 
-# Known city-0 store aliases (used for backward compat with bench scenarios and CLI).
+# Known city-0 city IDes (used for backward compat with bench scenarios and CLI).
 # Stores from other cities get auto-generated aliases ("s{store_id}").
 STORE_MAP = {
     "h235": 235,
@@ -76,10 +73,10 @@ REQUIRED_RAW_COLUMNS = {
 }
 
 FACT_TABLES = [
-    "fact_sales_store_day",
-    "fact_stockout_store_day",
-    "fact_discount_store_day",
-    "fact_activity_store_day",
+    "fact_sales_city_day",
+    "fact_stockout_city_day",
+    "fact_discount_city_day",
+    "fact_activity_city_day",
 ]
 
 CONTEXT_PACK_PATH = PROJECT_ROOT / "data" / "context_pack.json"
