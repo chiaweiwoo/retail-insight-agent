@@ -8,7 +8,7 @@ export default async function StoresPage() {
   // Fetch city normals for sorting and axis labels
   const { data: normals, error: normalsError } = await supabase
     .from("rca_city_normals")
-    .select("city_id, density_tier, avg_sale, store_count")
+    .select("city_id, density_tier, avg_sale")
     .order("avg_sale", { ascending: false });
 
   if (normalsError) {
@@ -95,7 +95,7 @@ export default async function StoresPage() {
                         <ArrowRight size={12} />
                       </Link>
                       <div className="text-xs text-slate-500 mt-0.5">
-                        Vol: {Math.round(city.avg_sale).toLocaleString()} | {city.store_count} stores
+                        Vol: {Math.round(city.avg_sale).toLocaleString()}
                       </div>
                     </div>
                   </td>
