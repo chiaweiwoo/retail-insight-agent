@@ -83,7 +83,10 @@ End your memo with this exact section (fill in every field):
 - data_gaps: <what you could not see, or "none">
 """.strip()
 
-DEFAULT_SIGNAL_METRIC = "trailing_7d_pct_change"
+DEFAULT_SIGNAL_METRIC = "residual_zscore"
+DEFAULT_DROP_THRESHOLD_Z = -2.0
+DEFAULT_LIFT_THRESHOLD_Z = 2.0
+# Legacy pct-change thresholds kept for context/signals.py historical analysis
 DEFAULT_DROP_THRESHOLD_PCT = -20.0
 DEFAULT_LIFT_THRESHOLD_PCT = 30.0
 

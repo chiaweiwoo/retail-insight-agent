@@ -8,8 +8,9 @@ from duckduckgo_search import DDGS
 
 from rca.config import (
     DEFAULT_DROP_THRESHOLD_PCT,
+    DEFAULT_DROP_THRESHOLD_Z,
     DEFAULT_LIFT_THRESHOLD_PCT,
-    DEFAULT_SIGNAL_METRIC,
+    DEFAULT_LIFT_THRESHOLD_Z,
 )
 from rca.evidence import get_store_day_evidence
 from rca.outcomes import get_prior_rca as load_prior_rca
@@ -56,37 +57,59 @@ def _get_history_slice(city_id: int, dt: str, days: int = 7) -> pd.DataFrame:
     return store_frame.iloc[start : pos + 1].copy()
 
 
-def _signal_label(
-    signal_value: float | None,
-    drop_threshold_pct: float,
-    lift_threshold_pct: float,
-) -> str:
-    if signal_value is None or pd.isna(signal_value):
-        return "insufficient_history"
-    if float(signal_value) <= drop_threshold_pct:
-        return "drop"
-    if float(signal_value) >= lift_threshold_pct:
-        return "lift"
-    return "neutral"
+def _get_analytics_signal(city_id: int, dt: str) -> dict[str, Any] | None:
+    """Read STL signal from local DuckDB analytics table. Returns None if table missing."""
+    import duckdb
+    from rca.config import DB_PATH
+    try:
+        con = duckdb.connect(str(DB_PATH), read_only=True)
+        row = con.execute(
+            "SELECT stl_residual, residual_zscore, signal_label "
+            "FROM analytics_city_signal WHERE city_id = ? AND dt = CAST(? AS DATE)",
+            [city_id, dt],
+        ).fetchone()
+        con.close()
+        if row is None:
+            return None
+        return {
+            "stl_residual": float(row[0]) if row[0] is not None else None,
+            "residual_zscore": float(row[1]) if row[1] is not None else None,
+            "signal_label": str(row[2]) if row[2] is not None else "neutral",
+        }
+    except Exception:
+        return None
 
 
 def get_signal_evidence(
     city_id: int,
     dt: str,
-    metric: str = DEFAULT_SIGNAL_METRIC,
-    drop_threshold_pct: float = DEFAULT_DROP_THRESHOLD_PCT,
-    lift_threshold_pct: float = DEFAULT_LIFT_THRESHOLD_PCT,
 ) -> dict[str, Any]:
     row = _get_signal_row(city_id, dt)
-    signal_value = row.get(metric)
+    analytics = _get_analytics_signal(city_id, dt)
+
+    if analytics is not None:
+        signal_label = analytics["signal_label"]
+    else:
+        # Fallback to legacy pct-change trigger while analytics table is not yet built
+        pct = row.get("trailing_7d_pct_change")
+        if pct is None or pd.isna(pct):
+            signal_label = "insufficient_history"
+        elif float(pct) <= DEFAULT_DROP_THRESHOLD_PCT:
+            signal_label = "drop"
+        elif float(pct) >= DEFAULT_LIFT_THRESHOLD_PCT:
+            signal_label = "lift"
+        else:
+            signal_label = "neutral"
+
     return {
         "city_id": city_id,
         "dt": dt,
-        "metric": metric,
-        "signal_label": _signal_label(signal_value, drop_threshold_pct, lift_threshold_pct),
+        "signal_label": signal_label,
+        "stl_residual": analytics["stl_residual"] if analytics else None,
+        "residual_zscore": analytics["residual_zscore"] if analytics else None,
         "thresholds": {
-            "drop_lte_pct": drop_threshold_pct,
-            "lift_gte_pct": lift_threshold_pct,
+            "drop_lte_z": DEFAULT_DROP_THRESHOLD_Z,
+            "lift_gte_z": DEFAULT_LIFT_THRESHOLD_Z,
         },
         "current_sales": _round_float(row["total_sales"]),
         "previous_day_sales": _round_float(row["previous_day_sales"]),
@@ -97,6 +120,52 @@ def get_signal_evidence(
         "same_weekday_4w_pct_change": _round_float(row["same_weekday_4w_pct_change"]),
         "weekday": str(row["weekday"]),
         "holiday_name_inferred": str(row["holiday_name_inferred"]),
+    }
+
+
+def get_intraday_profile(city_id: int, dt: str) -> dict[str, Any]:
+    """Return the 24-hour intraday sales profile and deviation z-scores for one city-day."""
+    import duckdb
+    from rca.config import DB_PATH
+
+    try:
+        con = duckdb.connect(str(DB_PATH), read_only=True)
+        rows = con.execute(
+            "SELECT hour, sales, sales_share, deviation_z, stockout_rate "
+            "FROM analytics_city_hourly "
+            "WHERE city_id = ? AND dt = CAST(? AS DATE) ORDER BY hour",
+            [city_id, dt],
+        ).fetchall()
+        con.close()
+    except Exception as exc:
+        return {"city_id": city_id, "dt": dt, "available": False, "error": str(exc)}
+
+    if not rows:
+        return {
+            "city_id": city_id,
+            "dt": dt,
+            "available": False,
+            "note": "No intraday profile. Run 'rca build' to generate analytics.",
+        }
+
+    hourly = [
+        {
+            "hour": int(r[0]),
+            "sales": _round_float(r[1]),
+            "sales_share_pct": round(float(r[2]) * 100, 2) if r[2] is not None else None,
+            "deviation_z": _round_float(r[3]),
+            "stockout_rate": _round_float(r[4]),
+        }
+        for r in rows
+    ]
+    notable = sorted(hourly, key=lambda h: abs(h["deviation_z"] or 0), reverse=True)[:4]
+
+    return {
+        "city_id": city_id,
+        "dt": dt,
+        "available": True,
+        "hourly": hourly,
+        "notable_hours": notable,
     }
 
 
@@ -460,6 +529,23 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
             "additionalProperties": False,
         },
         "function": search_news,
+    },
+    "get_intraday_profile": {
+        "description": (
+            "Get the 24-hour hourly sales profile for one city-day, including deviation z-scores "
+            "vs the city's typical hourly shape. Use this to identify which hours contributed most "
+            "to a day's sales drop or lift."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "city_id": {"type": "integer"},
+                "dt": {"type": "string"},
+            },
+            "required": ["city_id", "dt"],
+            "additionalProperties": False,
+        },
+        "function": get_intraday_profile,
     },
     "get_prior_rca": {
         "description": "Get prior RCA outcomes for this city from Supabase run history.",

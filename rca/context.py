@@ -84,27 +84,34 @@ def build_context_pack(db_path: Path = DB_PATH, output_path: Path = CONTEXT_PACK
         for row in holiday_days
     ]
 
-    # Empirical prefix grouping — stated as a computed observation, not a tier label
-    prefix_avg = con.execute("""
-        SELECT SUBSTRING(city_id, 1, 1) AS prefix, ROUND(AVG(total_sales), 2) AS avg_daily_sales
-        FROM fact_sales_city_day
-        GROUP BY prefix
-        ORDER BY prefix
+    # Density-tier grouping: 1 = >100 stores, 2 = 20-99, 3 = <20
+    tier_avg = con.execute("""
+        SELECT
+            CASE
+                WHEN dc.store_count >= 100 THEN '1'
+                WHEN dc.store_count >= 20  THEN '2'
+                ELSE '3'
+            END AS density_tier,
+            ROUND(AVG(s.total_sales), 2) AS avg_daily_sales
+        FROM fact_sales_city_day s
+        JOIN dim_city dc USING (city_id)
+        GROUP BY density_tier
+        ORDER BY density_tier
     """).fetchall()
-    prefix_empirical = {row[0]: row[1] for row in prefix_avg}
+    tier_empirical = {row[0]: row[1] for row in tier_avg}
 
     con.close()
 
     pack: dict[str, Any] = {
         "dataset": {
             "source": "FreshRetailNet-50K (anonymized 2024 dataset)",
-            "stores": store_count,
+            "cities": store_count,
             "days": day_count,
             "date_min": date_min,
             "date_max": date_max,
-            "granularity": "store-day",
+            "granularity": "city-day",
             "note": (
-                "Store aliases, city IDs, and product IDs are opaque anonymized identifiers. "
+                "City IDs (integers 0–17) and product IDs are opaque anonymized identifiers. "
                 "Do not assign business meaning to them beyond what is computed from the data. "
                 "holiday_name_inferred values are themselves inferred — treat as uncertain priors. "
                 + SALES_FIELD_SEMANTICS
@@ -115,15 +122,14 @@ def build_context_pack(db_path: Path = DB_PATH, output_path: Path = CONTEXT_PACK
             "weekday_avg_sales": weekday_pattern,
             "weekend_vs_weekday_avg_sales": weekend_vs_weekday,
         },
-        "store_prefix_empirical": {
+        "density_tier_empirical": {
             "description": (
-                "Average daily sales grouped by the first letter of city_id. "
-                "This is a computed grouping only — the prefix is an opaque identifier "
-                "and is NOT labelled as a tier or size category."
+                "Average daily sales grouped by density tier (1 = >100 stores, 2 = 20-99, 3 = <20). "
+                "Use as a weak prior for relative scale comparisons only."
             ),
-            "by_prefix": prefix_empirical,
+            "by_tier": tier_empirical,
         },
-        "per_store_normal": {row["city_id"]: row for row in per_store_rows},
+        "per_city_normal": {row["city_id"]: row for row in per_store_rows},
         "holidays_in_window": holidays,
         "provenance": {
             "built_from": str(db_path),
@@ -171,41 +177,41 @@ def build_context_preamble(
     if pack is None:
         base = (
             "CONTEXT: Dataset is FreshRetailNet-50K, anonymized 2024 retail data. "
-            "Store aliases and product IDs are opaque — do not assume business meaning. "
+            "City IDs and product IDs are opaque — do not assume business meaning. "
             f"{SALES_FIELD_SEMANTICS} "
             f"Analysis date is {dt}; do not reference events after the data window.\n"
         )
         if profile_text:
-            base += f"\nSTORE MEMORY ({city_id}) — treat as context, not ground truth:\n{profile_text}\n"
+            base += f"\nCITY MEMORY (city {city_id}) — treat as context, not ground truth:\n{profile_text}\n"
         return base
 
     dataset = pack["dataset"]
     fleet = pack["fleet"]
-    store_normal = pack.get("per_store_normal", {}).get(city_id)
+    city_normal = pack.get("per_city_normal", {}).get(city_id)
 
     lines = [
         f"GROUNDING CONTEXT (factual, computed from data — treat as weak prior):",
-        f"- Dataset: {dataset['source']}, {dataset['stores']} stores, {dataset['days']} days "
-        f"({dataset['date_min']} to {dataset['date_max']}), store-day granularity.",
-        f"- Store aliases, city IDs, and product IDs are opaque anonymized identifiers. "
+        f"- Dataset: {dataset['source']}, {dataset['cities']} cities, {dataset['days']} days "
+        f"({dataset['date_min']} to {dataset['date_max']}), city-day granularity.",
+        f"- City IDs (integers 0–17) and product IDs are opaque anonymized identifiers. "
         f"Do not assign business meaning beyond what the numbers show.",
         f"- {SALES_FIELD_SEMANTICS}",
         f"- Fleet average daily sales: {fleet['avg_daily_sales']}.",
     ]
 
-    if store_normal:
+    if city_normal:
         lines.append(
-            f"- {city_id} normal: avg {store_normal['avg_daily_sales']} / day, "
-            f"stddev {store_normal['stddev_daily_sales']} "
-            f"(range {store_normal['min_daily_sales']}–{store_normal['max_daily_sales']})."
+            f"- City {city_id} normal: avg {city_normal['avg_daily_sales']} / day, "
+            f"stddev {city_normal['stddev_daily_sales']} "
+            f"(range {city_normal['min_daily_sales']}–{city_normal['max_daily_sales']})."
         )
 
-    prefix = city_id[0] if city_id else ""
-    prefix_data = pack.get("store_prefix_empirical", {}).get("by_prefix", {})
-    if prefix in prefix_data:
+    tier_data = pack.get("density_tier_empirical", {}).get("by_tier", {})
+    if tier_data:
+        tier_summary = ", ".join(f"tier {t}: avg {v}" for t, v in sorted(tier_data.items()))
         lines.append(
-            f"- Stores with '{prefix}' prefix average {prefix_data[prefix]} / day (computed grouping — "
-            f"prefix is opaque, not a documented tier)."
+            f"- Density tier averages (1=>100 stores, 2=20-99, 3=<20): {tier_summary}. "
+            f"Use as a weak prior for relative scale only."
         )
 
     lines.append(
@@ -217,7 +223,7 @@ def build_context_preamble(
 
     if profile_text:
         lines.append(f"")
-        lines.append(f"STORE MEMORY ({city_id}) — distilled from prior RCA runs, treat as context not ground truth:")
+        lines.append(f"CITY MEMORY (city {city_id}) — distilled from prior RCA runs, treat as context not ground truth:")
         lines.append(profile_text)
 
     return "\n".join(lines) + "\n"
@@ -230,33 +236,33 @@ def _render_pack_md(pack: dict[str, Any]) -> str:
         "# Context Pack",
         "",
         f"**Source:** {ds['source']}",
-        f"**Window:** {ds['date_min']} to {ds['date_max']} ({ds['stores']} stores, {ds['days']} days)",
+        f"**Window:** {ds['date_min']} to {ds['date_max']} ({ds['cities']} cities, {ds['days']} days)",
         f"**Granularity:** {ds['granularity']}",
         "",
         "> " + ds["note"],
         "",
         "## Fleet",
         "",
-        f"- Average daily sales (all stores, all days): **{fl['avg_daily_sales']}**",
+        f"- Average daily sales (all cities, all days): **{fl['avg_daily_sales']}**",
         f"- Weekend vs weekday avg: {fl['weekend_vs_weekday_avg_sales']}",
         "",
-        "## Store prefix groupings (empirical, not tier labels)",
+        "## Density tier averages (empirical)",
         "",
-        pack["store_prefix_empirical"]["description"],
+        pack["density_tier_empirical"]["description"],
         "",
     ]
-    for prefix, avg in pack["store_prefix_empirical"]["by_prefix"].items():
-        lines.append(f"- `{prefix}` prefix: avg {avg} / day")
+    for tier, avg in pack["density_tier_empirical"]["by_tier"].items():
+        lines.append(f"- Tier {tier}: avg {avg} / day")
     lines += [
         "",
-        "## Per-store normals",
+        "## Per-city normals",
         "",
-        "| store | avg / day | stddev | min | max |",
+        "| city_id | avg / day | stddev | min | max |",
         "| --- | --- | --- | --- | --- |",
     ]
-    for alias, s in pack["per_store_normal"].items():
+    for city_id, s in pack["per_city_normal"].items():
         lines.append(
-            f"| {alias} | {s['avg_daily_sales']} | {s['stddev_daily_sales']} "
+            f"| {city_id} | {s['avg_daily_sales']} | {s['stddev_daily_sales']} "
             f"| {s['min_daily_sales']} | {s['max_daily_sales']} |"
         )
     lines += [

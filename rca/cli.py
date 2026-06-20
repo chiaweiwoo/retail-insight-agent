@@ -18,7 +18,7 @@ def _safe_print(text: str) -> None:
 
 
 def _cmd_build(args: argparse.Namespace) -> None:
-    from rca.database import ingest_to_duckdb, validate_daily_tables
+    from rca.database import ingest_to_duckdb, run_analytics, validate_daily_tables
     from rca.config import DB_PATH
 
     print("Building database...")
@@ -29,6 +29,12 @@ def _cmd_build(args: argparse.Namespace) -> None:
     print("Validating...")
     validate_daily_tables()
     print(f"Database built and validated: {DB_PATH}")
+
+    print("Running analytics pipeline...")
+    analytics_counts = run_analytics()
+    for table, count in analytics_counts.items():
+        print(f"  {table}: {count} rows")
+    print("Analytics complete.")
 
 
 def _cmd_analyze(args: argparse.Namespace) -> None:
@@ -443,7 +449,7 @@ def _cmd_reset_memory(args: argparse.Namespace) -> None:
 
 
 def _cmd_sync(args: argparse.Namespace) -> None:
-    from rca.database import sync_normals_to_supabase, sync_series_to_supabase
+    from rca.database import sync_analytics_to_supabase, sync_normals_to_supabase, sync_series_to_supabase
     from rca.config import DB_PATH
 
     if not DB_PATH.exists():
@@ -457,6 +463,11 @@ def _cmd_sync(args: argparse.Namespace) -> None:
     print("Syncing city_normals to Supabase...")
     normals_count = sync_normals_to_supabase()
     print(f"  Upserted {normals_count} city baselines.")
+
+    print("Syncing analytics tables to Supabase...")
+    analytics_counts = sync_analytics_to_supabase()
+    for table, count in analytics_counts.items():
+        print(f"  {table}: {count} rows upserted.")
 
     print("Sync complete.")
 

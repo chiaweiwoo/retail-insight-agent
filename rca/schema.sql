@@ -104,3 +104,40 @@ CREATE TABLE fact_activity_city_day (
     activity_sales_share DOUBLE NOT NULL,
     PRIMARY KEY (city_id, dt)
 );
+
+-- Analytics tables (populated by run_analytics_pipeline after ingest)
+
+CREATE TABLE analytics_city_signal (
+    city_id INTEGER NOT NULL,
+    dt DATE NOT NULL,
+    stl_residual DOUBLE,
+    residual_zscore DOUBLE,
+    signal_label TEXT,
+    PRIMARY KEY (city_id, dt)
+);
+
+CREATE TABLE analytics_city_hourly (
+    city_id INTEGER NOT NULL,
+    dt DATE NOT NULL,
+    hour INTEGER NOT NULL CHECK (hour BETWEEN 0 AND 23),
+    sales DOUBLE,
+    sales_share DOUBLE,
+    deviation_z DOUBLE,
+    stockout_rate DOUBLE,
+    PRIMARY KEY (city_id, dt, hour)
+);
+
+CREATE TABLE analytics_city_segment (
+    city_id INTEGER PRIMARY KEY,
+    cluster_id INTEGER,
+    segment_label TEXT
+);
+
+CREATE TABLE analytics_city_correlations (
+    city_id INTEGER PRIMARY KEY,
+    corr_stockout DOUBLE,
+    corr_discount DOUBLE,
+    corr_activity DOUBLE,
+    corr_precpt DOUBLE,
+    corr_temperature DOUBLE
+);

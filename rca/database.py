@@ -320,6 +320,12 @@ def ingest_to_duckdb() -> dict[str, int]:
     return row_counts
 
 
+def run_analytics(db_path: Path = DB_PATH) -> dict[str, int]:
+    """Run the analytics pipeline (STL, intraday, segments, correlations) on local DuckDB."""
+    from rca.analytics import run_analytics_pipeline
+    return run_analytics_pipeline(db_path)
+
+
 # ---------------------------------------------------------------------------
 # Validation
 # ---------------------------------------------------------------------------
@@ -622,3 +628,101 @@ def sync_normals_to_supabase(db_path: Path = DB_PATH) -> int:
         ).execute()
 
     return len(records)
+
+
+def sync_analytics_to_supabase(db_path: Path = DB_PATH, batch_size: int = 500) -> dict[str, int]:
+    """Push analytics tables from local DuckDB → Supabase rca_city_* analytics tables."""
+    connection = duckdb.connect(str(db_path), read_only=True)
+    try:
+        signal_rows = connection.execute(
+            "SELECT city_id, CAST(dt AS VARCHAR), stl_residual, residual_zscore, signal_label "
+            "FROM analytics_city_signal ORDER BY city_id, dt"
+        ).fetchall()
+
+        hourly_rows = connection.execute(
+            "SELECT city_id, CAST(dt AS VARCHAR), hour, sales, sales_share, deviation_z, stockout_rate "
+            "FROM analytics_city_hourly ORDER BY city_id, dt, hour"
+        ).fetchall()
+
+        segment_rows = connection.execute(
+            "SELECT city_id, cluster_id, segment_label FROM analytics_city_segment ORDER BY city_id"
+        ).fetchall()
+
+        corr_rows = connection.execute(
+            "SELECT city_id, corr_stockout, corr_discount, corr_activity, corr_precpt, corr_temperature "
+            "FROM analytics_city_correlations ORDER BY city_id"
+        ).fetchall()
+    finally:
+        connection.close()
+
+    client = make_supabase_client()
+    totals: dict[str, int] = {}
+
+    # --- rca_city_signal ---
+    batch: list[dict] = []
+    total = 0
+    for r in signal_rows:
+        batch.append({
+            "city_id": int(r[0]),
+            "dt": str(r[1]),
+            "stl_residual": float(r[2]) if r[2] is not None else None,
+            "residual_zscore": float(r[3]) if r[3] is not None else None,
+            "signal_label": str(r[4]) if r[4] is not None else None,
+        })
+        if len(batch) >= batch_size:
+            client.table("rca_city_signal").upsert(batch, on_conflict="city_id,dt").execute()
+            total += len(batch)
+            batch = []
+    if batch:
+        client.table("rca_city_signal").upsert(batch, on_conflict="city_id,dt").execute()
+        total += len(batch)
+    totals["rca_city_signal"] = total
+
+    # --- rca_city_hourly ---
+    batch = []
+    total = 0
+    for r in hourly_rows:
+        batch.append({
+            "city_id": int(r[0]),
+            "dt": str(r[1]),
+            "hour": int(r[2]),
+            "sales": float(r[3]) if r[3] is not None else None,
+            "sales_share": float(r[4]) if r[4] is not None else None,
+            "deviation_z": float(r[5]) if r[5] is not None else None,
+            "stockout_rate": float(r[6]) if r[6] is not None else None,
+        })
+        if len(batch) >= batch_size:
+            client.table("rca_city_hourly").upsert(batch, on_conflict="city_id,dt,hour").execute()
+            total += len(batch)
+            batch = []
+    if batch:
+        client.table("rca_city_hourly").upsert(batch, on_conflict="city_id,dt,hour").execute()
+        total += len(batch)
+    totals["rca_city_hourly"] = total
+
+    # --- rca_city_segment ---
+    records = [
+        {"city_id": int(r[0]), "cluster_id": int(r[1]) if r[1] is not None else None, "segment_label": str(r[2]) if r[2] is not None else None}
+        for r in segment_rows
+    ]
+    if records:
+        client.table("rca_city_segment").upsert(records, on_conflict="city_id").execute()
+    totals["rca_city_segment"] = len(records)
+
+    # --- rca_city_correlations ---
+    records = [
+        {
+            "city_id": int(r[0]),
+            "corr_stockout": float(r[1]) if r[1] is not None else None,
+            "corr_discount": float(r[2]) if r[2] is not None else None,
+            "corr_activity": float(r[3]) if r[3] is not None else None,
+            "corr_precpt": float(r[4]) if r[4] is not None else None,
+            "corr_temperature": float(r[5]) if r[5] is not None else None,
+        }
+        for r in corr_rows
+    ]
+    if records:
+        client.table("rca_city_correlations").upsert(records, on_conflict="city_id").execute()
+    totals["rca_city_correlations"] = len(records)
+
+    return totals
