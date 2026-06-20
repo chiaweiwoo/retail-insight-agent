@@ -20,18 +20,22 @@ ClientFactory = Callable[[str], Any]
 
 EVALUATOR_SYSTEM_PROMPT = """You are an RCA quality judge.
 
-Score the run on five dimensions from 1 to 5:
+Score the run on nine dimensions from 1 to 5:
 - groundedness
 - calibration
 - actionability
 - conciseness
 - causal_honesty
+- time_to_decision
+- format_compliance
+- procedure_transparency
+- restraint
 
 Rules:
 - judge only the supplied artifacts
 - do not reward fancy prose over honesty
 - prefer restrained, evidence-backed output
-- return valid JSON only
+- return valid JSON with exactly these 9 numeric keys + 1 string key: groundedness, calibration, actionability, conciseness, causal_honesty, time_to_decision, format_compliance, procedure_transparency, restraint, executive_pov
 """
 
 
@@ -226,13 +230,13 @@ def _render_eval_markdown(payload: dict[str, Any]) -> str:
         f"- signal matches: `{payload['signal_match_count']}`",
         f"- unsupported analyst checks: `{payload['faithfulness_unsupported_count']}`",
         "",
-        "| scenario_id | signal_match | checked_analysts | unsupported_analysts | groundedness | calibration | actionability |",
-        "| --- | --- | ---: | ---: | ---: | ---: | ---: |",
+        "| scenario_id | signal_match | checked_analysts | unsupported_analysts | groundedness | calibration | actionability | time_to_decision | format_compliance | procedure_transparency | restraint |",
+        "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
     for scenario in payload["scenarios"]:
         scores = scenario["judge_scores"]
         lines.append(
-            "| {scenario_id} | {signal_match} | {checked} | {unsupported} | {groundedness} | {calibration} | {actionability} |".format(
+            "| {scenario_id} | {signal_match} | {checked} | {unsupported} | {groundedness} | {calibration} | {actionability} | {time_to_decision} | {format_compliance} | {procedure_transparency} | {restraint} |".format(
                 scenario_id=scenario["scenario_id"],
                 signal_match="yes" if scenario["signal_match"] else "no",
                 checked=scenario["faithfulness"]["checked_analysts"],
@@ -240,7 +244,13 @@ def _render_eval_markdown(payload: dict[str, Any]) -> str:
                 groundedness=scores.get("groundedness", "n/a"),
                 calibration=scores.get("calibration", "n/a"),
                 actionability=scores.get("actionability", "n/a"),
+                time_to_decision=scores.get("time_to_decision", "n/a"),
+                format_compliance=scores.get("format_compliance", "n/a"),
+                procedure_transparency=scores.get("procedure_transparency", "n/a"),
+                restraint=scores.get("restraint", "n/a"),
             )
         )
+        executive_pov = scores.get("executive_pov", "n/a")
+        lines.append(f"  - **Executive POV**: {executive_pov}")
     lines.append("")
     return "\n".join(lines)

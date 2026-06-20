@@ -124,9 +124,7 @@ as structural. Recommend watching the next 5 trading days before drawing a concl
 - Missing data: no cost, margin, or intraday order data available; the ops analyst correctly flagged this but the synthesis treated the stockout correlation as more causal than warranted.
 - Action implication: the "monitor" recommendation is appropriate given the uncertainty; escalation would require at least one additional day of stockout confirmation before it is justified.
 """,
-    "evaluator": """\
-{"groundedness": 4, "calibration": 4, "actionability": 3, "conciseness": 4, "causal_honesty": 4, "summary": "Stub evaluation only."}
-""",
+    "evaluator": '{"groundedness": 4, "calibration": 4, "actionability": 3, "conciseness": 4, "causal_honesty": 4, "time_to_decision": 3, "format_compliance": 5, "procedure_transparency": 4, "restraint": 4, "executive_pov": "Stub evaluation only."}',
     "story_writer": """\
 # Story Report: h555 on 2024-05-16
 

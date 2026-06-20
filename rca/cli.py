@@ -378,6 +378,11 @@ def _cmd_story(args: argparse.Namespace) -> None:
     print(f"Story HTML written to {html_path}")
 
 
+def _cmd_mcp(args: argparse.Namespace) -> None:
+    from rca.mcp_server import mcp
+    mcp.run()
+
+
 def _cmd_distil(args: argparse.Namespace) -> None:
     import os
     from rca.llm import load_llm_settings, LLMSettings
@@ -631,6 +636,13 @@ def main() -> None:
         help="Use the stub LLM story writer",
     )
     story_parser.set_defaults(func=_cmd_story)
+
+    # rca mcp
+    mcp_parser = subparsers.add_parser(
+        "mcp",
+        help="Launch MCP tool server (read-only)",
+    )
+    mcp_parser.set_defaults(func=_cmd_mcp)
 
     args = parser.parse_args()
     args.func(args)
