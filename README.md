@@ -1,206 +1,107 @@
-# Retail Insight Agent
+# Retail Insight Agent (Agents 101)
 
-Retail RCA playground built on a local DuckDB evidence store, with a calibration-first multi-agent workflow on top.
+This project is a calibration-first, multi-agent Root Cause Analysis (Rca) system for retail store data. It is built on LangGraph and backed by a Supabase Postgres database.
 
-The canonical frontend is the Next.js app in `dashboard/`. The older `ui/` Vite app has been retired so the repo only has one active UI target.
+## 1. What This Is
 
-The current shape is:
-
-1. Build clean daily store facts in DuckDB.
-2. Precompute sales drop/lift signals.
-3. Run a selective analyst workflow per store-day.
-4. Produce a decision card, drill-down RCA, trace, and logs.
-5. Store prior outcomes so later runs can tell first-time noise from recurring patterns.
-6. Evaluate benchmark runs with deterministic faithfulness checks plus an LLM judge.
-7. Generate a reader-friendly story report HTML for selected runs.
-
-## Data Semantics
-
-Important: the source dataset's `sale_amount` and `hours_sale` fields are **normalized sales amounts**, not literal unit counts and not currency revenue.
-
-- The dataset card describes `sale_amount` as the daily sales amount after global normalization, multiplied by a specific coefficient.
-- In this repo, aggregated store-day sales should therefore be read as **relative sales amounts for comparison and anomaly detection**.
-- We should avoid wording like `units sold`, `revenue`, `$`, or margin math derived from these fields.
-- Safe wording is:
-  - `sales amount`
-  - `normalized sales amount`
-  - `relative sales level`
-
-This matters because many RCA conclusions depend on comparing store-days correctly, not on pretending we know true commercial magnitude.
-
-## Quick Start
-
-```bash
-uv sync
-uv run python -m rca.cli build
-uv run python -m rca.cli analyze
-uv run python -m rca.cli profile
-uv run python -m rca.cli run --store h555 --dt 2024-05-16 --full
-uv run python -m rca.cli story --run-dir data/analysis/agent_benchmark_runs/<run_folder>
-uv run python -m rca.cli runs
-```
-
-Dry-run mode exercises the whole workflow without API calls:
-
-```bash
-uv run python -m rca.cli run --store h555 --dt 2024-05-16 --dry-run --full
-```
-
-## Commands
-
-| Command | What it does |
-| --- | --- |
-| `uv run python -m rca.cli build` | Ingest raw parquet into `data/rca.duckdb` and validate row counts |
-| `uv run python -m rca.cli analyze` | Precompute signal CSVs and trigger grids under `data/analysis/` |
-| `uv run python -m rca.cli profile` | Build `data/context_pack.json` and `data/context_pack.md` |
-| `uv run python -m rca.cli run --store S --dt D [--dry-run] [--full]` | Run one RCA workflow; prints decision card by default |
-| `uv run python -m rca.cli bench` | Run the 6 fixed benchmark scenarios |
-| `uv run python -m rca.cli eval [--run-dir PATH] [--dry-run]` | Evaluate a benchmark run directory |
-| `uv run python -m rca.cli story --run-dir PATH [--no-llm] [--dry-run]` | Generate root-level story report markdown and HTML for one run |
-| `uv run python -m rca.cli runs` | Show recent run history from `data/runs.duckdb` |
-| `uv run python -m rca.cli dashboard` | Legacy alias; static dashboard retired |
-| `uv run python -m rca.cli export` | Legacy alias; Vite evidence viewer retired |
-
-## Frontend
-
-Use `dashboard/` as the only active frontend.
-
-- local dev: `cd dashboard && npm run dev`
-- production build: `cd dashboard && npm run build`
-- Vercel deploy from repo root; root `vercel.json` delegates build to `dashboard/`
-- required env vars: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-
-## Runtime Design
-
-The workflow is selective and calibration-first.
+This repo demonstrates how to use LLM agents to perform rigorous, grounded RCA on anomalous store sales signals (drops or lifts). The process is a "funnel" that starts with cheap, broad reasoning and ends with deep, synthesized oversight.
 
 ```mermaid
 flowchart TD
-    A["Input: store_alias + dt"] --> B["context pack + prior RCA lookup"]
-    B --> C["plan_specialists"]
-    C --> D["sales_analyst"]
-    C --> E["ops_analyst (if stockout signal)"]
-    C --> F["commercial_analyst (if promo/discount signal)"]
-    C --> G["market_analyst"]
-    C --> H["research_analyst (optional, off by default)"]
-    D --> I["critic"]
-    E --> I
-    F --> I
-    G --> I
-    H --> I
-    I --> J["coordinator"]
-    J --> K["finance_controller"]
-    K --> L["slt_brief"]
-    L --> M["record outcome"]
-    M --> N["artifacts + run logs"]
+    A["[Code] Input: store_alias + dt"] --> B["[Code] Context pack + prior memory"]
+    B --> C["[LLM] plan_specialists (Fast Model)"]
+    C --> D["[LLM] sales_analyst (Parallel)"]
+    C --> E["[LLM] ops_analyst (Parallel)"]
+    C --> F["[LLM] commercial_analyst (Parallel)"]
+    C --> G["[LLM] market_analyst (Parallel)"]
+    D & E & F & G --> I["[LLM] critic (Deep Model)"]
+    I --> J["[LLM] coordinator_analyst (Deep)"]
+    J --> K["[LLM] finance_controller (Deep)"]
+    K --> L["[LLM] slt_brief (Deep)"]
+    L --> M["[Code] sanitize & record memory"]
 ```
 
-![Agent Runtime DAG](/C:/Users/chiaw/OneDrive/Desktop/playground/retail_insight_agent/docs/images/agent_runtime_dag.svg)
+## 2. Components at a Glance
 
-## Agent Roles
+| Agent | Tools | Model | When | What it must change |
+| --- | --- | --- | --- | --- |
+| `plan_specialists` | local context checks | Fast | First node | Outputs an execution plan of which analysts to trigger. |
+| `sales/ops/commercial/market` | `get_stockout_context`, `get_sales_context`, etc | Fast | Parallel | Investigates the specific domain and outputs an evidence memo. |
+| `critic` | None | Deep | Post-analysis | Downgrades weak claims, flags false causality. |
+| `coordinator` | None | Deep | Synthesis | Merges the separate memos into one cohesive RCA report. |
+| `finance_controller` | None | Deep | Framing | Adds margin risk and structural impact framing. |
+| `slt_brief` | None | Deep | Last node | Compresses everything into a short decision card. |
 
-| Node | Role | Tool access |
-| --- | --- | --- |
-| `plan_specialists` | Cheap local planner that decides which analysts to run | local evidence functions only |
-| `sales_analyst` | Confirms trigger magnitude and baseline comparisons | `get_signal_evidence`, `get_sales_context` |
-| `ops_analyst` | Checks stockout and availability pressure | `get_stockout_context`, `get_sales_context` |
-| `commercial_analyst` | Checks discount and activity effects; flags margin risk honestly | `get_discount_context`, `get_activity_context`, `get_sales_context` |
-| `market_analyst` | Checks calendar, weather, and peer context | `get_calendar_weather_context`, `get_peer_store_context`, `get_sales_context` |
-| `research_analyst` | Optional retrospective news search | `search_news` |
-| `critic` | Downgrades weak claims and flags correlation-as-cause | no direct tools |
-| `coordinator_analyst` | Synthesizes analyst memos into one RCA | no direct tools |
-| `finance_controller` | Adds materiality, margin-risk, and one-off vs structural framing | no direct tools |
-| `slt_brief` | Compresses the RCA into the decision card | no direct tools |
-| `evaluator` | Offline judge for benchmark quality | no direct tools |
+## 3. How an LLM Agent Works
 
-## LLM Configuration
+In this system, agents use a **ReAct loop** (Reasoning + Acting). 
+- **System Prompt**: Defines the persona (e.g., "You are an Ops Analyst...").
+- **Tools**: Functions the agent can call (e.g., `get_stockout_baseline()`).
+- **Loop**: The agent receives context, reasons about what it needs, calls a tool, observes the result, and iterates until it has enough evidence to form a conclusion.
+- **Parallel Specialists**: Instead of one massive agent that hallucinates, we run bounded specialists in parallel (e.g. ops vs commercial) who are only allowed to see their own narrow domains.
 
-The pipeline enforces `temperature = 0.0` for all API calls (including data extraction, tool usage, and report sanitization). 
+## 4. Why Critic, Coordinator, and Decision Card?
 
-**Motivation**: 
-In earlier iterations, relying on default API temperatures (often `1.0` or `0.6` for models like DeepSeek) caused the agents to be overly "creative". For example, when tasked with querying peer stores, an analyst hallucinated a non-existent store alias (`m042`) and requested its data, which crashed the tool execution layer. 
+The funnel logic is designed for **calibration**.
+- Raw agent memos are often overly confident.
+- The **Critic** exists solely to challenge the analysts ("You said promotions drove the lift, but the baseline data shows the lift started *before* the promo").
+- The **Coordinator** resolves the tension.
+- The **Decision Card** forces the output into a strictly formatted, confidence-led brief for the SLT (Senior Leadership Team). 
 
-By locking the temperature to `0.0`, we:
-1. Ensure the agents remain strictly factual and grounded in the provided context.
-2. Prevent tool parameter hallucinations.
-3. Make the entire RCA workflow highly deterministic and reproducible across benchmark runs.
+## 5. Staying Honest
 
-## Calibration Rules
+- **Faithfulness**: Temperature is locked to `0.0`. Agents are not allowed to invent numbers.
+- **Data Guardrails**: Sales figures are normalized coefficients. Agents are banned from using the `$` symbol or claiming literal "revenue".
+- **Small-Sample Caution**: The local sandbox only has 15 stores. Agents are prompted to acknowledge that peer-comparisons on such a small group are statistically weak.
+- **LLM-as-judge ≠ Critic**: The critic runs *during* the workflow to improve the result. The `evaluator` judge runs offline afterward to score the benchmark performance.
 
-- Outputs are correlational RCA, not proof of causality.
-- Every specialist ends with an `Assessment` block.
-- Confidence vocabulary is fixed: `high`, `medium`, `low`.
-- The critic is part of the run and improves the current output.
-- The evaluator is separate and scores the system offline.
+## 6. Memory Over Time
 
-## Data Layout
+- **Episodic Memory**: Every completed RCA is recorded in the `rca_outcome` table.
+- **Semantic Profile**: We periodically run `rca distil` to compress the history into a standing `rca_store_profile`.
+- **Retrieval**: Next time the store triggers an alert, the planner reads the profile to know if this is a recurring problem or a new one.
+- **Tools**: Use `rca reset-memory` to wipe it.
 
-- `data/rca.duckdb`: daily store facts and dimensions
-- `data/context_pack.json` / `.md`: compact grounding pack built from local data
-- `data/analysis/`: signal summaries, trigger grids, benchmark outputs
-- `data/runs.duckdb`: run log plus `rca_outcome` memory table
-- `output/story_reports/`: root-level story report markdown and HTML generated from completed runs
+## 7. Model Routing
 
-## Run Artifacts
+- **Fast Model** (`DEEPSEEK_MODEL_FAST`): Used for cheap planning and parallel specialists.
+- **Deep Model** (`DEEPSEEK_MODEL_DEEP`): Used for the critic, coordinator, and SLT nodes where high reasoning and oversight are required. This optimizes cost without losing rigor.
 
-Each non-quick `rca run` writes a timestamped folder under `data/analysis/agent_benchmark_runs/` with:
+## 8. The Ecosystem
 
-- `decision_card.md` and `.html`
-- `report.md` and `.html`
-- `critique.md` and `.html`
-- `controller_note.md` and `.html`
-- `run_trace.json`
-- `run_log.jsonl`
-- `run_log.md`
-- `specialists/*.md` and `.html`
+- **LangGraph**: The orchestration framework managing the DAG, state, and retries.
+- **MCP (FastMCP)**: Exposes the RCA analytical read tools to external systems securely (`rca mcp`).
+- **Skills**: Claude Markdown guidelines (`.claude/skills/`) that teach Claude how to run workflows automatically.
+- **Langfuse**: Observability layer tracing every prompt, response, and token cost (`rca/obs.py`).
+- **Supabase**: Postgres system of record containing our `rca_` prefixed tables and memory.
+- **Vercel**: Hosts the Next.js App Router dashboard (`dashboard/`).
 
-Story reports are separate from the raw run folder. They are generated under:
+## 9. Glossary
 
-```text
-output/story_reports/<run_folder>/story_report.md
-output/story_reports/<run_folder>/story_report.html
+- **Store-day**: The primary grain of analysis.
+- **Decision Card**: A concise summary generated by the `slt_brief` node containing confidence, materiality, and the bottom line.
+- **Context Pack**: The initial structured text containing baseline data injected into the state.
+- **ReAct**: Reason + Act. The underlying pattern the LangChain models use to invoke tools.
+
+## 10. CLI Commands
+
+```bash
+uv run python -m rca.cli build        # Ingest parquet into DuckDB
+uv run python -m rca.cli analyze      # Precompute signals
+uv run python -m rca.cli profile      # Build context pack
+uv run python -m rca.cli run --store h555 --dt 2024-05-16 --full
+uv run python -m rca.cli bench        # Run fixed benchmark scenarios
+uv run python -m rca.cli eval         # Evaluate benchmark quality
+uv run python -m rca.cli story --run-dir <dir> # Generate story markdown
+uv run python -m rca.cli runs         # Show run history
+uv run python -m rca.cli distil       # Distil semantic memory
+uv run python -m rca.cli reset-memory # Wipe store memory
+uv run python -m rca.cli mcp          # Start FastMCP server
 ```
 
-The story report is meant for reading and review. It summarizes how the RCA moved from trigger, to specialist evidence, to critic challenge, to final decision.
+## 11. Data Structure
 
-## Scenario Policy
-
-The fixed six-scenario benchmark remains stable for regression work:
-
-- 3 drops and 3 lifts
-- across different store-prefix groups
-- based on `trailing_7d_pct_change`
-
-Ad hoc report examples can be selected separately when we want a more interesting narrative. For negative examples, prefer cases with:
-
-- a true drop signal
-- enough history for same-weekday comparison
-- possible tension between stockout, promotion, calendar, and peer context
-- a conclusion that is not just "big number moved"
-
-Current exploratory negative candidate:
-
-```text
-l165 on 2024-06-06
-```
-
-Reason: it triggers a -30.4% trailing-7-day drop, but same-weekday baseline is nearly normal. That creates a useful RCA discussion about whether the alert is real, a window-composition artifact, or partially affected by stockout/promotion context.
-
-## Evaluation
-
-`rca eval` writes:
-
-- `eval_report.json`
-- `eval_report.md`
-
-The evaluator combines:
-
-- deterministic faithfulness checks against analyst tool outputs
-- expected signal vs observed signal
-- an LLM judge rubric for groundedness, calibration, actionability, conciseness, and causal honesty
-
-## Notes
-
-- Research is off by default because it adds external noise and cost.
-- The context pack stays conservative about anonymized IDs.
-- The decision card is the primary output; the full RCA is the drill-down.
+- **Raw**: FreshRetailNet-50K parquet (DuckDB local ETL).
+- **Scope**: Local sandbox uses only 15 stores (5 cities full scope).
+- **Supabase Schema**: `public`.
+- **Tables**: `rca_store_series`, `rca_store_normals`, `rca_outcome`, `rca_store_profile`.

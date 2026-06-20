@@ -18,6 +18,7 @@ uv run python -m rca.cli distil --store h555          # generate store memory pr
 uv run python -m rca.cli distil                       # distil all stores with history
 uv run python -m rca.cli reset-memory --store h555    # delete one store's profile
 uv run python -m rca.cli reset-memory --all           # delete all profiles
+uv run python -m rca.cli mcp                          # start the FastMCP server
 ```
 
 ## Important Behavior
@@ -25,41 +26,20 @@ uv run python -m rca.cli reset-memory --all           # delete all profiles
 - `rca run` prints the decision card by default.
 - `--full` also prints the drill-down RCA.
 - `--dry-run` uses the deterministic stub client and should exercise the whole pipeline.
-- Research is gated off by default.
-- `rca story` is a post-run report rendering step. It reads a saved trace and writes root-level story report files.
-- `sale_amount` and `hours_sale` are normalized sales amounts from the source dataset, not literal units and not currency revenue. Prefer phrases like `sales amount`, `normalized sales amount`, or `relative sales level`.
-- Do not call store prefixes (`h/m/l`) tiers unless the text explicitly says they are only opaque prefix groupings.
-- The only active frontend is `dashboard/` (Next.js). The old `ui/` Vite app is retired.
-- For Vercel, deploy from the repo root; the root `vercel.json` and `package.json` delegate build/runtime work to `dashboard/`.
-- **Sandbox vs Production Scale (Crucial Context)**: The underlying raw dataset is `FreshRetailNet-50K` (898 stores, 18 cities, 50,000 series, heavily normalized metrics, sales could be in millions in reality). However, our local DuckDB database is a tiny sandbox subset of only **15 stores** spanning 90 days. 
-  - **WARNING**: Because the local dataset only has 15 stores, "peer group" comparisons (e.g. comparing a store to others sharing the same prefix) are statistically noisy and often meaningless. A peer group might only have 2-4 stores. Do not let the AI agents over-index on peer comparisons without acknowledging this limitation.
+- `rca story` reads a saved trace and writes root-level story report files.
+- `sale_amount` and `hours_sale` are normalized sales amounts from the source dataset, not currency. Prefer `sales amount`.
+- **Model Routing**: Specialists run on the fast model (e.g., flash), while synthesis/oversight (critic, coordinator, controller, slt) run on the deep model (e.g., pro).
+- **Deterministic Sanitizer**: The `sanitize` node uses no LLM calls. It runs strictly once at the write boundary before pushing to Supabase.
 
-## Artifacts
+## Artifacts & Datastores
 
-Non-quick runs write:
+Non-quick runs write decision cards, run traces, specialist memos, and logs to `data/analysis/agent_benchmark_runs/`.
 
-- decision card
-- RCA report
-- critic note
-- finance controller note
-- run trace
-- run logs
-- specialist memos
-- optional story report under `output/story_reports/<run_folder>/`
+**Datastores (Supabase is the System of Record)**:
+- Supabase: Primary read/write target for operations (`rca_` prefixed tables).
+- `data/rca.duckdb`: Kept for ETL only (aggregating parquet data before pushing to Supabase).
+- `data/runs.duckdb`: Legacy log database (deprecating).
 
-## Local Datastores
+## Sandbox Caveats
 
-- `data/rca.duckdb`: analytical evidence store
-- `data/runs.duckdb`: run logs and `rca_outcome` memory
-
-## Scenario Notes
-
-The six fixed benchmark scenarios should stay stable unless the benchmark definition changes.
-
-Ad hoc story-report examples can be selected separately. The current exploratory negative candidate is:
-
-```text
-l165 2024-06-06
-```
-
-Reason: it has a strong trailing-7-day drop, but same-weekday baseline is nearly normal, so it tests whether the RCA can identify a likely window-composition artifact instead of over-explaining the drop.
+The local dataset contains only 15 stores (from a 5-city scope). "Peer group" comparisons are statistically noisy. Do not let agents over-index on peer comparisons without acknowledging this limitation.
