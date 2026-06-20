@@ -138,10 +138,14 @@ ANALYST_SPECS: tuple[AnalystSpec, ...] = (
             domain_instructions=(
                 "Assess external factors and whether the move is store-specific or broadly contextual. "
                 "Look at calendar context (weekday, holiday), weather conditions, and how this store performed "
-                "relative to peers. WARNING: The dataset is a tiny sandbox of only 15 stores. Peer groups only contain 2-4 stores. "
-                "Therefore, peer comparisons are statistically noisy. Do NOT confidently claim a store is 'underperforming its peers' as a root cause. "
-                "If the move is fleet-wide, that points to external factors. "
-                "If it is isolated, that points to store-specific causes, but temper your confidence regarding peer comparisons."
+                "relative to peers. "
+                "PEER COMPARISON CAUTION: The peer group tool groups stores by their alias prefix (h/m/l) "
+                "or store type. For the well-known city-0 stores, each prefix group contains only ~5 stores — "
+                "statistically noisy. For stores aliased as 's{id}', the peer pool is large but spans multiple "
+                "cities with different demand patterns, making fleet-average comparisons unreliable as root-cause evidence. "
+                "In either case: peer comparison can support a hypothesis but CANNOT be the primary root cause. "
+                "If the move appears fleet-wide across the same calendar date, that supports external factors. "
+                "If isolated, flag it as store-specific but LOW confidence without corroborating evidence."
             ),
         ),
     ),
@@ -187,7 +191,7 @@ Rules:
 - Check whether claims are actually supported by the cited numbers.
 - Flag correlation being presented as causation.
 - Downgrade overconfident claims when evidence is thin.
-- Severely downgrade any claims that rely heavily on peer group comparisons, as the local dataset only contains 15 stores (peer groups of 2-4 stores are mathematically noisy).
+- Severely downgrade any claims that rely heavily on peer group comparisons. The dataset covers 677 stores across 5 cities, but alias-prefix peer groups (h/m/l) are still only ~5 stores each — mathematically noisy. Cross-city 's'-prefix groups are large but heterogeneous and not a valid peer comparison.
 - Keep the note concise and operational.
 - Use plain ASCII markdown.
 
@@ -205,14 +209,24 @@ You do not rewrite the RCA. You add a short finance lens:
 - margin risk
 - one-off vs structural read
 
+CRITICAL DATA CONTEXT — read before writing:
+- All sales figures in this dataset are NORMALIZED COEFFICIENTS, not currency.
+  sale_amount and hours_sale are index-like values multiplied by a source coefficient.
+  They are NOT dollars, RMB, or any monetary unit.
+- NEVER write a $ sign, currency symbol, or currency amount. Do not say "$28K", "28K USD", etc.
+- Quantify materiality as a MULTIPLE of the store's normal baseline or as a % of fleet mean.
+  Example: "the drop is 1.4x the store's typical day-to-day variance" or "this represents ~8% below
+  the fleet median for the date". Never invent a monetary figure.
+- We have NO margin or cost data. Do not invent margin estimates. Flag margin visibility as a data gap.
+
 Rules:
 - use only the RCA and critic note you are given
 - if margin data is missing, say so plainly
 - use plain ASCII markdown
 
 Return sections:
-1. Materiality
-2. Margin Risk
+1. Materiality (relative to store baseline and fleet — no currency)
+2. Margin Risk (flag absence of cost data if relevant)
 3. One-off vs Structural
 """
 

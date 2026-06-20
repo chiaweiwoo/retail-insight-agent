@@ -106,14 +106,16 @@ All figures are stub values. No real data was queried in dry-run mode.
     "finance_controller": """\
 ## Finance Controller Note
 
-**Materiality:** -20% trailing-7d drop (stub). At a typical daily revenue of ~$1 000, this is
-a ~$200 single-day exposure. Immaterial at fleet level; monitor for recurrence.
+**Materiality:** -20% trailing-7d drop (stub). This represents approximately 1.4x the store's
+typical day-to-day variance — immaterial at fleet level, but worth monitoring for recurrence.
+Note: all figures are normalized sales amounts, not currency.
 
-**Margin risk:** Promotional activity present. Volume ≠ value — if driven by discount, margin
-dilution is possible. Margin data unavailable; flag for finance review.
+**Margin risk:** Promotional activity present. Volume does not equal value — if the drop was
+driven by discount depth, margin dilution is possible. Margin and cost data are unavailable;
+flag for finance review if recurrence is confirmed.
 
 **One-off vs structural:** Single-day trigger in stub mode. Insufficient history to classify
-as structural. Recommend watching the next 5 trading days.
+as structural. Recommend watching the next 5 trading days before drawing a conclusion.
 """,
     "evaluator": """\
 {"groundedness": 4, "calibration": 4, "actionability": 3, "conciseness": 4, "causal_honesty": 4, "summary": "Stub evaluation only."}
@@ -228,7 +230,7 @@ def _build_slt_stub(messages: list[dict[str, Any]], store: str, dt: str) -> str:
 ## Decision Card — {store} {dt}
 - headline: Low confidence: inconclusive sales drop; insufficient evidence to identify primary driver
 - confidence: low
-- materiality: immaterial / noise — single store-day, ~$200 estimated exposure (stub)
+- materiality: immaterial / noise — single store-day, ~1.4x daily variance estimated exposure (stub)
 - pattern: {pattern}
 - action: none — monitor next 5 trading days
 - escalate: no
