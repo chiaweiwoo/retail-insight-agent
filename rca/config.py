@@ -1,30 +1,34 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+import json
 import os
 from pathlib import Path
+from typing import Any
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 ENV_FILE_PATH = PROJECT_ROOT / ".env"
 RAW_DATA_PATH = PROJECT_ROOT / "data" / "raw" / "train.parquet"
 RAW_METADATA_PATH = PROJECT_ROOT / "data" / "raw" / "train_metadata.json"
-ANALYSIS_PATH = PROJECT_ROOT / "data" / "analysis"
-AGENT_BENCHMARK_PATH = ANALYSIS_PATH / "agent_benchmark_runs"
+DOCS_PATH = PROJECT_ROOT / "docs"
+AGENT_SKILLS_PATH = PROJECT_ROOT / "rca" / "agent_skills"
+
+RCA_SCHEMA = "rca"
 
 DATE_START = "2024-03-28"
 DATE_END = "2024-06-25"
 EXPECTED_DAY_COUNT = 90
 HOURLY_LENGTH = 24
-
-# Processing all 18 cities in the dataset
-CITY_IDS = list(range(18)) # 0 to 17
-
-CITY_ID = 0  # default fallback
+CITY_IDS = list(range(18))
 
 REQUIRED_RAW_COLUMNS = {
     "city_id",
     "store_id",
+    "management_group_id",
+    "first_category_id",
+    "second_category_id",
+    "third_category_id",
     "product_id",
     "dt",
     "sale_amount",
@@ -40,56 +44,71 @@ REQUIRED_RAW_COLUMNS = {
     "avg_wind_level",
 }
 
-CONTEXT_PACK_PATH = PROJECT_ROOT / "data" / "context_pack.json"
+TABLE_SALES = "sales"
+TABLE_INVENTORY = "inventory"
+TABLE_PRICING = "pricing"
+TABLE_PROMOTIONS = "promotions"
+TABLE_CALENDAR = "calendar"
+TABLE_WEATHER = "weather"
+TABLE_GOALS = "goals"
+TABLE_SIGNALS = "signals"
+TABLE_OUTCOMES = "outcomes"
+TABLE_EVENTS = "events"
+TABLE_COMPLETIONS = "completions"
+TABLE_MEMORY = "memory"
+TABLE_EVIDENCE_CACHE = "evidence_cache"
+TABLE_EXTERNAL_EVENTS = "external_events"
+
+ALL_TABLES = [
+    TABLE_SALES,
+    TABLE_INVENTORY,
+    TABLE_PRICING,
+    TABLE_PROMOTIONS,
+    TABLE_CALENDAR,
+    TABLE_WEATHER,
+    TABLE_GOALS,
+    TABLE_SIGNALS,
+    TABLE_OUTCOMES,
+    TABLE_EVENTS,
+    TABLE_COMPLETIONS,
+    TABLE_MEMORY,
+    TABLE_EVIDENCE_CACHE,
+    TABLE_EXTERNAL_EVENTS,
+]
 
 SALES_FIELD_SEMANTICS = (
-    "sale_amount and hours_sale are normalized sales amounts multiplied by a specific "
-    "coefficient in the source dataset. Treat aggregated sales values as relative sales "
-    "amounts for comparison, not literal unit counts and not currency revenue."
+    "sale_amount and hours_sale are normalized sales amounts from the source dataset. "
+    "Treat them as relative sales amounts for comparison, not currency and not literal units."
 )
 
-CONFIDENCE_VOCAB = """
-Confidence levels — use these exact terms, no others:
-- HIGH: multiple independent evidence points align; the number clears its threshold with margin; alternative explanations are weak.
-- MEDIUM: evidence points one way but is single-source or has a plausible alternative.
-- LOW: suggestive only; correlational; or partly contradicted by another signal.
-""".strip()
+ACTIVITY_FIELD_SEMANTICS = (
+    "activity_flag is an unlabeled internal activity indicator. It may represent a promotion "
+    "or commercial push, but its exact business meaning is unknown."
+)
 
-ASSESSMENT_FORMAT = """
-End your memo with this exact section (fill in every field):
-
-## Assessment
-- verdict: <cause | contributing | ruled_out | inconclusive>
-- confidence: <high | medium | low>
-- key_numbers: <the 1-3 numbers that matter most, with values>
-- causal_caveat: <note on correlation vs causation, or "n/a">
-- data_gaps: <what you could not see, or "none">
-""".strip()
+HOLIDAY_FIELD_SEMANTICS = (
+    "holiday_flag marks a holiday-like date, but the name itself must be inferred from date context "
+    "or external search and should always be labeled as inferred."
+)
 
 DEFAULT_DROP_THRESHOLD_PCT = -10.0
 DEFAULT_LIFT_THRESHOLD_PCT = 25.0
-
-# Business target = statistical forecast × this factor (simulation only; adjust as needed)
-BUSINESS_TARGET_GROWTH_FACTOR = 1.03
-
 DEFAULT_LLM_BASE_URL = "https://api.deepseek.com"
 DEFAULT_LLM_MODEL = "deepseek-v4-flash"
-DEFAULT_LLM_MAX_TOOL_ROUNDS = 8
+DEFAULT_LLM_MAX_TOOL_ROUNDS = 6
+DEFAULT_NEWS_RESULTS = 5
 SGT = timezone(timedelta(hours=8), name="SGT")
 
 
 def load_env_file(env_file_path: Path = ENV_FILE_PATH) -> None:
     if not env_file_path.exists():
         return
-
     for raw_line in env_file_path.read_text(encoding="utf-8").splitlines():
         line = raw_line.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
         key, value = line.split("=", 1)
-        key = key.strip()
-        value = value.strip().strip('"').strip("'")
-        os.environ.setdefault(key, value)
+        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
 
 
 load_env_file()
@@ -121,17 +140,14 @@ def get_llm_model() -> str:
 
 
 def get_llm_thinking_enabled() -> bool:
-    value = os.getenv("DEEPSEEK_THINKING", "false").strip().lower()
-    return value in {"1", "true", "yes", "on"}
+    return os.getenv("DEEPSEEK_THINKING", "false").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def get_model_fast() -> str:
-    """High-volume / mechanical nodes: specialists, story writer."""
     return os.getenv("DEEPSEEK_MODEL_FAST", "deepseek-v4-flash")
 
 
 def get_model_deep() -> str:
-    """Synthesis / judgment nodes: critic, coordinator, slt_brief, judge."""
     return os.getenv("DEEPSEEK_MODEL_DEEP", "deepseek-v4-pro")
 
 
@@ -154,6 +170,16 @@ def get_supabase_anon_key() -> str:
 
 
 def make_supabase_client():
-    """Service-role client — bypasses RLS. Backend use only."""
-    from supabase import create_client  # lazy import; not all commands need it
+    from supabase._sync.client import create_client
+
     return create_client(get_supabase_url(), get_supabase_service_key())
+
+
+def make_supabase_schema_client(schema: str = RCA_SCHEMA):
+    return make_supabase_client().schema(schema)
+
+
+def load_raw_metadata() -> dict[str, Any]:
+    if not RAW_METADATA_PATH.exists():
+        return {}
+    return json.loads(RAW_METADATA_PATH.read_text(encoding="utf-8"))

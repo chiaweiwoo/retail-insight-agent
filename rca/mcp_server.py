@@ -1,80 +1,80 @@
+from __future__ import annotations
+
 from fastmcp import FastMCP
+
 from rca.tools import (
-    get_signal_evidence, get_sales_context, get_stockout_context,
-    get_stockout_baseline, get_discount_context, get_activity_context,
-    get_calendar_weather_context, get_peer_city_context, get_prior_rca,
+    compare_recent_baseline,
+    compare_same_weekday_baseline,
+    detect_intraday_shift,
+    get_calendar_weather_context,
+    get_intraday_profile,
+    get_inventory_context,
+    get_memory_context,
+    get_pricing_context,
+    get_promotions_context,
+    get_sales_context,
+    get_signal_evidence,
+    search_external_events,
 )
 
 mcp = FastMCP("retail-rca")
 
+
 @mcp.tool()
 def signal_evidence(city_id: int, dt: str) -> dict:
-    """Get signal evidence for a store on a given date.
-    Caveats: sales figures are normalized coefficients (not currency).
-    Peer comparisons come from a 15-store local sandbox — treat as weak priors.
-    """
     return get_signal_evidence(city_id, dt)
 
+
 @mcp.tool()
-def sales_context(city_id: int, dt: str, history_days: int = 7) -> dict:
-    """Get current sales plus recent store sales history and baseline windows.
-    Caveats: sales figures are normalized coefficients (not currency).
-    Peer comparisons come from a 15-store local sandbox — treat as weak priors.
-    """
+def sales_context(city_id: int, dt: str, history_days: int = 14) -> dict:
     return get_sales_context(city_id, dt, history_days)
 
-@mcp.tool()
-def stockout_context(city_id: int, dt: str) -> dict:
-    """Get stockout evidence for one store-day.
-    Caveats: sales figures are normalized coefficients (not currency).
-    Peer comparisons come from a 15-store local sandbox — treat as weak priors.
-    """
-    return get_stockout_context(city_id, dt)
 
 @mcp.tool()
-def stockout_baseline(city_id: int, dt: str, window: int = 30) -> dict:
-    """Get this store's rolling stockout baseline for the N days before the trigger date.
-    Caveats: sales figures are normalized coefficients (not currency).
-    Peer comparisons come from a 15-store local sandbox — treat as weak priors.
-    """
-    return get_stockout_baseline(city_id, dt, window)
+def inventory_context(city_id: int, dt: str) -> dict:
+    return get_inventory_context(city_id, dt)
+
 
 @mcp.tool()
-def discount_context(city_id: int, dt: str) -> dict:
-    """Get discount evidence for one store-day.
-    Caveats: sales figures are normalized coefficients (not currency).
-    Peer comparisons come from a 15-store local sandbox — treat as weak priors.
-    """
-    return get_discount_context(city_id, dt)
+def pricing_context(city_id: int, dt: str) -> dict:
+    return get_pricing_context(city_id, dt)
+
 
 @mcp.tool()
-def activity_context(city_id: int, dt: str) -> dict:
-    """Get promotional activity evidence for one store-day.
-    Caveats: sales figures are normalized coefficients (not currency).
-    Peer comparisons come from a 15-store local sandbox — treat as weak priors.
-    """
-    return get_activity_context(city_id, dt)
+def promotions_context(city_id: int, dt: str) -> dict:
+    return get_promotions_context(city_id, dt)
+
 
 @mcp.tool()
 def calendar_weather_context(city_id: int, dt: str) -> dict:
-    """Get holiday, weekday, weekend, and weather context for one store-day.
-    Caveats: sales figures are normalized coefficients (not currency).
-    Peer comparisons come from a 15-store local sandbox — treat as weak priors.
-    """
     return get_calendar_weather_context(city_id, dt)
 
-@mcp.tool()
-def peer_store_context(city_id: int, dt: str) -> dict:
-    """Compare the store against same-day peers and its same-prefix peer group.
-    Caveats: sales figures are normalized coefficients (not currency).
-    Peer comparisons come from a 15-store local sandbox — treat as weak priors.
-    """
-    return get_peer_city_context(city_id, dt)
 
 @mcp.tool()
-def prior_rca(city_id: int) -> dict:
-    """Get prior RCA outcomes for this store from the local run history.
-    Caveats: sales figures are normalized coefficients (not currency).
-    Peer comparisons come from a 15-store local sandbox — treat as weak priors.
-    """
-    return get_prior_rca(city_id)
+def intraday_profile(city_id: int, dt: str) -> dict:
+    return get_intraday_profile(city_id, dt)
+
+
+@mcp.tool()
+def recent_baseline(city_id: int, dt: str, window: int = 7) -> dict:
+    return compare_recent_baseline(city_id, dt, window)
+
+
+@mcp.tool()
+def same_weekday_baseline(city_id: int, dt: str, weeks: int = 4) -> dict:
+    return compare_same_weekday_baseline(city_id, dt, weeks)
+
+
+@mcp.tool()
+def intraday_shift(city_id: int, dt: str, lookback_days: int = 7) -> dict:
+    return detect_intraday_shift(city_id, dt, lookback_days)
+
+
+@mcp.tool()
+def memory_context(city_id: int, limit: int = 5) -> dict:
+    return get_memory_context(city_id, limit)
+
+
+@mcp.tool()
+def external_events(city_id: int, dt: str, query: str, max_results: int = 5) -> dict:
+    return search_external_events(city_id, dt, query, max_results)

@@ -1,183 +1,82 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-import os
-import re
 from typing import Any
 
-from rca.config import current_timestamp_sgt_iso, make_supabase_client
+from rca.config import TABLE_COMPLETIONS, TABLE_OUTCOMES, current_timestamp_sgt_iso, make_supabase_schema_client
 
 
 @dataclass(frozen=True)
 class OutcomeRecord:
-    run_name: str
+    run_id: str
     city_id: int
     dt: str
     signal_label: str
-    top_driver: str
-    driver_class: str
     confidence: str
-    escalated: bool
-    brief_headline: str
+    headline: str
     decision_card_markdown: str
     report_markdown: str
+    prediction_markdown: str
+    prescription_markdown: str
 
 
-def record_outcome(record: OutcomeRecord, dry_run: bool = False) -> None:
-    """Upsert a run outcome to Supabase rca_outcome. No-ops on dry-run.
-
-    Conflict key is (city_id, dt) — one row per triggered day per city.
-    Re-running the same city-day overwrites the previous result.
-    """
-    if dry_run or not os.getenv("SUPABASE_URL"):
-        return
-
-    client = make_supabase_client()
-    client.table("rca_outcome").upsert(
+def record_outcome(record: OutcomeRecord) -> None:
+    client = make_supabase_schema_client()
+    client.table(TABLE_OUTCOMES).upsert(
         {
-            "run_name": record.run_name,
+            "run_id": record.run_id,
             "city_id": record.city_id,
             "dt": record.dt,
             "signal_label": record.signal_label,
-            "top_driver": record.top_driver,
-            "driver_class": record.driver_class,
             "confidence": record.confidence,
-            "escalated": record.escalated,
-            "brief_headline": record.brief_headline,
+            "headline": record.headline,
             "decision_card_markdown": record.decision_card_markdown,
             "report_markdown": record.report_markdown,
+            "prediction_markdown": record.prediction_markdown,
+            "prescription_markdown": record.prescription_markdown,
             "generated_at": current_timestamp_sgt_iso(),
         },
         on_conflict="city_id,dt",
     ).execute()
 
 
-def update_outcome_story(city_id: int, dt: str, story_markdown: str) -> None:
-    """Overlay the polished story narrative on an existing (city_id, dt) row.
-
-    Called by `rca story` after running the LLM narrative pass.
-    No-ops if SUPABASE_URL is not set.
-    """
-    if not os.getenv("SUPABASE_URL"):
-        return
-
-    client = make_supabase_client()
-    client.table("rca_outcome").upsert(
-        {
-            "city_id": city_id,
-            "dt": dt,
-            "story_markdown": story_markdown,
-            "generated_at": current_timestamp_sgt_iso(),
-        },
-        on_conflict="city_id,dt",
-    ).execute()
+def get_prior_outcomes(city_id: int, limit: int = 5) -> list[dict[str, Any]]:
+    client = make_supabase_schema_client()
+    result = (
+        client.table(TABLE_OUTCOMES)
+        .select("dt,signal_label,confidence,headline")
+        .eq("city_id", city_id)
+        .order("generated_at", desc=True)
+        .limit(limit)
+        .execute()
+    )
+    return result.data or []
 
 
-def get_prior_rca(
-    city_id: int,
-    limit: int = 5,
-) -> dict[str, Any]:
-    """Read prior RCA outcomes for a city from Supabase."""
-    if not os.getenv("SUPABASE_URL"):
-        return _empty_prior(city_id)
-
-    try:
-        client = make_supabase_client()
-        rows = (
-            client
-            .table("rca_outcome")
-            .select("dt,signal_label,top_driver,driver_class,confidence,escalated,brief_headline")
-            .eq("city_id", city_id)
-            .order("dt", desc=True)
-            .limit(limit)
-            .execute()
-        )
-        data = rows.data or []
-    except Exception:
-        return _empty_prior(city_id)
-
-    driver_counts: dict[str, int] = {}
-    for row in data:
-        d = str(row.get("top_driver", "unknown"))
-        driver_counts[d] = driver_counts.get(d, 0) + 1
-
-    return {
-        "city_id": city_id,
-        "previous_trigger_count": len(data),
-        "top_driver_counts": [
-            {"top_driver": d, "trigger_count": c}
-            for d, c in sorted(driver_counts.items(), key=lambda x: -x[1])[:3]
-        ],
-        "recent_outcomes": [
-            {
-                "dt": str(row.get("dt")),
-                "signal_label": str(row.get("signal_label")),
-                "top_driver": str(row.get("top_driver")),
-                "driver_class": str(row.get("driver_class")),
-                "confidence": str(row.get("confidence")),
-                "escalated": bool(row.get("escalated")),
-                "brief_headline": str(row.get("brief_headline")),
-            }
-            for row in data
-        ],
-    }
-
-
-def _empty_prior(city_id: int) -> dict[str, Any]:
-    return {
-        "city_id": city_id,
-        "previous_trigger_count": 0,
-        "top_driver_counts": [],
-        "recent_outcomes": [],
-    }
-
-
-def build_outcome_record(
+def record_completion(
     *,
-    run_name: str,
+    run_id: str,
     city_id: int,
     dt: str,
-    signal_evidence: dict[str, Any],
-    coordinator_report_markdown: str,
-    decision_card_markdown: str,
-) -> OutcomeRecord:
-    return OutcomeRecord(
-        run_name=run_name,
-        city_id=city_id,
-        dt=dt,
-        signal_label=str(signal_evidence.get("signal_label", "unknown")),
-        top_driver=_extract_top_driver(coordinator_report_markdown),
-        driver_class=_extract_driver_class(coordinator_report_markdown),
-        confidence=_extract_bullet_value(decision_card_markdown, "confidence") or "unknown",
-        escalated=(
-            (_extract_bullet_value(decision_card_markdown, "escalate") or "").strip().lower()
-            == "yes"
-        ),
-        brief_headline=_extract_bullet_value(decision_card_markdown, "headline") or "",
-        decision_card_markdown=decision_card_markdown,
-        report_markdown=coordinator_report_markdown,
-    )
-
-
-def _extract_top_driver(report_markdown: str) -> str:
-    match = re.search(r"## Likely Drivers\s+1\.\s+(.*)", report_markdown, re.DOTALL)
-    if not match:
-        return "unknown"
-    first_line = match.group(1).splitlines()[0].strip()
-    if "]" in first_line:
-        first_line = first_line.split("]", 1)[1].strip()
-    return first_line or "unknown"
-
-
-def _extract_driver_class(report_markdown: str) -> str:
-    match = re.search(r"\[([a-z_]+)\s*/\s*(high|medium|low)\]", report_markdown, re.IGNORECASE)
-    if not match:
-        return "unknown"
-    return match.group(1).lower()
-
-
-def _extract_bullet_value(markdown: str, field_name: str) -> str | None:
-    match = re.search(rf"^- {re.escape(field_name)}:\s*(.+)$", markdown, re.MULTILINE)
-    if not match:
-        return None
-    return match.group(1).strip()
+    node_name: str,
+    model: str,
+    content: str,
+    prompt_tokens: int | None,
+    completion_tokens: int | None,
+    tool_calls_json: list[dict[str, Any]] | None = None,
+) -> None:
+    client = make_supabase_schema_client()
+    client.table(TABLE_COMPLETIONS).insert(
+        {
+            "run_id": run_id,
+            "city_id": city_id,
+            "dt": dt,
+            "ts": current_timestamp_sgt_iso(),
+            "node_name": node_name,
+            "model": model,
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "content": content,
+            "tool_calls_json": tool_calls_json or [],
+        }
+    ).execute()

@@ -7,7 +7,6 @@ requires-python = ">=3.11"
 dependencies = [
     "duckduckgo-search>=8.0.0",
     "fastmcp>=2.0",
-    "langfuse>=2.0",
     "langgraph>=0.3",
     "markdown>=3.8.2",
     "openai>=2.8.1",
@@ -34,3 +33,6 @@ rca = "rca.cli:main"
 dev = [
     "pytest>=9.1.1",
 ]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]

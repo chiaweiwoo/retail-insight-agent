@@ -1,61 +1,52 @@
-"""Smoke tests for the Supabase-backed data layer.
-
-These tests require SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to be set.
-If the env vars are absent (CI without secrets), all tests skip gracefully.
-"""
 from __future__ import annotations
 
-import os
+import pandas as pd
 
-import pytest
-
-from rca.config import CITY_IDS, DATE_START, DATE_END
+from rca.database import build_goals_df, build_signals_df
 
 
-pytestmark = pytest.mark.skipif(
-    not os.getenv("SUPABASE_URL"),
-    reason="SUPABASE_URL not set — skipping Supabase smoke tests",
-)
-
-
-def test_rca_city_series_has_rows() -> None:
-    from rca.config import make_supabase_client
-    client = make_supabase_client()
-    resp = client.table("rca_city_series").select("city_id").limit(1).execute()
-    assert resp.data, "rca_city_series is empty — run 'rca build' first"
-
-
-def test_rca_city_signal_returns_rows() -> None:
-    from rca.config import make_supabase_client
-    client = make_supabase_client()
-    resp = (
-        client.table("rca_city_signal")
-        .select("city_id,dt,signal_label,business_target,target_deviation_pct")
-        .limit(5)
-        .execute()
+def test_build_goals_prefers_same_weekday_then_recent_baseline() -> None:
+    sales_df = pd.DataFrame(
+        [
+            {"city_id": 0, "dt": "2024-04-01", "total_sales": 100.0},
+            {"city_id": 0, "dt": "2024-04-08", "total_sales": 110.0},
+            {"city_id": 0, "dt": "2024-04-15", "total_sales": 120.0},
+            {"city_id": 0, "dt": "2024-04-22", "total_sales": 130.0},
+            {"city_id": 0, "dt": "2024-04-29", "total_sales": 80.0},
+        ]
     )
-    assert resp.data, "rca_city_signal is empty — run 'rca analyze' first"
-    for row in resp.data:
-        assert row["signal_label"] in {"drop", "lift", "neutral", "insufficient_history"}
+    goals = build_goals_df(sales_df)
+    latest = goals[goals["dt"] == "2024-04-29"].iloc[0]
+    assert latest["goal_method"] == "same_weekday_4w"
+    assert round(float(latest["expected_sales"]), 2) == 115.0
 
 
-def test_evidence_fetcher_returns_expected_shape() -> None:
-    from rca.evidence import get_city_day_evidence
-    evidence = get_city_day_evidence(city_id=0, dt=DATE_START)
-    assert "sales" in evidence
-    assert "stockout" in evidence
-    assert "discount" in evidence
-    assert "activity" in evidence
-    assert "holiday" in evidence
-    assert "weather" in evidence
-    assert len(evidence["sales"]["hourly_sales"]) == 24
-
-
-def test_signal_frame_loads_all_cities() -> None:
-    from rca.tools import _signal_frame
-    frame = _signal_frame()
-    loaded_cities = set(frame["city_id"].unique())
-    expected = set(CITY_IDS)
-    assert expected.issubset(loaded_cities), (
-        f"Missing cities in signal frame: {expected - loaded_cities}"
+def test_build_signals_labels_drop_and_preserves_build_version() -> None:
+    sales_df = pd.DataFrame([{"city_id": 0, "dt": "2024-04-29", "total_sales": 80.0}])
+    goals_df = pd.DataFrame(
+        [
+            {
+                "city_id": 0,
+                "dt": "2024-04-29",
+                "expected_sales": 100.0,
+                "goal_method": "recent_7d",
+                "recent_7d_avg_sales": 100.0,
+                "same_weekday_4w_avg_sales": None,
+            }
+        ]
     )
+    calendar_df = pd.DataFrame(
+        [
+            {
+                "city_id": 0,
+                "dt": "2024-04-29",
+                "weekday": "monday",
+                "holiday_name_inferred": "normal_weekday",
+            }
+        ]
+    )
+    signals = build_signals_df(sales_df, goals_df, calendar_df, "build_123")
+    row = signals.iloc[0]
+    assert row["signal_label"] == "drop"
+    assert round(float(row["deviation_pct"]), 2) == -20.0
+    assert row["build_version"] == "build_123"

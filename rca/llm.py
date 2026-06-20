@@ -10,28 +10,25 @@ from rca.config import (
     get_llm_base_url,
     get_llm_model,
     get_llm_thinking_enabled,
-    get_model_fast,
     get_model_deep,
+    get_model_fast,
 )
 
 
 ClientFactory = Callable[[str], Any]
 
 NODE_MODEL_MAP: dict[str, str] = {
-    # specialists and story → fast model
-    "sales_analyst": "fast",
-    "ops_analyst": "fast",
-    "commercial_analyst": "fast",
-    "market_analyst": "fast",
-    "research_analyst": "fast",
-    "story_writer": "fast",
-    # synthesis and oversight → deep model
-    "coordinator_analyst": "deep",
+    "planner": "deep",
+    "statistician": "fast",
+    "sales_agent": "fast",
+    "inventory_agent": "fast",
+    "pricing_agent": "fast",
+    "promotions_agent": "fast",
+    "calendar_weather_agent": "fast",
+    "news_agent": "fast",
     "critic": "deep",
-    "finance_controller": "deep",
-    "slt_brief": "deep",
-    "reflect": "deep",
-    "evaluator": "deep",
+    "coordinator": "deep",
+    "memory_distiller": "fast",
 }
 
 
@@ -58,7 +55,6 @@ def build_openai_compatible_client(settings: LLMSettings | None = None) -> OpenA
 
 
 def make_routed_settings(base_settings: LLMSettings, node_name: str) -> LLMSettings:
-    """Return settings with the right model for the given node."""
     tier = NODE_MODEL_MAP.get(node_name, "deep")
     model = get_model_fast() if tier == "fast" else get_model_deep()
     return LLMSettings(

@@ -1,20 +1,14 @@
 from __future__ import annotations
 
-import pytest
+from rca.tools import execute_tool, get_tool_schemas
 
-from rca.tools import (
-    execute_tool,
-    get_activity_context,
-    get_calendar_weather_context,
-    get_discount_context,
-    get_prior_rca,
-    get_peer_city_context,
-    get_sales_context,
-    get_signal_evidence,
-    get_stockout_context,
-    get_tool_schemas,
-)
 
-# These tests are store-era (store aliases, store-grain assertions). They are
-# being rewritten for city grain in Round E1. Skipped here to keep collection clean.
-pytestmark = pytest.mark.skip(reason="store-era tests — rewritten for city grain in Round E1")
+def test_tool_schemas_include_signal_and_news_tools() -> None:
+    names = {tool["function"]["name"] for tool in get_tool_schemas()}
+    assert "get_signal_evidence" in names
+    assert "search_external_events" in names
+
+
+def test_execute_tool_returns_error_for_unknown_tool() -> None:
+    result = execute_tool("does_not_exist", {})
+    assert "error" in result

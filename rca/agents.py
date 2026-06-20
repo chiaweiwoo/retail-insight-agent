@@ -1,50 +1,38 @@
 from __future__ import annotations
 
 import json
-from concurrent.futures import ThreadPoolExecutor
+import re
 from dataclasses import asdict, dataclass
-from pathlib import Path
 from typing import Any, Callable
 
-from rca.config import (
-    ASSESSMENT_FORMAT,
-    CONFIDENCE_VOCAB,
-    DEFAULT_LLM_MAX_TOOL_ROUNDS,
-)
-from rca.context import build_context_preamble
-from rca.llm import (
-    LLMSettings,
-    build_chat_completion_kwargs,
-    build_openai_compatible_client,
-    load_llm_settings,
-)
-from rca.outcomes import build_outcome_record, get_prior_rca, record_outcome
+from rca.config import AGENT_SKILLS_PATH, DEFAULT_LLM_MAX_TOOL_ROUNDS, SALES_FIELD_SEMANTICS
+from rca.llm import LLMSettings, build_chat_completion_kwargs, build_openai_compatible_client
+from rca.memory import get_memory_notes, write_memory
+from rca.outcomes import record_completion
+from rca.runlog import RunLogger
 from rca.tools import (
     execute_tool,
-    get_activity_context,
-    get_discount_context,
+    get_calendar_weather_context,
+    get_memory_context,
+    get_sales_context,
     get_signal_evidence,
-    get_stockout_baseline,
-    get_stockout_context,
     get_tool_schemas,
 )
-from rca.report import render_markdown_document, sanitize_generated_markdown
-from rca.runlog import RunLogger
 
 
 ClientFactory = Callable[[str], Any]
 
 
 @dataclass(frozen=True)
-class AnalystSpec:
+class AgentSpec:
     name: str
     focus: str
     tool_names: tuple[str, ...]
-    system_prompt: str
+    skill_file: str
 
 
 @dataclass
-class AnalystRunResult:
+class AgentRunResult:
     name: str
     focus: str
     memo_markdown: str
@@ -52,290 +40,106 @@ class AnalystRunResult:
 
 
 @dataclass
-class CoordinatorResult:
-    city_id: int
-    dt: str
-    coordinator_report_markdown: str
-    critic_note_markdown: str
-    controller_note_markdown: str
-    decision_card_markdown: str
-    analyst_results: list[AnalystRunResult]
+class PlannerDecision:
+    selected_agents: list[str]
+    rationale: str
+    news_query: str
 
 
-def _analyst_prompt(role: str, domain_instructions: str) -> str:
-    return f"""You are the {role} for a retail RCA team.
-
-{domain_instructions}
-
-{CONFIDENCE_VOCAB}
-
-Use only the tools provided to you. Use plain ASCII markdown. Return sections:
-1. Scope
-2. Findings
-3. Caveats
-4. Assessment (required — see format below)
-
-{ASSESSMENT_FORMAT}
-
-If your domain shows nothing material, return verdict "inconclusive" and confidence "low"
-rather than padding the findings section. Concise and honest is better than long and inflated.
-"""
-
-
-ANALYST_SPECS: tuple[AnalystSpec, ...] = (
-    AnalystSpec(
-        name="sales_analyst",
-        focus="sales performance — confirm signal magnitude and baseline comparison",
+AGENT_SPECS: tuple[AgentSpec, ...] = (
+    AgentSpec(
+        name="statistician",
+        focus="validate the signal with runtime baselines, intraday shape, and descriptive statistics",
+        tool_names=(
+            "get_signal_evidence",
+            "get_sales_context",
+            "compare_recent_baseline",
+            "compare_same_weekday_baseline",
+            "detect_intraday_shift",
+            "get_intraday_profile",
+        ),
+        skill_file="statistician.md",
+    ),
+    AgentSpec(
+        name="sales_agent",
+        focus="explain sales movement versus expected sales and recent history",
         tool_names=("get_signal_evidence", "get_sales_context"),
-        system_prompt=_analyst_prompt(
-            role="Sales Analyst",
-            domain_instructions=(
-                "Confirm whether the sales move is real and how large it is. "
-                "Compare current sales against trailing 7-day average, previous day, and same-weekday baselines. "
-                "Describe the recent sales trend shape. "
-                "Do not comment on stockouts, discounts, promotions, weather, or peers "
-                "unless they appear directly in your tool output."
-            ),
-        ),
+        skill_file="sales.md",
     ),
-    AnalystSpec(
-        name="ops_analyst",
-        focus="operations — stockout and product availability assessment",
-        tool_names=("get_stockout_context", "get_stockout_baseline", "get_sales_context"),
-        system_prompt=_analyst_prompt(
-            role="Operations Analyst",
-            domain_instructions=(
-                "Assess whether stockouts or product availability issues contributed to the sales move. "
-                "Look at stockout hours, stockout rates by severity, and peak hourly pressure. "
-                "Be explicit about cause vs consequence ambiguity — stockouts can cause drops, "
-                "but drops can also precede stockouts."
-            ),
-        ),
+    AgentSpec(
+        name="inventory_agent",
+        focus="assess whether stockout or availability pressure likely contributed to the move",
+        tool_names=("get_inventory_context", "get_intraday_profile", "compare_recent_baseline"),
+        skill_file="inventory.md",
     ),
-
-
-
-    AnalystSpec(
-        name="commercial_analyst",
-        focus="commercial — discount and promotional activity assessment",
-        tool_names=("get_discount_context", "get_activity_context", "get_sales_context"),
-        system_prompt=_analyst_prompt(
-            role="Commercial Analyst",
-            domain_instructions=(
-                "Assess whether pricing or promotional activity contributed to the sales move. "
-                "Look at discount depth, discounted product rate, promotional activity rate, and promotional sales share. "
-                "Assess whether any lift is likely driven by promotion, or whether a drop happened despite or because of promotion. "
-                "IMPORTANT on margin: we have no cost or margin data. If significant promotion is present, "
-                "flag margin dilution risk explicitly under data_gaps — do not invent margin figures."
-            ),
-        ),
+    AgentSpec(
+        name="pricing_agent",
+        focus="assess discount depth and pricing pressure",
+        tool_names=("get_pricing_context", "get_signal_evidence"),
+        skill_file="pricing.md",
     ),
-    AnalystSpec(
-        name="market_analyst",
-        focus="market context — calendar, weather, and peer city comparison",
-        tool_names=("get_calendar_weather_context", "get_peer_city_context", "get_sales_context"),
-        system_prompt=_analyst_prompt(
-            role="Market Analyst",
-            domain_instructions=(
-                "Assess external factors and whether the move is city-specific or broadly macro-regional. "
-                "Look at calendar context (weekday, holiday), weather conditions, and how this city performed "
-                "relative to peers. "
-                "PEER COMPARISON CAUTION: The peer group tool groups cities by their density tier "
-                "(based on their store count). While this provides a baseline, macro-economic factors can affect "
-                "all cities simultaneously. "
-                "Peer comparison can support a hypothesis but CANNOT be the primary root cause. "
-                "If the move appears fleet-wide across the same calendar date, that supports external factors. "
-                "If isolated, flag it as city-specific but LOW confidence without corroborating evidence."
-            ),
-        ),
+    AgentSpec(
+        name="promotions_agent",
+        focus="assess the unlabeled activity indicator and possible promotion contribution",
+        tool_names=("get_promotions_context", "get_signal_evidence"),
+        skill_file="promotions.md",
     ),
-    AnalystSpec(
-        name="research_analyst",
-        focus="external research — web news search for broader market events on the date",
-        tool_names=("search_news",),
-        system_prompt=_analyst_prompt(
-            role="Research Analyst",
-            domain_instructions=(
-                "Find relevant external news or events that may have influenced retail sales on this date. "
-                "Search for news about retail conditions, economic events, or local events relevant to the city date. "
-                "Report only what you find in search results — do not invent or infer beyond the evidence returned. "
-                "This search is retrospective; findings are approximate and should be treated as LOW confidence."
-            ),
-        ),
+    AgentSpec(
+        name="calendar_weather_agent",
+        focus="assess calendar, inferred holiday, and weather context",
+        tool_names=("get_calendar_weather_context", "get_signal_evidence"),
+        skill_file="calendar_weather.md",
+    ),
+    AgentSpec(
+        name="news_agent",
+        focus="search for external events and news that may explain the city/date movement",
+        tool_names=("search_external_events",),
+        skill_file="news.md",
     ),
 )
 
-
-COORDINATOR_SYSTEM_PROMPT = """You are the RCA coordinator analyst.
-Rules:
-- Do not invent evidence beyond the specialist memos.
-- Distinguish observed evidence from inference.
-- Mention disagreements or ambiguity plainly.
-- Prefer concise, practical reasoning.
-- Use plain ASCII markdown.
-
-Return sections:
-1. Trigger
-2. Likely Drivers
-3. Evidence
-4. Caveats
-5. Suggested Next Checks
-"""
+SPEC_BY_NAME = {spec.name: spec for spec in AGENT_SPECS}
 
 
-CRITIC_SYSTEM_PROMPT = """You are a skeptical RCA reviewer.
-
-You review specialist memos before the coordinator synthesizes them.
-
-Rules:
-- Check whether claims are actually supported by the cited numbers.
-- Flag correlation being presented as causation.
-- Downgrade overconfident claims when evidence is thin.
-- Severely downgrade any claims that rely heavily on peer group comparisons. The dataset covers multiple cities, but inter-city peer comparisons are noisy.
-- Keep the note concise and operational.
-- Use plain ASCII markdown.
-
-Return sections:
-1. Claim Audit
-2. Gaps
-3. Calibration Note
-"""
+def _load_skill_text(skill_file: str) -> str:
+    path = AGENT_SKILLS_PATH / skill_file
+    if not path.exists():
+        return ""
+    return path.read_text(encoding="utf-8").strip()
 
 
-FINANCE_CONTROLLER_SYSTEM_PROMPT = """You are the finance controller for a retail RCA workflow.
-
-You do not rewrite the RCA. You add a short finance lens:
-- materiality
-- margin risk
-- one-off vs structural read
-
-CRITICAL DATA CONTEXT — read before writing:
-- All sales figures in this dataset are NORMALIZED COEFFICIENTS, not currency.
-  sale_amount and hours_sale are index-like values multiplied by a source coefficient.
-  They are NOT dollars, RMB, or any monetary unit.
-- NEVER write a $ sign, currency symbol, or currency amount. Do not say "$28K", "28K USD", etc.
-- Quantify materiality as a MULTIPLE of the city's normal baseline or as a % of fleet mean.
-  Example: "the drop is 1.4x the city's typical day-to-day variance" or "this represents ~8% below
-  the fleet median for the date". Never invent a monetary figure.
-- We have NO margin or cost data. Do not invent margin estimates. Flag margin visibility as a data gap.
-
-Rules:
-- use only the RCA and critic note you are given
-- if margin data is missing, say so plainly
-- use plain ASCII markdown
-
-Return sections:
-1. Materiality (relative to city baseline and fleet — no currency)
-2. Margin Risk (flag absence of cost data if relevant)
-3. One-off vs Structural
-"""
+def _extract_json_object(text: str) -> dict[str, Any]:
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        match = re.search(r"\{.*\}", text, re.DOTALL)
+        if not match:
+            raise
+        return json.loads(match.group(0))
 
 
-SLT_BRIEF_SYSTEM_PROMPT = """You are writing a decision card for senior leadership.
-
-Rules:
-- compress the RCA into one screen
-- lead with confidence
-- it is allowed to say "none - monitor" and "no"
-- use plain ASCII markdown
-
-Return exactly this shape:
-## Regional Decision Card - <city> <date>
-- headline: <one line>
-- confidence: <high | medium | low>
-- materiality: <short line>
-- pattern: <short line>
-- action: <one line>
-- escalate: <yes | no>
-"""
-
-
-def plan_specialists(
+def _record_completion_response(
+    *,
+    run_id: str,
     city_id: int,
     dt: str,
-    signal: dict[str, Any] | None = None,
-    include_research: bool = False,
-) -> list[AnalystSpec]:
-    selected, _, _ = _plan_specialists_with_reasons(
+    node_name: str,
+    response: Any,
+    content: str,
+    tool_calls_json: list[dict[str, Any]] | None = None,
+) -> None:
+    usage = getattr(response, "usage", None)
+    record_completion(
+        run_id=run_id,
         city_id=city_id,
         dt=dt,
-        signal=signal,
-        include_research=include_research,
+        node_name=node_name,
+        model=getattr(response, "model", "unknown"),
+        content=content,
+        prompt_tokens=getattr(usage, "prompt_tokens", None),
+        completion_tokens=getattr(usage, "completion_tokens", None),
+        tool_calls_json=tool_calls_json,
     )
-    return selected
-
-
-def _plan_specialists_with_reasons(
-    city_id: int,
-    dt: str,
-    signal: dict[str, Any] | None = None,
-    include_research: bool = False,
-) -> tuple[list[AnalystSpec], list[dict[str, Any]], dict[str, Any]]:
-    spec_by_name = {spec.name: spec for spec in ANALYST_SPECS}
-    signal_evidence = signal or get_signal_evidence(city_id, dt)
-    stockout_context = get_stockout_context(city_id, dt)
-    discount_context = get_discount_context(city_id, dt)
-    activity_context = get_activity_context(city_id, dt)
-
-    planning_inputs = {
-        "signal_evidence": signal_evidence,
-        "stockout_context": stockout_context,
-        "discount_context": discount_context,
-        "activity_context": activity_context,
-    }
-
-    selected_names = ["sales_analyst", "market_analyst"]
-    skipped: list[dict[str, Any]] = []
-
-    stockout_present = any(
-        (stockout_context.get(field) or 0) > 0
-        for field in (
-            "avg_stockout_hours",
-            "stockout_product_rate",
-            "severe_stockout_product_rate",
-            "full_stockout_product_rate",
-            "hourly_stockout_rate_peak",
-        )
-    )
-    if stockout_present:
-        selected_names.append("ops_analyst")
-    else:
-        skipped.append(
-            {
-                "analyst": "ops_analyst",
-                "reason": "No stockout signal in local evidence.",
-            }
-        )
-
-    commercial_present = any(
-        (discount_context.get(field) or 0) > 0
-        for field in ("discounted_product_rate", "deep_discount_product_rate")
-    ) or any(
-        (activity_context.get(field) or 0) > 0
-        for field in ("activity_product_rate", "activity_sales_share")
-    )
-    if commercial_present:
-        selected_names.append("commercial_analyst")
-    else:
-        skipped.append(
-            {
-                "analyst": "commercial_analyst",
-                "reason": "No discount or activity signal in local evidence.",
-            }
-        )
-
-    if include_research:
-        selected_names.append("research_analyst")
-    else:
-        skipped.append(
-            {
-                "analyst": "research_analyst",
-                "reason": "Research analyst gated off by default.",
-            }
-        )
-
-    selected = [spec_by_name[name] for name in selected_names]
-    return selected, skipped, planning_inputs
 
 
 def _default_client_factory(settings: LLMSettings) -> ClientFactory:
@@ -345,78 +149,161 @@ def _default_client_factory(settings: LLMSettings) -> ClientFactory:
     return factory
 
 
-def _run_specialist(
-    spec: AnalystSpec,
+def plan_investigation(
+    *,
     city_id: int,
     dt: str,
     settings: LLMSettings,
     logger: RunLogger,
     client_factory: ClientFactory,
-    max_tool_rounds: int = DEFAULT_LLM_MAX_TOOL_ROUNDS,
-    profile_text: str | None = None,
-) -> AnalystRunResult:
-    subject = f"{city_id}:{dt}"
-    client = client_factory(spec.name)
-    logger.log(
-        actor_type="agent",
-        actor_name=spec.name,
-        action="started",
-        subject=subject,
-        source="system",
-        details={"focus": spec.focus},
+    run_id: str,
+) -> PlannerDecision:
+    signal = get_signal_evidence(city_id, dt)
+    sales = get_sales_context(city_id, dt, history_days=10)
+    calendar_weather = get_calendar_weather_context(city_id, dt)
+    memory = get_memory_context(city_id, limit=4)
+    skill = _load_skill_text("planner.md")
+    client = client_factory("planner")
+
+    prompt = (
+        "You are planning a city/date retail RCA. Return valid JSON only.\n"
+        "Allowed agents: statistician, sales_agent, inventory_agent, pricing_agent, "
+        "promotions_agent, calendar_weather_agent, news_agent.\n"
+        "Always include statistician and sales_agent.\n"
+        f"{skill}\n"
     )
+    user = {
+        "signal": signal,
+        "sales": sales,
+        "calendar_weather": calendar_weather,
+        "memory": memory,
+    }
+    logger.log(actor_type="workflow", actor_name="planner", action="started", source="system", details={"signal": signal})
+    response = client.chat.completions.create(
+        **build_chat_completion_kwargs(
+            settings,
+            [
+                {"role": "system", "content": prompt},
+                {"role": "user", "content": json.dumps(user, ensure_ascii=False)},
+            ],
+            tools=None,
+        )
+    )
+    content = response.choices[0].message.content or "{}"
+    _record_completion_response(
+        run_id=run_id,
+        city_id=city_id,
+        dt=dt,
+        node_name="planner",
+        response=response,
+        content=content,
+    )
+    try:
+        parsed = _extract_json_object(content)
+        selected_agents = [
+            name
+            for name in parsed.get("selected_agents", [])
+            if name in SPEC_BY_NAME
+        ]
+        if "statistician" not in selected_agents:
+            selected_agents.insert(0, "statistician")
+        if "sales_agent" not in selected_agents:
+            selected_agents.insert(1, "sales_agent")
+        if "news_agent" not in selected_agents:
+            selected_agents.append("news_agent")
+        decision = PlannerDecision(
+            selected_agents=selected_agents,
+            rationale=str(parsed.get("rationale") or ""),
+            news_query=str(parsed.get("news_query") or f"city {city_id} retail news {dt}"),
+        )
+    except Exception:
+        decision = PlannerDecision(
+            selected_agents=[
+                "statistician",
+                "sales_agent",
+                "inventory_agent",
+                "pricing_agent",
+                "promotions_agent",
+                "calendar_weather_agent",
+                "news_agent",
+            ],
+            rationale="Fallback planner path used because structured parsing failed.",
+            news_query=f"city {city_id} retail news {dt}",
+        )
+    logger.log(
+        actor_type="workflow",
+        actor_name="planner",
+        action="completed",
+        source="llm",
+        details={"selected_agents": decision.selected_agents, "news_query": decision.news_query},
+    )
+    return decision
+
+
+def run_agent(
+    *,
+    spec: AgentSpec,
+    city_id: int,
+    dt: str,
+    settings: LLMSettings,
+    logger: RunLogger,
+    client_factory: ClientFactory,
+    run_id: str,
+    news_query: str = "",
+    max_tool_rounds: int = DEFAULT_LLM_MAX_TOOL_ROUNDS,
+) -> AgentRunResult:
+    client = client_factory(spec.name)
+    system_prompt = (
+        f"You are a retail RCA agent focused on {spec.focus}.\n"
+        f"{SALES_FIELD_SEMANTICS}\n"
+        "Use plain ASCII markdown. Distinguish observation from inference.\n"
+        "Return sections:\n"
+        "## Why It Matters\n## Evidence\n## Interpretation\n## Caveats\n"
+    )
+    skill = _load_skill_text(spec.skill_file)
     messages: list[dict[str, Any]] = [
-        {
-            "role": "system",
-            "content": build_context_preamble(city_id, dt, profile_text=profile_text) + "\n" + spec.system_prompt,
-        },
+        {"role": "system", "content": system_prompt + "\n" + skill},
         {
             "role": "user",
             "content": (
-                f"Analyze city {city_id} on {dt}. "
-                f"Your focus is {spec.focus}. Produce a short specialist memo."
+                f"Analyze city {city_id} on {dt}. Focus: {spec.focus}."
+                + (f" Use this external query if helpful: {news_query}." if news_query and spec.name == "news_agent" else "")
             ),
         },
     ]
-    tool_schemas = get_tool_schemas(spec.tool_names)
+    logger.log(actor_type="agent", actor_name=spec.name, action="started", source="system", details={"focus": spec.focus})
     executed_tool_calls: list[dict[str, Any]] = []
+    tool_schemas = get_tool_schemas(spec.tool_names)
 
     for round_index in range(1, max_tool_rounds + 1):
-        logger.log(
-            actor_type="llm",
-            actor_name=spec.name,
-            action="completion_requested",
-            subject=subject,
-            source="llm",
-            details={"round": round_index, "tool_names": list(spec.tool_names)},
-        )
         response = client.chat.completions.create(
             **build_chat_completion_kwargs(settings, messages, tool_schemas)
         )
         message = response.choices[0].message
         tool_calls = getattr(message, "tool_calls", None)
+
         if not tool_calls:
-            memo = getattr(message, "content", None) or ""
-            logger.log(
-                actor_type="llm",
-                actor_name=spec.name,
-                action="completion_finished",
-                subject=subject,
-                source="llm",
-                details={"round": round_index, "content_preview": memo[:200]},
+            content = message.content or ""
+            _record_completion_response(
+                run_id=run_id,
+                city_id=city_id,
+                dt=dt,
+                node_name=spec.name,
+                response=response,
+                content=content,
+                tool_calls_json=executed_tool_calls,
             )
             logger.log(
                 actor_type="agent",
                 actor_name=spec.name,
                 action="completed",
-                subject=subject,
-                source="system",
+                source="llm",
                 details={"tool_call_count": len(executed_tool_calls)},
             )
-            return AnalystRunResult(
+            return AgentRunResult(
                 name=spec.name,
                 focus=spec.focus,
-                memo_markdown=memo,
+                memo_markdown=content,
                 tool_calls=executed_tool_calls,
             )
 
@@ -425,33 +312,28 @@ def _run_specialist(
             "content": getattr(message, "content", None) or "",
             "tool_calls": [],
         }
+        tool_call_logs: list[dict[str, Any]] = []
         for tool_call in tool_calls:
-            raw_arguments = tool_call.function.arguments or "{}"
-            arguments = json.loads(raw_arguments)
-            logger.log(
-                actor_type="agent",
-                actor_name=spec.name,
-                action="tool_call_started",
-                subject=subject,
-                source="llm",
-                details={"tool_name": tool_call.function.name, "arguments": arguments},
-            )
+            arguments = json.loads(tool_call.function.arguments or "{}")
+            if spec.name == "news_agent":
+                arguments.setdefault("city_id", city_id)
+                arguments.setdefault("dt", dt)
+                arguments.setdefault("query", news_query or f"city {city_id} retail news {dt}")
             result = execute_tool(tool_call.function.name, arguments)
+            log_row = {
+                "id": tool_call.id,
+                "name": tool_call.function.name,
+                "arguments": arguments,
+                "result": result,
+            }
+            executed_tool_calls.append(log_row)
+            tool_call_logs.append(log_row)
             logger.log(
                 actor_type="tool",
                 actor_name=tool_call.function.name,
                 action="completed",
-                subject=subject,
-                source="tool",
-                details={"called_by": spec.name, "result_preview": json.dumps(result)[:200]},
-            )
-            executed_tool_calls.append(
-                {
-                    "id": tool_call.id,
-                    "name": tool_call.function.name,
-                    "arguments": arguments,
-                    "result": result,
-                }
+                source=spec.name,
+                details={"arguments": arguments},
             )
             assistant_message["tool_calls"].append(
                 {
@@ -459,486 +341,222 @@ def _run_specialist(
                     "type": "function",
                     "function": {
                         "name": tool_call.function.name,
-                        "arguments": raw_arguments,
+                        "arguments": json.dumps(arguments, ensure_ascii=False),
                     },
                 }
             )
+        _record_completion_response(
+            run_id=run_id,
+            city_id=city_id,
+            dt=dt,
+            node_name=spec.name,
+            response=response,
+            content=getattr(message, "content", None) or "",
+            tool_calls_json=tool_call_logs,
+        )
         messages.append(assistant_message)
-        for tool_call in executed_tool_calls[-len(tool_calls):]:
+        for tool_call in tool_call_logs:
             messages.append(
                 {
                     "role": "tool",
                     "tool_call_id": tool_call["id"],
                     "name": tool_call["name"],
-                    "content": json.dumps(tool_call["result"]),
+                    "content": json.dumps(tool_call["result"], ensure_ascii=False),
                 }
             )
 
     raise RuntimeError(f"{spec.name} exceeded the maximum tool rounds ({max_tool_rounds}).")
 
 
-def _synthesize(
+def run_critic(
+    *,
     city_id: int,
     dt: str,
-    analyst_results: list[AnalystRunResult],
-    critic_note_markdown: str,
+    agent_results: list[AgentRunResult],
     settings: LLMSettings,
     logger: RunLogger,
     client_factory: ClientFactory,
-    profile_text: str | None = None,
+    run_id: str,
 ) -> str:
-    subject = f"{city_id}:{dt}"
-    client = client_factory("coordinator_analyst")
-    memos = "\n\n".join(
-        f"## {result.name}\nFocus: {result.focus}\n\n{result.memo_markdown}"
-        for result in analyst_results
-    )
-    messages = [
-        {
-            "role": "system",
-            "content": build_context_preamble(city_id, dt, profile_text=profile_text) + "\n" + COORDINATOR_SYSTEM_PROMPT,
-        },
-        {
-            "role": "user",
-            "content": (
-                f"Synthesize the specialist memos for city {city_id} on {dt}.\n\n"
-                f"Specialist memos:\n\n{memos}\n\n"
-                f"Critic note:\n\n{critic_note_markdown}"
-            ),
-        },
-    ]
-    logger.log(
-        actor_type="llm",
-        actor_name="coordinator_analyst",
-        action="completion_requested",
-        subject=subject,
-        source="llm",
-        details={"specialist_count": len(analyst_results)},
-    )
-    response = client.chat.completions.create(
-        **build_chat_completion_kwargs(settings, messages, tools=None)
-    )
-    content = response.choices[0].message.content or ""
-    logger.log(
-        actor_type="llm",
-        actor_name="coordinator_analyst",
-        action="completion_finished",
-        subject=subject,
-        source="llm",
-        details={"content_preview": content[:200]},
-    )
-    return content
-
-
-def _run_critic(
-    city_id: int,
-    dt: str,
-    analyst_results: list[AnalystRunResult],
-    settings: LLMSettings,
-    logger: RunLogger,
-    client_factory: ClientFactory,
-    profile_text: str | None = None,
-) -> str:
-    subject = f"{city_id}:{dt}"
     client = client_factory("critic")
+    skill = _load_skill_text("critic.md")
     memos = "\n\n".join(
         f"## {result.name}\nFocus: {result.focus}\n\n{result.memo_markdown}"
-        for result in analyst_results
-    )
-    messages = [
-        {
-            "role": "system",
-            "content": build_context_preamble(city_id, dt, profile_text=profile_text) + "\n" + CRITIC_SYSTEM_PROMPT,
-        },
-        {
-            "role": "user",
-            "content": (
-                f"Review the specialist memos for city {city_id} on {dt}.\n\n"
-                f"{memos}"
-            ),
-        },
-    ]
-    logger.log(
-        actor_type="llm",
-        actor_name="critic",
-        action="completion_requested",
-        subject=subject,
-        source="llm",
-        details={"specialist_count": len(analyst_results)},
+        for result in agent_results
     )
     response = client.chat.completions.create(
-        **build_chat_completion_kwargs(settings, messages, tools=None)
+        **build_chat_completion_kwargs(
+            settings,
+            [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are the critic for a retail RCA workflow.\n"
+                        "Return sections:\n## Claim Audit\n## Gaps\n## Calibration\n## Follow Up\n"
+                        + skill
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": f"Review the following agent memos for city {city_id} on {dt}.\n\n{memos}",
+                },
+            ],
+            tools=None,
+        )
     )
     content = response.choices[0].message.content or ""
-    logger.log(
-        actor_type="llm",
-        actor_name="critic",
-        action="completion_finished",
-        subject=subject,
-        source="llm",
-        details={"content_preview": content[:200]},
+    _record_completion_response(
+        run_id=run_id,
+        city_id=city_id,
+        dt=dt,
+        node_name="critic",
+        response=response,
+        content=content,
     )
-    return content
-
-
-def _run_finance_controller(
-    city_id: int,
-    dt: str,
-    coordinator_report_markdown: str,
-    critic_note_markdown: str,
-    settings: LLMSettings,
-    logger: RunLogger,
-    client_factory: ClientFactory,
-    profile_text: str | None = None,
-) -> str:
-    subject = f"{city_id}:{dt}"
-    client = client_factory("finance_controller")
-    messages = [
-        {
-            "role": "system",
-            "content": build_context_preamble(city_id, dt, profile_text=profile_text) + "\n" + FINANCE_CONTROLLER_SYSTEM_PROMPT,
-        },
-        {
-            "role": "user",
-            "content": (
-                f"Review this RCA for city {city_id} on {dt}.\n\n"
-                f"RCA:\n\n{coordinator_report_markdown}\n\n"
-                f"Critic note:\n\n{critic_note_markdown}"
-            ),
-        },
-    ]
-    logger.log(
-        actor_type="llm",
-        actor_name="finance_controller",
-        action="completion_requested",
-        subject=subject,
-        source="llm",
-        details={},
-    )
-    response = client.chat.completions.create(
-        **build_chat_completion_kwargs(settings, messages, tools=None)
-    )
-    content = response.choices[0].message.content or ""
-    logger.log(
-        actor_type="llm",
-        actor_name="finance_controller",
-        action="completion_finished",
-        subject=subject,
-        source="llm",
-        details={"content_preview": content[:200]},
-    )
-    return content
-
-
-def _run_slt_brief(
-    city_id: int,
-    dt: str,
-    coordinator_report_markdown: str,
-    controller_note_markdown: str,
-    critic_note_markdown: str,
-    prior_rca_summary: dict[str, Any],
-    settings: LLMSettings,
-    logger: RunLogger,
-    client_factory: ClientFactory,
-    profile_text: str | None = None,
-) -> str:
-    subject = f"{city_id}:{dt}"
-    client = client_factory("slt_brief")
-    messages = [
-        {
-            "role": "system",
-            "content": build_context_preamble(city_id, dt, profile_text=profile_text) + "\n" + SLT_BRIEF_SYSTEM_PROMPT,
-        },
-        {
-            "role": "user",
-            "content": (
-                f"Create the regional decision card for city {city_id} on {dt}.\n\n"
-                f"RCA:\n\n{coordinator_report_markdown}\n\n"
-                f"Finance controller note:\n\n{controller_note_markdown}\n\n"
-                f"Critic note:\n\n{critic_note_markdown}\n\n"
-                f"Prior RCA summary:\n\n{json.dumps(prior_rca_summary, indent=2)}"
-            ),
-        },
-    ]
-    logger.log(
-        actor_type="llm",
-        actor_name="slt_brief",
-        action="completion_requested",
-        subject=subject,
-        source="llm",
-        details={},
-    )
-    response = client.chat.completions.create(
-        **build_chat_completion_kwargs(settings, messages, tools=None)
-    )
-    content = response.choices[0].message.content or ""
-    logger.log(
-        actor_type="llm",
-        actor_name="slt_brief",
-        action="completion_finished",
-        subject=subject,
-        source="llm",
-        details={"content_preview": content[:200]},
-    )
+    logger.log(actor_type="agent", actor_name="critic", action="completed", source="llm", details={})
     return content
 
 
 def run_coordinator(
+    *,
     city_id: int,
     dt: str,
-    specialists: list[AnalystSpec] | None = None,
-    settings: LLMSettings | None = None,
-    client_factory: ClientFactory | None = None,
-    output_dir: Path | None = None,
-    include_research: bool = False,
-) -> CoordinatorResult:
-    settings = settings or load_llm_settings()
-    client_factory = client_factory or _default_client_factory(settings)
-    run_name = f"{city_id}_{dt}"
-    logger = RunLogger(run_name=run_name)
-    subject = f"{city_id}:{dt}"
-
-    planning_inputs: dict[str, Any] | None = None
-    skipped_analysts: list[dict[str, Any]] = []
-    prior_rca_summary = get_prior_rca(city_id)
-    if specialists is None:
-        specialists, skipped_analysts, planning_inputs = _plan_specialists_with_reasons(
-            city_id=city_id,
-            dt=dt,
-            include_research=include_research,
+    signal_evidence: dict[str, Any],
+    planner_decision: PlannerDecision,
+    agent_results: list[AgentRunResult],
+    critic_note: str,
+    settings: LLMSettings,
+    logger: RunLogger,
+    client_factory: ClientFactory,
+    run_id: str,
+) -> str:
+    client = client_factory("coordinator")
+    skill = _load_skill_text("coordinator.md")
+    memory = get_memory_notes(city_id, limit=5)
+    memos = "\n\n".join(
+        f"## {result.name}\nFocus: {result.focus}\n\n{result.memo_markdown}"
+        for result in agent_results
+    )
+    response = client.chat.completions.create(
+        **build_chat_completion_kwargs(
+            settings,
+            [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are the coordinator for a retail RCA system.\n"
+                        "Return exactly these sections in markdown:\n"
+                        "# Decision Card\n"
+                        "- headline: <one line>\n"
+                        "- confidence: <high | medium | low>\n"
+                        "- signal: <drop | lift | neutral | insufficient_history>\n"
+                        "## RCA\n## Internal Factors\n## External Factors\n## Prediction\n## Prescription\n## Caveats\n"
+                        + skill
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": json.dumps(
+                        {
+                            "city_id": city_id,
+                            "dt": dt,
+                            "signal_evidence": signal_evidence,
+                            "planner_decision": asdict(planner_decision),
+                            "recent_memory": memory,
+                            "critic_note": critic_note,
+                            "agent_memos": [asdict(item) for item in agent_results],
+                        },
+                        ensure_ascii=False,
+                    ),
+                },
+            ],
+            tools=None,
         )
-
-    logger.log(
-        actor_type="workflow",
-        actor_name="coordinator_pipeline",
-        action="started",
-        subject=subject,
-        source="system",
-        details={
-            "analyst_count": len(specialists),
-            "planning_inputs": planning_inputs,
-            "prior_rca_summary": prior_rca_summary,
-        },
     )
-    logger.log(
-        actor_type="workflow",
-        actor_name="plan_specialists",
-        action="completed",
-        subject=subject,
-        source="system",
-        details={
-            "selected_analysts": [spec.name for spec in specialists],
-            "skipped_analysts": skipped_analysts,
-            "include_research": include_research,
-            "prior_rca_summary": prior_rca_summary,
-        },
-    )
-
-    def run_one(spec: AnalystSpec) -> AnalystRunResult:
-        return _run_specialist(
-            spec=spec,
-            city_id=city_id,
-            dt=dt,
-            settings=settings,
-            logger=logger,
-            client_factory=client_factory,
-        )
-
-    with ThreadPoolExecutor(max_workers=len(specialists)) as executor:
-        future_map = {spec.name: executor.submit(run_one, spec) for spec in specialists}
-        results_by_name = {name: future.result() for name, future in future_map.items()}
-
-    analyst_results = [results_by_name[spec.name] for spec in specialists]
-    logger.log(
-        actor_type="workflow",
-        actor_name="coordinator_pipeline",
-        action="analysts_completed",
-        subject=subject,
-        source="system",
-        details={
-            "analysts": [result.name for result in analyst_results],
-            "tool_call_counts": {result.name: len(result.tool_calls) for result in analyst_results},
-        },
-    )
-
-    critic_note = _run_critic(
+    content = response.choices[0].message.content or ""
+    _record_completion_response(
+        run_id=run_id,
         city_id=city_id,
         dt=dt,
-        analyst_results=analyst_results,
-        settings=settings,
-        logger=logger,
-        client_factory=client_factory,
+        node_name="coordinator",
+        response=response,
+        content=content,
     )
-    logger.log(
-        actor_type="workflow",
-        actor_name="coordinator_pipeline",
-        action="critic_completed",
-        subject=subject,
-        source="system",
-        details={"critic_note_preview": critic_note[:200]},
-    )
+    logger.log(actor_type="agent", actor_name="coordinator", action="completed", source="llm", details={})
+    return content
 
-    coordinator_report = _synthesize(
-        city_id=city_id,
-        dt=dt,
-        analyst_results=analyst_results,
-        critic_note_markdown=critic_note,
-        settings=settings,
-        logger=logger,
-        client_factory=client_factory,
-    )
-    controller_note = _run_finance_controller(
-        city_id=city_id,
-        dt=dt,
-        coordinator_report_markdown=coordinator_report,
-        critic_note_markdown=critic_note,
-        settings=settings,
-        logger=logger,
-        client_factory=client_factory,
-    )
-    decision_card = _run_slt_brief(
-        city_id=city_id,
-        dt=dt,
-        coordinator_report_markdown=coordinator_report,
-        controller_note_markdown=controller_note,
-        critic_note_markdown=critic_note,
-        prior_rca_summary=prior_rca_summary,
-        settings=settings,
-        logger=logger,
-        client_factory=client_factory,
-    )
 
-    coordinator_report = sanitize_generated_markdown(coordinator_report)
-    critic_note = sanitize_generated_markdown(critic_note)
-    controller_note = sanitize_generated_markdown(controller_note)
-    decision_card = sanitize_generated_markdown(decision_card)
-    for result in analyst_results:
-        result.memo_markdown = sanitize_generated_markdown(result.memo_markdown)
-    logger.log(
-        actor_type="workflow",
-        actor_name="coordinator_pipeline",
-        action="completed",
-        subject=subject,
-        source="system",
-        details={
-            "analyst_count": len(analyst_results),
-            "output_dir": str(output_dir) if output_dir is not None else None,
-        },
+def run_memory_distiller(
+    *,
+    city_id: int,
+    dt: str,
+    signal_label: str,
+    final_report: str,
+    settings: LLMSettings,
+    logger: RunLogger,
+    client_factory: ClientFactory,
+    run_id: str,
+) -> str:
+    client = client_factory("memory_distiller")
+    skill = _load_skill_text("memory_distiller.md")
+    response = client.chat.completions.create(
+        **build_chat_completion_kwargs(
+            settings,
+            [
+                {
+                    "role": "system",
+                    "content": (
+                        "Write short reusable city lessons from one RCA run.\n"
+                        "Return markdown with section ## Lessons and 3-5 bullets.\n"
+                        + skill
+                    ),
+                },
+                {"role": "user", "content": final_report},
+            ],
+            tools=None,
+        )
     )
-    outcome_record = build_outcome_record(
-        run_name=run_name,
+    content = response.choices[0].message.content or ""
+    _record_completion_response(
+        run_id=run_id,
         city_id=city_id,
         dt=dt,
-        signal_evidence=(planning_inputs or {}).get("signal_evidence") or get_signal_evidence(city_id, dt),
-        coordinator_report_markdown=coordinator_report,
-        decision_card_markdown=decision_card,
+        node_name="memory_distiller",
+        response=response,
+        content=content,
     )
-    is_dry_run = client_factory is not None
-    record_outcome(outcome_record, dry_run=is_dry_run)
-    logger.log(
-        actor_type="workflow",
-        actor_name="coordinator_pipeline",
-        action="outcome_recorded",
-        subject=subject,
-        source="system",
-        details={
-            "signal_label": outcome_record.signal_label,
-            "top_driver": outcome_record.top_driver,
-            "driver_class": outcome_record.driver_class,
-            "confidence": outcome_record.confidence,
-            "escalated": outcome_record.escalated,
-        },
-    )
-
-    if output_dir is not None:
-        output_dir.mkdir(parents=True, exist_ok=True)
-        (output_dir / "run_log.jsonl").write_text(logger.to_jsonl(), encoding="utf-8")
-        (output_dir / "run_log.md").write_text(logger.to_markdown(), encoding="utf-8")
-        specialist_dir = output_dir / "specialists"
-        specialist_dir.mkdir(parents=True, exist_ok=True)
-        for result in analyst_results:
-            markdown_path = specialist_dir / f"{result.name}.md"
-            html_path = specialist_dir / f"{result.name}.html"
-            markdown_path.write_text(result.memo_markdown, encoding="utf-8")
-            html_path.write_text(
-                render_markdown_document(
-                    result.memo_markdown,
-                    title=f"{result.name} memo for {city_id} on {dt}",
-                ),
-                encoding="utf-8",
-            )
-        critique_markdown_path = output_dir / "critique.md"
-        critique_html_path = output_dir / "critique.html"
-        critique_markdown_path.write_text(critic_note, encoding="utf-8")
-        critique_html_path.write_text(
-            render_markdown_document(
-                critic_note,
-                title=f"Critique for {city_id} on {dt}",
-            ),
-            encoding="utf-8",
-        )
-        controller_markdown_path = output_dir / "controller_note.md"
-        controller_html_path = output_dir / "controller_note.html"
-        controller_markdown_path.write_text(controller_note, encoding="utf-8")
-        controller_html_path.write_text(
-            render_markdown_document(
-                controller_note,
-                title=f"Finance controller note for {city_id} on {dt}",
-            ),
-            encoding="utf-8",
-        )
-        decision_card_markdown_path = output_dir / "decision_card.md"
-        decision_card_html_path = output_dir / "decision_card.html"
-        decision_card_markdown_path.write_text(decision_card, encoding="utf-8")
-        decision_card_html_path.write_text(
-            render_markdown_document(
-                decision_card,
-                title=f"Decision card for {city_id} on {dt}",
-            ),
-            encoding="utf-8",
-        )
-        report_markdown_path = output_dir / "report.md"
-        report_html_path = output_dir / "report.html"
-        report_markdown_path.write_text(coordinator_report, encoding="utf-8")
-        report_html_path.write_text(
-            render_markdown_document(
-                coordinator_report,
-                title=f"RCA report for {city_id} on {dt}",
-            ),
-            encoding="utf-8",
-        )
-        payload = {
-            "city_id": city_id,
-            "dt": dt,
-            "planner": {
-                "selected_analysts": [spec.name for spec in specialists],
-                "skipped_analysts": skipped_analysts,
-                "include_research": include_research,
-                "planning_inputs": planning_inputs,
-                "prior_rca_summary": prior_rca_summary,
-            },
-            "critic_note_markdown": critic_note,
-            "controller_note_markdown": controller_note,
-            "decision_card_markdown": decision_card,
-            "coordinator_report_markdown": coordinator_report,
-            "analyst_results": [asdict(result) for result in analyst_results],
-        }
-        trace_json = json.dumps(payload, indent=2, ensure_ascii=False)
-        (output_dir / "coordinator_trace.json").write_text(
-            trace_json,
-            encoding="utf-8",
-        )
-        (output_dir / "run_trace.json").write_text(
-            trace_json,
-            encoding="utf-8",
-        )
-
-    return CoordinatorResult(
+    write_memory(
         city_id=city_id,
         dt=dt,
-        coordinator_report_markdown=coordinator_report,
-        critic_note_markdown=critic_note,
-        controller_note_markdown=controller_note,
-        decision_card_markdown=decision_card,
-        analyst_results=analyst_results,
+        run_id=run_id,
+        memory_type="lesson",
+        topic="rca_lesson",
+        content=content,
+        signal_label=signal_label,
     )
+    logger.log(actor_type="agent", actor_name="memory_distiller", action="completed", source="llm", details={})
+    return content
+
+
+def extract_outcome_fields(markdown: str) -> dict[str, str]:
+    def bullet(name: str) -> str:
+        match = re.search(rf"^- {re.escape(name)}:\s*(.+)$", markdown, re.MULTILINE)
+        return match.group(1).strip() if match else ""
+
+    def section(title: str) -> str:
+        match = re.search(
+            rf"^## {re.escape(title)}\s*(.*?)(?=^## |\Z)",
+            markdown,
+            re.MULTILINE | re.DOTALL,
+        )
+        return match.group(1).strip() if match else ""
+
+    return {
+        "headline": bullet("headline"),
+        "confidence": bullet("confidence") or "medium",
+        "signal": bullet("signal"),
+        "decision_card": markdown.split("## RCA", 1)[0].strip(),
+        "rca": section("RCA"),
+        "prediction": section("Prediction"),
+        "prescription": section("Prescription"),
+    }

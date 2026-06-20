@@ -1,11 +1,8 @@
-"""Agent tool implementations — all reads from Supabase.
-
-The signal frame is loaded once per process from rca_city_signal and cached.
-"""
+"""Runtime evidence tools backed by Supabase city/date facts."""
 from __future__ import annotations
 
-import os
-from functools import lru_cache
+from datetime import datetime
+import json
 from typing import Any, Callable
 
 import pandas as pd
@@ -13,10 +10,25 @@ import pandas as pd
 from rca.config import (
     DEFAULT_DROP_THRESHOLD_PCT,
     DEFAULT_LIFT_THRESHOLD_PCT,
-    make_supabase_client,
+    DEFAULT_NEWS_RESULTS,
+    TABLE_CALENDAR,
+    TABLE_GOALS,
+    TABLE_INVENTORY,
+    TABLE_PRICING,
+    TABLE_PROMOTIONS,
+    TABLE_SALES,
+    TABLE_SIGNALS,
+    TABLE_WEATHER,
+    make_supabase_schema_client,
 )
-from rca.evidence import get_city_day_evidence
-from rca.outcomes import get_prior_rca as load_prior_rca
+from rca.memory import (
+    cache_external_events,
+    get_cached_evidence,
+    get_cached_external_events,
+    get_memory_notes,
+    put_cached_evidence,
+)
+from rca.outcomes import get_prior_outcomes
 
 
 ToolFunction = Callable[..., dict[str, Any]]
@@ -28,517 +40,495 @@ def _round_float(value: float | None, digits: int = 4) -> float | None:
     return round(float(value), digits)
 
 
-# ---------------------------------------------------------------------------
-# Cached signal frame — loaded once from Supabase rca_city_signal
-# ---------------------------------------------------------------------------
+def _client():
+    return make_supabase_schema_client()
 
 
-@lru_cache(maxsize=1)
-def _signal_frame() -> pd.DataFrame:
-    """Load all city-days from rca_city_signal and cache for the process lifetime."""
-    client = make_supabase_client()
-    resp = (
-        client.table("rca_city_signal")
-        .select(
-            "city_id,dt,total_sales,business_target,target_deviation_pct,signal_label,"
-            "previous_day_sales,trailing_7d_avg_sales,same_weekday_4w_avg_sales,"
-            "day_over_day_pct_change,trailing_7d_pct_change,same_weekday_4w_pct_change,"
-            "weekday,density_tier,holiday_name_inferred"
-        )
-        .limit(2000)
+def _fetch_one(table: str, city_id: int, dt: str, columns: str = "*") -> dict[str, Any]:
+    result = (
+        _client()
+        .table(table)
+        .select(columns)
+        .eq("city_id", city_id)
+        .eq("dt", dt)
+        .limit(1)
         .execute()
     )
-    frame = pd.DataFrame(resp.data or [])
-    if frame.empty:
-        raise RuntimeError(
-            "rca_city_signal is empty. "
-            "Run 'rca analyze' to compute and push signal rows."
-        )
-    frame["dt"] = pd.to_datetime(frame["dt"])
-    frame["dt_label"] = frame["dt"].dt.strftime("%Y-%m-%d")
-    return frame
+    rows = result.data or []
+    if not rows:
+        raise ValueError(f"No row found in {table} for city_id={city_id} dt={dt}")
+    return rows[0]
 
 
-def _get_signal_row(city_id: int, dt: str) -> pd.Series:
-    frame = _signal_frame()
-    matched = frame[(frame["city_id"] == city_id) & (frame["dt_label"] == dt)]
-    if matched.empty:
-        raise ValueError(f"No signal row found for city_id={city_id} dt={dt}")
-    return matched.iloc[0]
-
-
-def _get_history_slice(city_id: int, dt: str, days: int = 7) -> pd.DataFrame:
-    frame = _signal_frame()
-    city_frame = frame[frame["city_id"] == city_id].sort_values("dt").reset_index(drop=True)
-    pos_mask = city_frame["dt_label"] == dt
-    if not pos_mask.any():
-        raise ValueError(f"No history row found for city_id={city_id} dt={dt}")
-    pos = int(pos_mask.idxmax())
-    start = max(0, pos - days)
-    return city_frame.iloc[start : pos + 1].copy()
-
-
-# ---------------------------------------------------------------------------
-# Tool implementations
-# ---------------------------------------------------------------------------
+def _fetch_city_history(table: str, city_id: int, dt: str, columns: str = "*", limit: int = 90) -> list[dict[str, Any]]:
+    result = (
+        _client()
+        .table(table)
+        .select(columns)
+        .eq("city_id", city_id)
+        .lte("dt", dt)
+        .order("dt")
+        .limit(limit)
+        .execute()
+    )
+    return result.data or []
 
 
 def get_signal_evidence(city_id: int, dt: str) -> dict[str, Any]:
-    row = _get_signal_row(city_id, dt)
-    signal_label = str(row.get("signal_label", "neutral") or "neutral")
+    signal = _fetch_one(TABLE_SIGNALS, city_id, dt)
     return {
         "city_id": city_id,
         "dt": dt,
-        "signal_label": signal_label,
-        "current_sales": _round_float(row["total_sales"]),
-        "business_target": _round_float(row.get("business_target")),
-        "target_deviation_pct": _round_float(row.get("target_deviation_pct")),
-        "previous_day_sales": _round_float(row["previous_day_sales"]),
-        "trailing_7d_avg_sales": _round_float(row["trailing_7d_avg_sales"]),
-        "same_weekday_4w_avg_sales": _round_float(row["same_weekday_4w_avg_sales"]),
-        "day_over_day_pct_change": _round_float(row["day_over_day_pct_change"]),
-        "trailing_7d_pct_change": _round_float(row["trailing_7d_pct_change"]),
-        "same_weekday_4w_pct_change": _round_float(row["same_weekday_4w_pct_change"]),
+        "signal_label": str(signal["signal_label"]),
+        "current_sales": _round_float(signal.get("total_sales")),
+        "expected_sales": _round_float(signal.get("expected_sales")),
+        "deviation_pct": _round_float(signal.get("deviation_pct")),
+        "goal_method": str(signal.get("goal_method") or ""),
+        "weekday": str(signal.get("weekday") or ""),
+        "holiday_name_inferred": str(signal.get("holiday_name_inferred") or ""),
         "thresholds": {
             "drop_lte_pct": DEFAULT_DROP_THRESHOLD_PCT,
             "lift_gte_pct": DEFAULT_LIFT_THRESHOLD_PCT,
         },
-        "weekday": str(row["weekday"]),
-        "holiday_name_inferred": str(row["holiday_name_inferred"] or ""),
     }
 
 
-def get_intraday_profile(city_id: int, dt: str) -> dict[str, Any]:
-    """Return the 24-hour intraday sales profile and deviation z-scores for one city-day."""
-    client = make_supabase_client()
-    resp = (
-        client.table("rca_city_hourly")
-        .select("hour, sales, sales_share, deviation_z, stockout_rate")
-        .eq("city_id", city_id)
-        .eq("dt", dt)
-        .order("hour")
-        .execute()
+def get_sales_context(city_id: int, dt: str, history_days: int = 14) -> dict[str, Any]:
+    rows = _fetch_city_history(
+        TABLE_SALES,
+        city_id,
+        dt,
+        columns="dt,total_sales,store_count,product_count,active_product_count,avg_sales_per_product",
+        limit=max(14, history_days + 2),
     )
-    rows = resp.data or []
-
-    if not rows:
-        return {
-            "city_id": city_id,
-            "dt": dt,
-            "available": False,
-            "note": "No intraday profile. Run 'rca build' to regenerate analytics.",
-        }
-
-    hourly = [
-        {
-            "hour": int(r["hour"]),
-            "sales": _round_float(r["sales"]),
-            "sales_share_pct": round(float(r["sales_share"]) * 100, 2) if r["sales_share"] is not None else None,
-            "deviation_z": _round_float(r["deviation_z"]),
-            "stockout_rate": _round_float(r["stockout_rate"]),
-        }
-        for r in rows
-    ]
-    notable = sorted(hourly, key=lambda h: abs(h["deviation_z"] or 0), reverse=True)[:4]
-
+    frame = pd.DataFrame(rows)
+    if frame.empty:
+        raise ValueError(f"No sales history found for city_id={city_id}")
+    frame["dt"] = pd.to_datetime(frame["dt"])
+    frame = frame.sort_values("dt").reset_index(drop=True)
+    frame["dt_label"] = frame["dt"].dt.strftime("%Y-%m-%d")
+    current = frame[frame["dt_label"] == dt]
+    if current.empty:
+        raise ValueError(f"No sales row found for city_id={city_id} dt={dt}")
+    current_row = current.iloc[0]
+    pos = int(current.index[0])
+    history = frame.iloc[max(0, pos - history_days) : pos + 1]
     return {
         "city_id": city_id,
         "dt": dt,
-        "available": True,
-        "hourly": hourly,
-        "notable_hours": notable,
+        "current_total_sales": _round_float(current_row["total_sales"]),
+        "store_count": int(current_row["store_count"]),
+        "product_count": int(current_row["product_count"]),
+        "active_product_count": int(current_row["active_product_count"]),
+        "avg_sales_per_product": _round_float(current_row["avg_sales_per_product"]),
+        "history": [
+            {
+                "dt": row.dt_label,
+                "total_sales": _round_float(row.total_sales),
+            }
+            for row in history.itertuples(index=False)
+        ],
     }
 
 
-def get_sales_context(city_id: int, dt: str, history_days: int = 7) -> dict[str, Any]:
-    signal_row = _get_signal_row(city_id, dt)
-    history = _get_history_slice(city_id, dt, days=history_days)
-    rows = [
-        {
-            "dt": row.dt_label,
-            "total_sales": _round_float(row.total_sales),
-            "weekday": str(row.weekday),
-            "holiday_name_inferred": str(row.holiday_name_inferred or ""),
-        }
-        for row in history.itertuples(index=False)
-    ]
+def get_inventory_context(city_id: int, dt: str) -> dict[str, Any]:
+    row = _fetch_one(TABLE_INVENTORY, city_id, dt)
     return {
         "city_id": city_id,
         "dt": dt,
-        "history_window_days": history_days,
-        "current_total_sales": _round_float(signal_row["total_sales"]),
-        "history": rows,
-        "sales_baselines": {
-            "previous_day_sales": _round_float(signal_row["previous_day_sales"]),
-            "trailing_7d_avg_sales": _round_float(signal_row["trailing_7d_avg_sales"]),
-            "same_weekday_4w_avg_sales": _round_float(signal_row["same_weekday_4w_avg_sales"]),
-            "business_target": _round_float(signal_row.get("business_target")),
-        },
+        "avg_stockout_hours": _round_float(row.get("avg_stockout_hours")),
+        "stockout_product_count": int(row.get("stockout_product_count") or 0),
+        "stockout_product_rate": _round_float(row.get("stockout_product_rate")),
+        "severe_stockout_product_count": int(row.get("severe_stockout_product_count") or 0),
+        "severe_stockout_product_rate": _round_float(row.get("severe_stockout_product_rate")),
+        "full_stockout_product_count": int(row.get("full_stockout_product_count") or 0),
+        "full_stockout_product_rate": _round_float(row.get("full_stockout_product_rate")),
+        "hourly_stockout_rate": [
+            _round_float(row.get(f"hour_{hour:02d}_stockout_rate"))
+            for hour in range(24)
+        ],
     }
 
 
-def get_stockout_context(city_id: int, dt: str) -> dict[str, Any]:
-    record = get_city_day_evidence(city_id, dt)
-    history = _get_history_slice(city_id, dt, days=7)
-    trailing_avg = (
-        _round_float(history["total_sales"].iloc[:-1].mean()) if len(history) > 1 else None
-    )
+def get_pricing_context(city_id: int, dt: str) -> dict[str, Any]:
+    row = _fetch_one(TABLE_PRICING, city_id, dt)
     return {
         "city_id": city_id,
         "dt": dt,
-        "avg_stockout_hours": _round_float(record["stockout"]["avg_stockout_hours"]),
-        "stockout_product_rate": _round_float(record["stockout"]["stockout_product_rate"]),
-        "severe_stockout_product_rate": _round_float(record["stockout"]["severe_stockout_product_rate"]),
-        "full_stockout_product_rate": _round_float(record["stockout"]["full_stockout_product_rate"]),
-        "hourly_stockout_rate_peak": _round_float(max(record["stockout"]["hourly_stockout_rate"])),
-        "current_total_sales": _round_float(record["sales"]["total_sales"]),
-        "recent_avg_sales": trailing_avg,
+        "avg_discount": _round_float(row.get("avg_discount")),
+        "min_discount": _round_float(row.get("min_discount")),
+        "discounted_product_count": int(row.get("discounted_product_count") or 0),
+        "discounted_product_rate": _round_float(row.get("discounted_product_rate")),
+        "deep_discounted_product_count": int(row.get("deep_discounted_product_count") or 0),
+        "deep_discounted_product_rate": _round_float(row.get("deep_discounted_product_rate")),
     }
 
 
-def get_stockout_baseline(city_id: int, dt: str, window: int = 30) -> dict[str, Any]:
-    """Return this city's rolling stockout baseline for the N days before dt."""
-    client = make_supabase_client()
-
-    from datetime import datetime, timedelta
-    dt_date = datetime.strptime(dt, "%Y-%m-%d").date()
-    window_start = (dt_date - timedelta(days=window)).isoformat()
-
-    resp = (
-        client.table("rca_city_series")
-        .select("dt, stockout_product_rate, severe_stockout_rate, full_stockout_product_rate, avg_stockout_hours")
-        .eq("city_id", city_id)
-        .lt("dt", dt)
-        .gte("dt", window_start)
-        .execute()
-    )
-    rows = resp.data or []
-
-    if not rows:
-        return {
-            "city_id": city_id,
-            "dt": dt,
-            "window_days": window,
-            "baseline_available": False,
-            "note": "No prior stockout data in window.",
-        }
-
-    avg_so = sum(r["stockout_product_rate"] or 0 for r in rows) / len(rows)
-    avg_severe = sum(r["severe_stockout_rate"] or 0 for r in rows) / len(rows)
-    avg_full = sum(r["full_stockout_product_rate"] or 0 for r in rows) / len(rows)
-    avg_hours = sum(r["avg_stockout_hours"] or 0 for r in rows) / len(rows)
-
-    current = get_city_day_evidence(city_id, dt)
-    cur_rate = current["stockout"]["stockout_product_rate"]
-    ratio = _round_float(cur_rate / avg_so) if avg_so > 0 else None
-
+def get_promotions_context(city_id: int, dt: str) -> dict[str, Any]:
+    row = _fetch_one(TABLE_PROMOTIONS, city_id, dt)
     return {
         "city_id": city_id,
         "dt": dt,
-        "window_days": len(rows),
-        "baseline_available": True,
-        "baseline": {
-            "avg_stockout_product_rate": _round_float(avg_so),
-            "avg_severe_stockout_product_rate": _round_float(avg_severe),
-            "avg_full_stockout_product_rate": _round_float(avg_full),
-            "avg_stockout_hours": _round_float(avg_hours),
-        },
-        "current_day": {
-            "stockout_product_rate": _round_float(cur_rate),
-            "severe_stockout_product_rate": _round_float(current["stockout"]["severe_stockout_product_rate"]),
-            "avg_stockout_hours": _round_float(current["stockout"]["avg_stockout_hours"]),
-        },
-        "stockout_rate_vs_baseline": ratio,
-        "interpretation": (
-            f"Current stockout rate is {ratio:.1f}x the {len(rows)}-day baseline."
-            if ratio is not None
-            else "Cannot compute ratio — baseline is zero."
-        ),
-    }
-
-
-def get_discount_context(city_id: int, dt: str) -> dict[str, Any]:
-    record = get_city_day_evidence(city_id, dt)
-    return {
-        "city_id": city_id,
-        "dt": dt,
-        "avg_discount": _round_float(record["discount"]["avg_discount"]),
-        "discounted_product_rate": _round_float(record["discount"]["discounted_product_rate"]),
-        "deep_discount_product_rate": _round_float(record["discount"]["deep_discount_product_rate"]),
-    }
-
-
-def get_activity_context(city_id: int, dt: str) -> dict[str, Any]:
-    record = get_city_day_evidence(city_id, dt)
-    return {
-        "city_id": city_id,
-        "dt": dt,
-        "activity_product_rate": _round_float(record["activity"]["activity_product_rate"]),
-        "activity_sales_share": _round_float(record["activity"]["activity_sales_share"]),
+        "activity_product_count": int(row.get("activity_product_count") or 0),
+        "activity_product_rate": _round_float(row.get("activity_product_rate")),
+        "activity_sales": _round_float(row.get("activity_sales")),
+        "activity_sales_share": _round_float(row.get("activity_sales_share")),
+        "caveat": "activity_flag is unlabeled and should be treated as an unknown internal activity indicator.",
     }
 
 
 def get_calendar_weather_context(city_id: int, dt: str) -> dict[str, Any]:
-    record = get_city_day_evidence(city_id, dt)
+    calendar = _fetch_one(TABLE_CALENDAR, city_id, dt)
+    weather = _fetch_one(TABLE_WEATHER, city_id, dt)
     return {
         "city_id": city_id,
         "dt": dt,
-        "weekday": record["holiday"]["weekday"],
-        "is_weekend": record["holiday"]["is_weekend"],
-        "holiday_name_inferred": record["holiday"]["holiday_name_inferred"],
-        "holiday_flag": record["holiday"]["holiday_flag"],
-        "precpt": _round_float(record["weather"]["precpt"]),
-        "avg_temperature": _round_float(record["weather"]["avg_temperature"]),
-        "avg_humidity": _round_float(record["weather"]["avg_humidity"]),
-        "avg_wind_level": _round_float(record["weather"]["avg_wind_level"]),
+        "weekday": str(calendar.get("weekday") or ""),
+        "is_weekend": bool(calendar.get("is_weekend")),
+        "holiday_flag": bool(calendar.get("holiday_flag")),
+        "holiday_name_inferred": str(calendar.get("holiday_name_inferred") or ""),
+        "holiday_caveat": "holiday names are inferred from date context, not source-labeled.",
+        "precpt": _round_float(weather.get("precpt")),
+        "avg_temperature": _round_float(weather.get("avg_temperature")),
+        "avg_humidity": _round_float(weather.get("avg_humidity")),
+        "avg_wind_level": _round_float(weather.get("avg_wind_level")),
     }
 
 
-def get_peer_city_context(city_id: int, dt: str) -> dict[str, Any]:
-    row = _get_signal_row(city_id, dt)
-    frame = _signal_frame()
-    daily = frame[frame["dt_label"] == str(row["dt_label"] if "dt_label" in row.index else dt)].copy()
-
-    # Density tier from the cached signal frame
-    density_tier = str(row.get("density_tier", "3") or "3")
-    tier_daily = daily[daily["density_tier"] == density_tier]
-
-    overall_avg = _round_float(daily["total_sales"].mean())
-    tier_avg = _round_float(tier_daily["total_sales"].mean())
-
-    rank = int(daily["total_sales"].rank(method="min", ascending=False)[daily["city_id"] == city_id].iloc[0])
-    tier_rank = int(
-        tier_daily["total_sales"].rank(method="min", ascending=False)[tier_daily["city_id"] == city_id].iloc[0]
-        if not tier_daily[tier_daily["city_id"] == city_id].empty
-        else 1
-    )
-
-    # Segment label for this city
-    segment_label = _get_city_segment(city_id)
-
-    return {
-        "city_id": city_id,
-        "dt": dt,
-        "density_tier": density_tier,
-        "segment_label": segment_label,
-        "city_total_sales": _round_float(row["total_sales"]),
-        "tier_avg_sales_same_day": tier_avg,
-        "overall_avg_sales_same_day": overall_avg,
-        "overall_rank_same_day": rank,
-        "overall_city_count": int(daily.shape[0]),
-        "tier_rank_same_day": tier_rank,
-        "tier_city_count": int(tier_daily.shape[0]),
-    }
-
-
-@lru_cache(maxsize=18)
-def _get_city_segment(city_id: int) -> str | None:
-    """Fetch segment label for a city from rca_city_segment (cached per city)."""
-    if not os.getenv("SUPABASE_URL"):
-        return None
-    try:
-        client = make_supabase_client()
-        resp = (
-            client.table("rca_city_segment")
-            .select("segment_label")
-            .eq("city_id", city_id)
-            .limit(1)
-            .execute()
+def get_intraday_profile(city_id: int, dt: str) -> dict[str, Any]:
+    sales = _fetch_one(TABLE_SALES, city_id, dt)
+    inventory = _fetch_one(TABLE_INVENTORY, city_id, dt)
+    hourly = []
+    total_sales = float(sales.get("total_sales") or 0.0)
+    for hour in range(24):
+        sales_value = float(sales.get(f"hour_{hour:02d}_sales") or 0.0)
+        share = sales_value / total_sales if total_sales > 0 else 0.0
+        hourly.append(
+            {
+                "hour": hour,
+                "sales": _round_float(sales_value),
+                "sales_share_pct": _round_float(share * 100.0, digits=2),
+                "stockout_rate": _round_float(inventory.get(f"hour_{hour:02d}_stockout_rate")),
+            }
         )
-        rows = resp.data or []
-        return str(rows[0]["segment_label"]) if rows and rows[0].get("segment_label") else None
-    except Exception:
-        return None
+    return {"city_id": city_id, "dt": dt, "hourly": hourly}
 
 
-def search_news(query: str, max_results: int = 5) -> dict[str, Any]:
+def compare_recent_baseline(city_id: int, dt: str, window: int = 7) -> dict[str, Any]:
+    cached = get_cached_evidence("compare_recent_baseline", {"city_id": city_id, "dt": dt, "window": window})
+    if cached is not None:
+        cached["cache_hit"] = True
+        return cached
+
+    rows = _fetch_city_history(TABLE_SALES, city_id, dt, columns="dt,total_sales", limit=60)
+    frame = pd.DataFrame(rows)
+    frame["dt"] = pd.to_datetime(frame["dt"])
+    frame = frame.sort_values("dt").reset_index(drop=True)
+    frame["dt_label"] = frame["dt"].dt.strftime("%Y-%m-%d")
+    current = frame[frame["dt_label"] == dt]
+    if current.empty:
+        raise ValueError(f"No sales row found for city_id={city_id} dt={dt}")
+    pos = int(current.index[0])
+    lookback = frame.iloc[max(0, pos - window) : pos]
+    baseline = float(lookback["total_sales"].mean()) if not lookback.empty else None
+    current_sales = float(current.iloc[0]["total_sales"])
+    delta_pct = ((current_sales - baseline) / baseline * 100.0) if baseline and baseline > 0 else None
+    result = {
+        "city_id": city_id,
+        "dt": dt,
+        "window": window,
+        "current_sales": _round_float(current_sales),
+        "baseline_sales": _round_float(baseline),
+        "delta_pct": _round_float(delta_pct),
+        "cache_hit": False,
+    }
+    put_cached_evidence("compare_recent_baseline", {"city_id": city_id, "dt": dt, "window": window}, result)
+    return result
+
+
+def compare_same_weekday_baseline(city_id: int, dt: str, weeks: int = 4) -> dict[str, Any]:
+    cached = get_cached_evidence("compare_same_weekday_baseline", {"city_id": city_id, "dt": dt, "weeks": weeks})
+    if cached is not None:
+        cached["cache_hit"] = True
+        return cached
+
+    rows = _fetch_city_history(TABLE_SALES, city_id, dt, columns="dt,total_sales", limit=90)
+    frame = pd.DataFrame(rows)
+    frame["dt"] = pd.to_datetime(frame["dt"])
+    frame = frame.sort_values("dt").reset_index(drop=True)
+    frame["dt_label"] = frame["dt"].dt.strftime("%Y-%m-%d")
+    frame["dow"] = frame["dt"].dt.dayofweek
+    current = frame[frame["dt_label"] == dt]
+    if current.empty:
+        raise ValueError(f"No sales row found for city_id={city_id} dt={dt}")
+    current_row = current.iloc[0]
+    lookback = frame[(frame["dt"] < current_row["dt"]) & (frame["dow"] == current_row["dow"])].tail(weeks)
+    baseline = float(lookback["total_sales"].mean()) if not lookback.empty else None
+    current_sales = float(current_row["total_sales"])
+    delta_pct = ((current_sales - baseline) / baseline * 100.0) if baseline and baseline > 0 else None
+    result = {
+        "city_id": city_id,
+        "dt": dt,
+        "weeks": weeks,
+        "current_sales": _round_float(current_sales),
+        "baseline_sales": _round_float(baseline),
+        "delta_pct": _round_float(delta_pct),
+        "cache_hit": False,
+    }
+    put_cached_evidence("compare_same_weekday_baseline", {"city_id": city_id, "dt": dt, "weeks": weeks}, result)
+    return result
+
+
+def detect_intraday_shift(city_id: int, dt: str, lookback_days: int = 7) -> dict[str, Any]:
+    cached = get_cached_evidence("detect_intraday_shift", {"city_id": city_id, "dt": dt, "lookback_days": lookback_days})
+    if cached is not None:
+        cached["cache_hit"] = True
+        return cached
+
+    rows = _fetch_city_history(TABLE_SALES, city_id, dt, columns="*", limit=60)
+    frame = pd.DataFrame(rows)
+    if frame.empty:
+        raise ValueError(f"No sales history found for city_id={city_id}")
+    frame["dt"] = pd.to_datetime(frame["dt"])
+    frame = frame.sort_values("dt").reset_index(drop=True)
+    frame["dt_label"] = frame["dt"].dt.strftime("%Y-%m-%d")
+    current = frame[frame["dt_label"] == dt]
+    if current.empty:
+        raise ValueError(f"No sales row found for city_id={city_id} dt={dt}")
+    pos = int(current.index[0])
+    history = frame.iloc[max(0, pos - lookback_days) : pos]
+    current_row = current.iloc[0]
+
+    def shares(row: pd.Series) -> list[float]:
+        total = float(row["total_sales"] or 0.0)
+        if total <= 0:
+            return [0.0] * 24
+        return [float(row[f"hour_{hour:02d}_sales"] or 0.0) / total for hour in range(24)]
+
+    current_shares = shares(current_row)
+    if history.empty:
+        baseline = [0.0] * 24
+    else:
+        baseline = list(pd.DataFrame([shares(row) for _, row in history.iterrows()]).mean())
+
+    deviations = [
+        {
+            "hour": hour,
+            "current_share_pct": _round_float(current_shares[hour] * 100.0, digits=2),
+            "baseline_share_pct": _round_float(baseline[hour] * 100.0, digits=2),
+            "delta_share_pct": _round_float((current_shares[hour] - baseline[hour]) * 100.0, digits=2),
+        }
+        for hour in range(24)
+    ]
+    notable_hours = sorted(deviations, key=lambda item: abs(item["delta_share_pct"] or 0.0), reverse=True)[:4]
+    result = {
+        "city_id": city_id,
+        "dt": dt,
+        "lookback_days": lookback_days,
+        "notable_hours": notable_hours,
+        "cache_hit": False,
+    }
+    put_cached_evidence("detect_intraday_shift", {"city_id": city_id, "dt": dt, "lookback_days": lookback_days}, result)
+    return result
+
+
+def get_memory_context(city_id: int, limit: int = 5) -> dict[str, Any]:
+    return {
+        "city_id": city_id,
+        "recent_memories": get_memory_notes(city_id, limit=limit),
+        "recent_outcomes": get_prior_outcomes(city_id, limit=limit),
+    }
+
+
+def search_external_events(city_id: int, dt: str, query: str, max_results: int = DEFAULT_NEWS_RESULTS) -> dict[str, Any]:
+    cached = get_cached_external_events(city_id, dt, query)
+    if cached:
+        return {
+            "city_id": city_id,
+            "dt": dt,
+            "query": query,
+            "results": [
+                row.get("result_json") or {
+                    "source": row.get("source"),
+                    "title": row.get("title"),
+                    "url": row.get("url"),
+                    "snippet": row.get("snippet"),
+                    "published_at": row.get("published_at"),
+                }
+                for row in cached
+            ],
+            "cache_hit": True,
+        }
+
     from duckduckgo_search import DDGS
+
     results = []
-    try:
-        with DDGS() as ddgs:
-            for r in ddgs.text(query, max_results=max_results):
-                results.append({
-                    "title": r.get("title", ""),
-                    "url": r.get("href", ""),
-                    "snippet": r.get("body", ""),
-                })
-    except Exception as exc:
-        return {"query": query, "error": str(exc), "results": []}
-    return {"query": query, "result_count": len(results), "results": results}
-
-
-def get_prior_rca(city_id: int) -> dict[str, Any]:
-    return load_prior_rca(city_id)
-
-
-# ---------------------------------------------------------------------------
-# Tool registry
-# ---------------------------------------------------------------------------
+    with DDGS() as ddgs:
+        for item in ddgs.text(query, max_results=max_results):
+            results.append(
+                {
+                    "source": "duckduckgo",
+                    "title": item.get("title", ""),
+                    "url": item.get("href", ""),
+                    "snippet": item.get("body", ""),
+                    "published_at": item.get("date"),
+                }
+            )
+    cache_external_events(city_id, dt, query, results)
+    return {"city_id": city_id, "dt": dt, "query": query, "results": results, "cache_hit": False}
 
 
 TOOL_REGISTRY: dict[str, dict[str, Any]] = {
     "get_signal_evidence": {
-        "description": "Get the precomputed city-day sales trigger signal and baseline comparisons.",
+        "description": "Get the city/date signal row and expected-sales comparison.",
         "parameters": {
             "type": "object",
-            "properties": {
-                "city_id": {"type": "integer"},
-                "dt": {"type": "string"},
-            },
+            "properties": {"city_id": {"type": "integer"}, "dt": {"type": "string"}},
             "required": ["city_id", "dt"],
             "additionalProperties": False,
         },
         "function": get_signal_evidence,
     },
     "get_sales_context": {
-        "description": "Get current sales plus recent city sales history and baseline windows.",
+        "description": "Get recent sales history and city/date sales facts.",
         "parameters": {
             "type": "object",
             "properties": {
                 "city_id": {"type": "integer"},
                 "dt": {"type": "string"},
-                "history_days": {"type": "integer", "minimum": 3, "maximum": 14},
+                "history_days": {"type": "integer", "minimum": 3, "maximum": 30, "default": 14},
             },
             "required": ["city_id", "dt"],
             "additionalProperties": False,
         },
         "function": get_sales_context,
     },
-    "get_stockout_context": {
-        "description": "Get stockout evidence for one city-day.",
+    "get_inventory_context": {
+        "description": "Get stockout and availability facts for one city/date.",
         "parameters": {
             "type": "object",
-            "properties": {
-                "city_id": {"type": "integer"},
-                "dt": {"type": "string"},
-            },
+            "properties": {"city_id": {"type": "integer"}, "dt": {"type": "string"}},
             "required": ["city_id", "dt"],
             "additionalProperties": False,
         },
-        "function": get_stockout_context,
+        "function": get_inventory_context,
     },
-    "get_stockout_baseline": {
-        "description": (
-            "Get this city's rolling stockout baseline for the N days before the trigger date. "
-            "Returns the baseline average rates and the ratio of today's rate to the baseline."
-        ),
+    "get_pricing_context": {
+        "description": "Get discount facts for one city/date.",
         "parameters": {
             "type": "object",
-            "properties": {
-                "city_id": {"type": "integer"},
-                "dt": {"type": "string"},
-                "window": {
-                    "type": "integer",
-                    "minimum": 7,
-                    "maximum": 60,
-                    "default": 30,
-                    "description": "Number of days before dt to average over.",
-                },
-            },
+            "properties": {"city_id": {"type": "integer"}, "dt": {"type": "string"}},
             "required": ["city_id", "dt"],
             "additionalProperties": False,
         },
-        "function": get_stockout_baseline,
+        "function": get_pricing_context,
     },
-    "get_discount_context": {
-        "description": "Get discount evidence for one city-day.",
+    "get_promotions_context": {
+        "description": "Get unlabeled activity flag facts for one city/date.",
         "parameters": {
             "type": "object",
-            "properties": {
-                "city_id": {"type": "integer"},
-                "dt": {"type": "string"},
-            },
+            "properties": {"city_id": {"type": "integer"}, "dt": {"type": "string"}},
             "required": ["city_id", "dt"],
             "additionalProperties": False,
         },
-        "function": get_discount_context,
-    },
-    "get_activity_context": {
-        "description": "Get promotional activity evidence for one city-day.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "city_id": {"type": "integer"},
-                "dt": {"type": "string"},
-            },
-            "required": ["city_id", "dt"],
-            "additionalProperties": False,
-        },
-        "function": get_activity_context,
+        "function": get_promotions_context,
     },
     "get_calendar_weather_context": {
-        "description": "Get holiday, weekday, weekend, and weather context for one city-day.",
+        "description": "Get holiday, weekday, weekend, and weather context for one city/date.",
         "parameters": {
             "type": "object",
-            "properties": {
-                "city_id": {"type": "integer"},
-                "dt": {"type": "string"},
-            },
+            "properties": {"city_id": {"type": "integer"}, "dt": {"type": "string"}},
             "required": ["city_id", "dt"],
             "additionalProperties": False,
         },
         "function": get_calendar_weather_context,
     },
-    "get_peer_city_context": {
-        "description": "Compare this city against same-day peers in its density tier group.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "city_id": {"type": "integer"},
-                "dt": {"type": "string"},
-            },
-            "required": ["city_id", "dt"],
-            "additionalProperties": False,
-        },
-        "function": get_peer_city_context,
-    },
-    "search_news": {
-        "description": "Search the web for news or events relevant to a retail sales move.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "query": {"type": "string"},
-                "max_results": {"type": "integer", "minimum": 1, "maximum": 10, "default": 5},
-            },
-            "required": ["query"],
-            "additionalProperties": False,
-        },
-        "function": search_news,
-    },
     "get_intraday_profile": {
-        "description": (
-            "Get the 24-hour hourly sales profile for one city-day, including deviation z-scores "
-            "vs the city's typical hourly shape."
-        ),
+        "description": "Get hourly sales share and hourly stockout rates for one city/date.",
         "parameters": {
             "type": "object",
-            "properties": {
-                "city_id": {"type": "integer"},
-                "dt": {"type": "string"},
-            },
+            "properties": {"city_id": {"type": "integer"}, "dt": {"type": "string"}},
             "required": ["city_id", "dt"],
             "additionalProperties": False,
         },
         "function": get_intraday_profile,
     },
-    "get_prior_rca": {
-        "description": "Get prior RCA outcomes for this city from Supabase run history.",
+    "compare_recent_baseline": {
+        "description": "Compare current sales to a recent rolling baseline.",
         "parameters": {
             "type": "object",
             "properties": {
                 "city_id": {"type": "integer"},
+                "dt": {"type": "string"},
+                "window": {"type": "integer", "minimum": 3, "maximum": 28, "default": 7},
+            },
+            "required": ["city_id", "dt"],
+            "additionalProperties": False,
+        },
+        "function": compare_recent_baseline,
+    },
+    "compare_same_weekday_baseline": {
+        "description": "Compare current sales to prior same-weekday history.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "city_id": {"type": "integer"},
+                "dt": {"type": "string"},
+                "weeks": {"type": "integer", "minimum": 2, "maximum": 8, "default": 4},
+            },
+            "required": ["city_id", "dt"],
+            "additionalProperties": False,
+        },
+        "function": compare_same_weekday_baseline,
+    },
+    "detect_intraday_shift": {
+        "description": "Compare the current intraday sales shape to recent history.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "city_id": {"type": "integer"},
+                "dt": {"type": "string"},
+                "lookback_days": {"type": "integer", "minimum": 3, "maximum": 21, "default": 7},
+            },
+            "required": ["city_id", "dt"],
+            "additionalProperties": False,
+        },
+        "function": detect_intraday_shift,
+    },
+    "get_memory_context": {
+        "description": "Retrieve recent lessons and outcome summaries for the city.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "city_id": {"type": "integer"},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 10, "default": 5},
             },
             "required": ["city_id"],
             "additionalProperties": False,
         },
-        "function": get_prior_rca,
+        "function": get_memory_context,
+    },
+    "search_external_events": {
+        "description": "Search the web for external events or news that may explain the city/date move.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "city_id": {"type": "integer"},
+                "dt": {"type": "string"},
+                "query": {"type": "string"},
+                "max_results": {"type": "integer", "minimum": 1, "maximum": 10, "default": DEFAULT_NEWS_RESULTS},
+            },
+            "required": ["city_id", "dt", "query"],
+            "additionalProperties": False,
+        },
+        "function": search_external_events,
     },
 }
 
 
 def get_tool_schemas(tool_names: list[str] | tuple[str, ...] | None = None) -> list[dict[str, Any]]:
-    schemas: list[dict[str, Any]] = []
     names = list(tool_names) if tool_names is not None else list(TOOL_REGISTRY.keys())
+    schemas = []
     for name in names:
         tool = TOOL_REGISTRY[name]
         schemas.append(
@@ -562,6 +552,14 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         coerced = dict(arguments)
         if "city_id" in coerced:
             coerced["city_id"] = int(coerced["city_id"])
+        if "history_days" in coerced:
+            coerced["history_days"] = int(coerced["history_days"])
+        if "window" in coerced:
+            coerced["window"] = int(coerced["window"])
+        if "weeks" in coerced:
+            coerced["weeks"] = int(coerced["weeks"])
+        if "lookback_days" in coerced:
+            coerced["lookback_days"] = int(coerced["lookback_days"])
         return function(**coerced)
-    except Exception as e:
-        return {"error": str(e)}
+    except Exception as exc:
+        return {"error": str(exc)}
