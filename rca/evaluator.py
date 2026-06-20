@@ -145,15 +145,29 @@ def evaluate_benchmark(
 
 
 def _resolve_scenario_dirs(run_dir: Path) -> dict[str, Path]:
+    """Locate scenario subdirs inside a bench run or a single run dir.
+
+    Bench layout:  <run_dir>/<scenario_id>/coordinator_trace.json
+    Single layout: <run_dir>/coordinator_trace.json
+    """
     direct_trace = run_dir / "coordinator_trace.json"
     if direct_trace.exists():
         return {run_dir.name: run_dir}
 
+    # Bench layout — scan for any subdir with a coordinator_trace.json
     scenario_dirs: dict[str, Path] = {}
-    for scenario in SCENARIOS:
-        candidate = run_dir / scenario.scenario_id / "coordinator_trace.json"
-        if candidate.exists():
-            scenario_dirs[scenario.scenario_id] = candidate.parent
+    for child in sorted(run_dir.iterdir()):
+        if not child.is_dir():
+            continue
+        trace = child / "coordinator_trace.json"
+        if trace.exists():
+            scenario_dirs[child.name] = child
+
+    if not scenario_dirs:
+        raise FileNotFoundError(
+            f"No coordinator_trace.json found in {run_dir} or its subdirectories. "
+            "Run 'rca bench' first, then pass the bench run directory with --run-dir."
+        )
     return scenario_dirs
 
 

@@ -215,7 +215,12 @@ def _cmd_run(args: argparse.Namespace) -> None:
 
 def _cmd_bench(args: argparse.Namespace) -> None:
     from rca.bench import run_benchmark
-    run_benchmark()
+    client_factory = None
+    if getattr(args, "dry_run", False):
+        from rca.stubclient import stub_client_factory
+        client_factory = stub_client_factory
+        print("[dry-run] Using stub LLM client for benchmark.")
+    run_benchmark(client_factory=client_factory)
 
 
 def _cmd_dashboard(args: argparse.Namespace) -> None:
@@ -317,10 +322,18 @@ def _cmd_eval(args: argparse.Namespace) -> None:
     if args.run_dir:
         run_dir = Path(args.run_dir)
     else:
-        run_dirs = sorted([path for path in AGENT_BENCHMARK_PATH.iterdir() if path.is_dir()])
-        if not run_dirs:
-            raise RuntimeError("No benchmark runs found. Run `rca bench` first or pass --run-dir.")
-        run_dir = run_dirs[-1]
+        # Sort by mtime descending — most recent run first.
+        # Bench runs contain scenario subdirs; single runs have coordinator_trace.json at root.
+        all_dirs = [p for p in AGENT_BENCHMARK_PATH.iterdir() if p.is_dir()]
+        if not all_dirs:
+            raise RuntimeError("No benchmark runs found. Run 'rca bench' first or pass --run-dir.")
+        # Prefer a bench run dir (has subdirectories with traces) over a single-run dir
+        bench_dirs = [
+            p for p in all_dirs
+            if any((p / child.name / "coordinator_trace.json").exists() for child in p.iterdir() if child.is_dir())
+        ]
+        candidates = bench_dirs if bench_dirs else all_dirs
+        run_dir = max(candidates, key=lambda p: p.stat().st_mtime)
 
     payload = evaluate_benchmark(run_dir=run_dir, settings=settings, client_factory=client_factory)
     print(f"Evaluation written to {run_dir / 'eval_report.md'}")
@@ -432,6 +445,12 @@ def main() -> None:
     bench_parser = subparsers.add_parser(
         "bench",
         help="Run benchmark batch over the 6 fixed scenarios",
+    )
+    bench_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        dest="dry_run",
+        help="Use stub LLM client — no API calls",
     )
     bench_parser.set_defaults(func=_cmd_bench)
 

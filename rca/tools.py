@@ -146,6 +146,83 @@ def get_stockout_context(store_alias: str, dt: str) -> dict[str, Any]:
     }
 
 
+def get_stockout_baseline(
+    store_alias: str,
+    dt: str,
+    window: int = 30,
+) -> dict[str, Any]:
+    """Return this store's rolling stockout baseline for the N days before dt.
+
+    Lets the ops analyst say '2x the 30-day average' rather than having no anchor.
+    """
+    import duckdb
+    from rca.config import DB_PATH
+
+    try:
+        con = duckdb.connect(str(DB_PATH), read_only=True)
+        row = con.execute(
+            """
+            SELECT
+                AVG(stockout_product_rate)        AS avg_stockout_product_rate,
+                AVG(severe_stockout_product_rate) AS avg_severe_stockout_product_rate,
+                AVG(full_stockout_product_rate)   AS avg_full_stockout_product_rate,
+                AVG(avg_stockout_hours)           AS avg_stockout_hours,
+                COUNT(*)                          AS days_in_window
+            FROM fact_stockout_store_day
+            WHERE store_alias = ?
+              AND dt < CAST(? AS DATE)
+              AND dt >= CAST(? AS DATE) - INTERVAL (?) DAY
+            """,
+            [store_alias, dt, dt, window],
+        ).fetchone()
+        con.close()
+    except Exception as exc:
+        return {"store_alias": store_alias, "dt": dt, "window_days": window, "error": str(exc)}
+
+    if row is None or row[4] == 0:
+        return {
+            "store_alias": store_alias,
+            "dt": dt,
+            "window_days": window,
+            "baseline_available": False,
+            "note": "No prior stockout data in window.",
+        }
+
+    current = get_store_day_evidence(store_alias, dt)
+    cur_rate = current["stockout"]["stockout_product_rate"]
+    baseline_rate = float(row[0]) if row[0] is not None else None
+
+    ratio = None
+    if baseline_rate and baseline_rate > 0:
+        ratio = _round_float(cur_rate / baseline_rate)
+
+    return {
+        "store_alias": store_alias,
+        "dt": dt,
+        "window_days": int(row[4]),
+        "baseline_available": True,
+        "baseline": {
+            "avg_stockout_product_rate": _round_float(row[0]),
+            "avg_severe_stockout_product_rate": _round_float(row[1]),
+            "avg_full_stockout_product_rate": _round_float(row[2]),
+            "avg_stockout_hours": _round_float(row[3]),
+        },
+        "current_day": {
+            "stockout_product_rate": _round_float(cur_rate),
+            "severe_stockout_product_rate": _round_float(
+                current["stockout"]["severe_stockout_product_rate"]
+            ),
+            "avg_stockout_hours": _round_float(current["stockout"]["avg_stockout_hours"]),
+        },
+        "stockout_rate_vs_baseline": ratio,
+        "interpretation": (
+            f"Current stockout rate is {ratio:.1f}x the {int(row[4])}-day baseline."
+            if ratio is not None
+            else "Cannot compute ratio — baseline is zero."
+        ),
+    }
+
+
 def get_discount_context(store_alias: str, dt: str) -> dict[str, Any]:
     record = get_store_day_evidence(store_alias, dt)
     return {
@@ -279,6 +356,30 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
             "additionalProperties": False,
         },
         "function": get_stockout_context,
+    },
+    "get_stockout_baseline": {
+        "description": (
+            "Get this store's rolling stockout baseline for the N days before the trigger date. "
+            "Returns the baseline average rates and the ratio of today's rate to the baseline, "
+            "so you can say '2x the 30-day average' rather than citing raw numbers with no anchor."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "store_alias": {"type": "string"},
+                "dt": {"type": "string"},
+                "window": {
+                    "type": "integer",
+                    "minimum": 7,
+                    "maximum": 60,
+                    "default": 30,
+                    "description": "Number of days before dt to average over.",
+                },
+            },
+            "required": ["store_alias", "dt"],
+            "additionalProperties": False,
+        },
+        "function": get_stockout_baseline,
     },
     "get_discount_context": {
         "description": "Get discount evidence for one store-day.",

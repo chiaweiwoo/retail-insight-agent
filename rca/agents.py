@@ -24,6 +24,7 @@ from rca.tools import (
     get_activity_context,
     get_discount_context,
     get_signal_evidence,
+    get_stockout_baseline,
     get_stockout_context,
     get_tool_schemas,
 )
@@ -100,7 +101,7 @@ ANALYST_SPECS: tuple[AnalystSpec, ...] = (
     AnalystSpec(
         name="ops_analyst",
         focus="operations — stockout and product availability assessment",
-        tool_names=("get_stockout_context", "get_sales_context"),
+        tool_names=("get_stockout_context", "get_stockout_baseline", "get_sales_context"),
         system_prompt=_analyst_prompt(
             role="Operations Analyst",
             domain_instructions=(

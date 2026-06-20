@@ -12,7 +12,7 @@ from rca.tools import get_signal_evidence
 @dataclass(frozen=True)
 class BenchmarkScenario:
     scenario_id: str
-    tier: str
+    signal_strength: str  # high / medium / low — how strong the signal was
     expected_signal: str
     store_alias: str
     dt: str
@@ -129,11 +129,19 @@ def _build_manifest_markdown(
     return "\n".join(lines) + "\n"
 
 
-def run_benchmark() -> None:
-    from rca.llm import load_llm_settings
+def run_benchmark(client_factory=None) -> None:
+    from rca.llm import load_llm_settings, LLMSettings
     from rca.agents import run_coordinator
 
-    settings = load_llm_settings()
+    if client_factory is not None:
+        settings = LLMSettings(
+            api_key="dry-run",
+            base_url="https://api.deepseek.com",
+            model="deepseek-v4-flash",
+            thinking_enabled=False,
+        )
+    else:
+        settings = load_llm_settings()
     timestamp_label = current_timestamp_sgt_label()
     run_dir = AGENT_BENCHMARK_PATH / timestamp_label
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -145,6 +153,7 @@ def run_benchmark() -> None:
             store_alias=scenario.store_alias,
             dt=scenario.dt,
             settings=settings,
+            client_factory=client_factory,
             output_dir=scenario_dir,
         )
         payload = _result_payload(
