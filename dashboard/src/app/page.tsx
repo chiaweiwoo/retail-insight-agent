@@ -64,7 +64,7 @@ export default async function CitiesPage() {
         </div>
       </div>
 
-      <div className="glass-panel overflow-x-auto rounded-2xl border border-white/5 bg-slate-900/50 relative">
+      <div className="glass-panel overflow-x-auto overscroll-x-none rounded-2xl border border-white/5 bg-slate-900/50 relative">
         <table className="w-full text-left border-collapse">
           <thead>
             <tr>
