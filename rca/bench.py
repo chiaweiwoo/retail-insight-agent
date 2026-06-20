@@ -18,13 +18,17 @@ class BenchmarkScenario:
     dt: str
 
 
+# city_id values are integer placeholders (0–17). The dates and signal_strength labels
+# were inherited from the old store-era bench; re-verify actual city signals in Round C2
+# when rca analyze runs on the restudied distribution. In Round D these scenarios will be
+# replaced by rca replay which replays real trigger days chronologically.
 SCENARIOS: tuple[BenchmarkScenario, ...] = (
-    BenchmarkScenario("drop_high_h555_2024-05-16", "high", "drop", "h555", "2024-05-16"),
-    BenchmarkScenario("drop_medium_m041_2024-05-09", "medium", "drop", "m041", "2024-05-09"),
-    BenchmarkScenario("drop_low_l165_2024-05-16", "low", "drop", "l165", "2024-05-16"),
-    BenchmarkScenario("lift_high_h235_2024-05-05", "high", "lift", "h235", "2024-05-05"),
-    BenchmarkScenario("lift_medium_m041_2024-05-12", "medium", "lift", "m041", "2024-05-12"),
-    BenchmarkScenario("lift_low_l185_2024-04-13", "low", "lift", "l185", "2024-04-13"),
+    BenchmarkScenario("drop_high_h555_2024-05-16", "high", "drop", 0, "2024-05-16"),
+    BenchmarkScenario("drop_medium_m041_2024-05-09", "medium", "drop", 1, "2024-05-09"),
+    BenchmarkScenario("drop_low_l165_2024-05-16", "low", "drop", 2, "2024-05-16"),
+    BenchmarkScenario("lift_high_h235_2024-05-05", "high", "lift", 3, "2024-05-05"),
+    BenchmarkScenario("lift_medium_m041_2024-05-12", "medium", "lift", 4, "2024-05-12"),
+    BenchmarkScenario("lift_low_l185_2024-04-13", "low", "lift", 5, "2024-04-13"),
 )
 
 

@@ -46,14 +46,14 @@ def _safe_pct_change(current: pd.Series, baseline: pd.Series) -> pd.Series:
 def build_sales_signal_frame(frame: pd.DataFrame) -> pd.DataFrame:
     signals = frame.copy().sort_values(["city_id", "dt"]).reset_index(drop=True)
 
-    by_store = signals.groupby("city_id", group_keys=False)
-    signals["previous_day_sales"] = by_store["total_sales"].shift(1)
-    signals["trailing_7d_avg_sales"] = by_store["total_sales"].transform(
+    by_city = signals.groupby("city_id", group_keys=False)
+    signals["previous_day_sales"] = by_city["total_sales"].shift(1)
+    signals["trailing_7d_avg_sales"] = by_city["total_sales"].transform(
         lambda series: series.shift(1).rolling(window=7, min_periods=MIN_BASELINE_OBSERVATIONS).mean()
     )
 
-    by_store_weekday = signals.groupby(["city_id", "weekday"], group_keys=False)
-    signals["same_weekday_4w_avg_sales"] = by_store_weekday["total_sales"].transform(
+    by_city_weekday = signals.groupby(["city_id", "weekday"], group_keys=False)
+    signals["same_weekday_4w_avg_sales"] = by_city_weekday["total_sales"].transform(
         lambda series: series.shift(1).rolling(window=4, min_periods=MIN_BASELINE_OBSERVATIONS).mean()
     )
 
@@ -146,17 +146,17 @@ def summarize_signal_distribution(signals: pd.DataFrame) -> dict[str, pd.DataFra
                     }
                 )
 
-    store_rows: list[dict[str, float | str | int]] = []
-    for city_id, store_frame in signals.groupby("city_id"):
-        store_rows.append(
+    city_rows: list[dict[str, float | str | int]] = []
+    for city_id, city_frame in signals.groupby("city_id"):
+        city_rows.append(
             {
                 "city_id": str(city_id),
-                "avg_sales": float(store_frame["total_sales"].mean()),
-                "sales_std": float(store_frame["total_sales"].std()),
-                "day_over_day_pct_std": float(store_frame["day_over_day_pct_change"].dropna().std()),
-                "trailing_7d_pct_std": float(store_frame["trailing_7d_pct_change"].dropna().std()),
+                "avg_sales": float(city_frame["total_sales"].mean()),
+                "sales_std": float(city_frame["total_sales"].std()),
+                "day_over_day_pct_std": float(city_frame["day_over_day_pct_change"].dropna().std()),
+                "trailing_7d_pct_std": float(city_frame["trailing_7d_pct_change"].dropna().std()),
                 "same_weekday_4w_pct_std": float(
-                    store_frame["same_weekday_4w_pct_change"].dropna().std()
+                    city_frame["same_weekday_4w_pct_change"].dropna().std()
                 ),
             }
         )
@@ -164,7 +164,7 @@ def summarize_signal_distribution(signals: pd.DataFrame) -> dict[str, pd.DataFra
     return {
         "distribution": pd.DataFrame(distribution_rows),
         "thresholds": pd.DataFrame(threshold_rows),
-        "store_stability": pd.DataFrame(store_rows).sort_values("avg_sales", ascending=False),
+        "city_stability": pd.DataFrame(city_rows).sort_values("avg_sales", ascending=False),
     }
 
 
@@ -198,20 +198,20 @@ def summarize_pct_trigger_distribution(
             }
         )
 
-        for city_id, store_frame in eligible.groupby("city_id"):
-            store_drop_mask = store_frame[metric] <= -pct_threshold
-            store_lift_mask = store_frame[metric] >= pct_threshold
-            store_trigger_count = int((store_drop_mask | store_lift_mask).sum())
+        for city_id, city_frame in eligible.groupby("city_id"):
+            city_drop_mask = city_frame[metric] <= -pct_threshold
+            city_lift_mask = city_frame[metric] >= pct_threshold
+            city_trigger_count = int((city_drop_mask | city_lift_mask).sum())
             per_store_rows.append(
                 {
                     "metric": metric,
                     "pct_threshold": pct_threshold,
                     "city_id": str(city_id),
-                    "eligible_days": int(store_frame.shape[0]),
-                    "drop_days": int(store_drop_mask.sum()),
-                    "lift_days": int(store_lift_mask.sum()),
-                    "triggered_days": store_trigger_count,
-                    "trigger_rate_pct": float((store_trigger_count / store_frame.shape[0]) * 100.0),
+                    "eligible_days": int(city_frame.shape[0]),
+                    "drop_days": int(city_drop_mask.sum()),
+                    "lift_days": int(city_lift_mask.sum()),
+                    "triggered_days": city_trigger_count,
+                    "trigger_rate_pct": float((city_trigger_count / city_frame.shape[0]) * 100.0),
                 }
             )
 

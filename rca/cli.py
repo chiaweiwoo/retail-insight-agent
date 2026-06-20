@@ -146,7 +146,7 @@ def _cmd_analyze(args: argparse.Namespace) -> None:
     signals.to_csv(analysis_dir / "store_day_sales_signals.csv", index=False)
     summary_tables["distribution"].to_csv(analysis_dir / "signal_distribution_summary.csv", index=False)
     summary_tables["thresholds"].to_csv(analysis_dir / "signal_threshold_grid.csv", index=False)
-    summary_tables["store_stability"].to_csv(analysis_dir / "store_signal_stability.csv", index=False)
+    summary_tables["city_stability"].to_csv(analysis_dir / "store_signal_stability.csv", index=False)
     pct_trigger_tables["overall"].to_csv(analysis_dir / "pct_trigger_overall_summary.csv", index=False)
     pct_trigger_tables["per_store"].to_csv(analysis_dir / "pct_trigger_by_store.csv", index=False)
     pct_trigger_tables["per_date"].to_csv(analysis_dir / "pct_trigger_by_date.csv", index=False)
@@ -195,10 +195,10 @@ def _cmd_run(args: argparse.Namespace) -> None:
     if not args.quick:
         from rca.config import PROJECT_ROOT
         label = "dry_run" if args.dry_run else current_timestamp_sgt_label()
-        output_dir = PROJECT_ROOT / "data" / "analysis" / "agent_benchmark_runs" / f"{args.store}_{args.dt}_{label}"
+        output_dir = PROJECT_ROOT / "data" / "analysis" / "agent_benchmark_runs" / f"city{args.city}_{args.dt}_{label}"
 
     result = run_rca_graph(
-        city_id=args.store,
+        city_id=args.city,
         dt=args.dt,
         specialists=specialists,
         client_factory=client_factory,
@@ -265,7 +265,7 @@ def _cmd_runs(args: argparse.Namespace) -> None:
     result = (
         client
         .table("rca_outcome")
-        .select("run_name,store_id,dt,signal_label,confidence,escalated,brief_headline,created_at")
+        .select("run_name,city_id,dt,signal_label,confidence,escalated,brief_headline,created_at")
         .order("created_at", desc=True)
         .limit(30)
         .execute()
@@ -276,10 +276,10 @@ def _cmd_runs(args: argparse.Namespace) -> None:
         print("No runs recorded yet.")
         sys.exit(0)
 
-    col = {"run_name": 40, "store_id": 8, "dt": 12, "conf": 8}
+    col = {"run_name": 40, "city_id": 7, "dt": 12, "conf": 8}
     header = (
         f"{'run':<{col['run_name']}}  "
-        f"{'store':<{col['store_id']}}  "
+        f"{'city':<{col['city_id']}}  "
         f"{'dt':<{col['dt']}}  "
         f"{'conf':<{col['conf']}}  "
         f"headline"
@@ -291,7 +291,7 @@ def _cmd_runs(args: argparse.Namespace) -> None:
         escalated = " [ESC]" if row.get("escalated") else ""
         print(
             f"{str(row.get('run_name','')):<{col['run_name']}}  "
-            f"{str(row.get('store_id','')):<{col['store_id']}}  "
+            f"{str(row.get('city_id','')):<{col['city_id']}}  "
             f"{str(row.get('dt','')):<{col['dt']}}  "
             f"{str(row.get('confidence','')):<{col['conf']}}  "
             f"{row.get('brief_headline','')}{escalated}"
@@ -382,7 +382,7 @@ def _cmd_mcp(args: argparse.Namespace) -> None:
 def _cmd_distil(args: argparse.Namespace) -> None:
     import os
     from rca.llm import load_llm_settings, LLMSettings
-    from rca.profiles import distil_store_profile, distil_all_stores
+    from rca.profiles import distil_city_profile, distil_all_cities
 
     dry_run = getattr(args, "dry_run", False)
     client_factory = None
@@ -404,21 +404,21 @@ def _cmd_distil(args: argparse.Namespace) -> None:
             return
         settings = load_llm_settings()
 
-    if args.store:
-        profile = distil_store_profile(
-            args.store, settings=settings, client_factory=client_factory, dry_run=dry_run
+    if args.city is not None:
+        profile = distil_city_profile(
+            args.city, settings=settings, client_factory=client_factory, dry_run=dry_run
         )
-        print(f"Profile for {args.store}:")
+        print(f"Profile for city {args.city}:")
         print(profile)
         if not dry_run:
             print(f"\nWritten to Supabase rca_city_profile.")
     else:
-        results = distil_all_stores(settings=settings, client_factory=client_factory, dry_run=dry_run)
+        results = distil_all_cities(settings=settings, client_factory=client_factory, dry_run=dry_run)
         if not results:
-            print("No stores with prior outcomes found.")
+            print("No cities with prior outcomes found.")
             return
         for city_id, profile in results:
-            print(f"\n--- {city_id} ---")
+            print(f"\n--- city {city_id} ---")
             print(profile)
         if not dry_run:
             print(f"\nWritten {len(results)} profiles to Supabase rca_city_profile.")
@@ -426,20 +426,20 @@ def _cmd_distil(args: argparse.Namespace) -> None:
 
 def _cmd_reset_memory(args: argparse.Namespace) -> None:
     import os
-    from rca.profiles import reset_store_profile
+    from rca.profiles import reset_city_profile
 
     if not os.getenv("SUPABASE_URL"):
         print("SUPABASE_URL not set — nothing to reset.")
         return
 
-    if args.store:
-        count = reset_store_profile(args.store)
-        print(f"Deleted profile for {args.store} ({count} row(s) removed).")
+    if args.city is not None:
+        count = reset_city_profile(args.city)
+        print(f"Deleted profile for city {args.city} ({count} row(s) removed).")
     elif args.all:
-        count = reset_store_profile(city_id=None)
-        print(f"Deleted all store profiles ({count} row(s) removed).")
+        count = reset_city_profile(city_id=None)
+        print(f"Deleted all city profiles ({count} row(s) removed).")
     else:
-        print("Specify --store ALIAS or --all.")
+        print("Specify --city ID or --all.")
 
 
 def _cmd_sync(args: argparse.Namespace) -> None:
@@ -450,13 +450,13 @@ def _cmd_sync(args: argparse.Namespace) -> None:
         print("Local DuckDB not found. Run 'rca build' first.")
         return
 
-    print("Syncing store_series to Supabase...")
+    print("Syncing city_series to Supabase...")
     series_count = sync_series_to_supabase()
-    print(f"  Upserted {series_count} store-day rows.")
+    print(f"  Upserted {series_count} city-day rows.")
 
-    print("Syncing store_normals to Supabase...")
+    print("Syncing city_normals to Supabase...")
     normals_count = sync_normals_to_supabase()
-    print(f"  Upserted {normals_count} store baselines.")
+    print(f"  Upserted {normals_count} city baselines.")
 
     print("Sync complete.")
 
@@ -464,7 +464,7 @@ def _cmd_sync(args: argparse.Namespace) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="rca",
-        description="Retail Insight Agent — root cause analysis for store sales signals",
+        description="Retail Insight Agent — root cause analysis for city-aggregate sales signals",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -485,9 +485,9 @@ def main() -> None:
     # rca run
     run_parser = subparsers.add_parser(
         "run",
-        help="Run the coordinator pipeline for one store-day",
+        help="Run the coordinator pipeline for one city-day",
     )
-    run_parser.add_argument("--store", required=True, help="Store alias (e.g. h555)")
+    run_parser.add_argument("--city", required=True, type=int, help="City ID (integer 0–17)")
     run_parser.add_argument("--dt", required=True, help="Date (YYYY-MM-DD)")
     run_parser.add_argument(
         "--quick",
@@ -549,11 +549,13 @@ def main() -> None:
     # rca distil
     distil_parser = subparsers.add_parser(
         "distil",
-        help="Generate episodic store memory profiles from prior RCA outcomes",
+        help="Generate episodic city memory profiles from prior RCA outcomes",
     )
     distil_parser.add_argument(
-        "--store",
-        help="Store alias to distil (omit to distil all stores with history)",
+        "--city",
+        type=int,
+        default=None,
+        help="City ID to distil (omit to distil all cities with history)",
     )
     distil_parser.add_argument(
         "--dry-run",
@@ -568,9 +570,9 @@ def main() -> None:
         "reset-memory",
         help="Delete stored episodic profiles from Supabase rca_city_profile",
     )
-    reset_mem_parser.add_argument("--store", help="Store alias to reset")
+    reset_mem_parser.add_argument("--city", type=int, default=None, help="City ID to reset")
     reset_mem_parser.add_argument(
-        "--all", action="store_true", help="Reset profiles for all stores"
+        "--all", action="store_true", help="Reset profiles for all cities"
     )
     reset_mem_parser.set_defaults(func=_cmd_reset_memory)
 

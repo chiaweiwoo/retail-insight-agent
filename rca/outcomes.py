@@ -32,7 +32,7 @@ def record_outcome(record: OutcomeRecord, dry_run: bool = False) -> None:
     client.table("rca_outcome").upsert(
         {
             "run_name": record.run_name,
-            "store_id": record.city_id,
+            "city_id": record.city_id,
             "dt": record.dt,
             "signal_label": record.signal_label,
             "top_driver": record.top_driver,
@@ -60,7 +60,7 @@ def get_prior_rca(
             client
             .table("rca_outcome")
             .select("dt,signal_label,top_driver,driver_class,confidence,escalated,brief_headline")
-            .eq("store_id", city_id)
+            .eq("city_id", city_id)
             .order("dt", desc=True)
             .limit(limit)
             .execute()

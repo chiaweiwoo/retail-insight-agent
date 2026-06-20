@@ -25,29 +25,7 @@ HOURLY_LENGTH = 24
 # Processing all 18 cities in the dataset
 CITY_IDS = list(range(18)) # 0 to 17
 
-CITY_ID = 0 # default fallback
-
-# Known city-0 city IDes (used for backward compat with bench scenarios and CLI).
-# Stores from other cities get auto-generated aliases ("s{store_id}").
-STORE_MAP = {
-    "h235": 235,
-    "h263": 263,
-    "h182": 182,
-    "h018": 18,
-    "h555": 555,
-    "m679": 679,
-    "m648": 648,
-    "m041": 41,
-    "m236": 236,
-    "m386": 386,
-    "l260": 260,
-    "l185": 185,
-    "l165": 165,
-    "l164": 164,
-    "l175": 175,
-}
-# Reverse lookup: numeric store_id → alias string
-STORE_ID_TO_ALIAS: dict[int, str] = {v: k for k, v in STORE_MAP.items()}
+CITY_ID = 0  # default fallback
 
 EXPECTED_TABLE_ROWS: dict[str, int] = {
     "dim_holiday_day": EXPECTED_DAY_COUNT,

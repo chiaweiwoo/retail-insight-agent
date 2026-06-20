@@ -18,7 +18,6 @@ from rca.config import (
     RAW_DATA_PATH,
     REQUIRED_RAW_COLUMNS,
     SCHEMA_PATH,
-    STORE_ID_TO_ALIAS,
     make_supabase_client,
 )
 
@@ -116,10 +115,6 @@ def _infer_holiday_name(dt: pd.Timestamp) -> str:
         return "weekend"
     return "normal_weekday"
 
-
-def _make_store_alias(store_id: int) -> str:
-    """Map numeric store_id → alias. Known city-0 stores get h/m/l prefix; others get 's{id}'."""
-    return STORE_ID_TO_ALIAS.get(store_id, f"s{store_id}")
 
 
 def load_scoped_raw_data(raw_data_path: Path = RAW_DATA_PATH) -> pd.DataFrame:
@@ -532,7 +527,7 @@ def sync_series_to_supabase(db_path: Path = DB_PATH, batch_size: int = 500) -> i
         store_count = int(row[1])
         batch.append({
             "city_id": city_id,
-            "prefix": _city_tier(store_count), # Using legacy prefix column for tiering
+            "density_tier": _city_tier(store_count),
             "dt": str(row[2]),
             "total_sales": float(row[3]) if row[3] is not None else None,
             "product_count": int(row[4]) if row[4] is not None else None,
@@ -612,7 +607,7 @@ def sync_normals_to_supabase(db_path: Path = DB_PATH) -> int:
         store_count = int(row[1])
         records.append({
             "city_id": city_id,
-            "prefix": _city_tier(store_count),
+            "density_tier": _city_tier(store_count),
             "p25_sale": float(row[2]) if row[2] is not None else None,
             "p50_sale": float(row[3]) if row[3] is not None else None,
             "p75_sale": float(row[4]) if row[4] is not None else None,

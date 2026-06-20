@@ -63,10 +63,10 @@ def test_build_sales_signal_frame_on_toy_data() -> None:
 def test_summarize_signal_distribution_outputs_tables() -> None:
     signals = build_sales_signal_frame(load_sales_history())
     summary = summarize_signal_distribution(signals)
-    assert set(summary.keys()) == {"distribution", "thresholds", "store_stability"}
+    assert set(summary.keys()) == {"distribution", "thresholds", "city_stability"}
     assert not summary["distribution"].empty
     assert not summary["thresholds"].empty
-    assert not summary["store_stability"].empty
+    assert not summary["city_stability"].empty
 
 
 def test_recommend_primary_signal_is_supported_metric() -> None:

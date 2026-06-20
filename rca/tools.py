@@ -333,11 +333,11 @@ def get_prior_rca(city_id: int) -> dict[str, Any]:
 
 TOOL_REGISTRY: dict[str, dict[str, Any]] = {
     "get_signal_evidence": {
-        "description": "Get the precomputed store-day sales trigger signal and baseline comparisons.",
+        "description": "Get the precomputed city-day sales trigger signal and baseline comparisons.",
         "parameters": {
             "type": "object",
             "properties": {
-                "city_id": {"type": "string"},
+                "city_id": {"type": "integer"},
                 "dt": {"type": "string"},
             },
             "required": ["city_id", "dt"],
@@ -346,11 +346,11 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
         "function": get_signal_evidence,
     },
     "get_sales_context": {
-        "description": "Get current sales plus recent store sales history and baseline windows.",
+        "description": "Get current sales plus recent city sales history and baseline windows.",
         "parameters": {
             "type": "object",
             "properties": {
-                "city_id": {"type": "string"},
+                "city_id": {"type": "integer"},
                 "dt": {"type": "string"},
                 "history_days": {"type": "integer", "minimum": 3, "maximum": 14},
             },
@@ -360,11 +360,11 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
         "function": get_sales_context,
     },
     "get_stockout_context": {
-        "description": "Get stockout evidence for one store-day.",
+        "description": "Get stockout evidence for one city-day.",
         "parameters": {
             "type": "object",
             "properties": {
-                "city_id": {"type": "string"},
+                "city_id": {"type": "integer"},
                 "dt": {"type": "string"},
             },
             "required": ["city_id", "dt"],
@@ -374,14 +374,14 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
     },
     "get_stockout_baseline": {
         "description": (
-            "Get this store's rolling stockout baseline for the N days before the trigger date. "
+            "Get this city's rolling stockout baseline for the N days before the trigger date. "
             "Returns the baseline average rates and the ratio of today's rate to the baseline, "
             "so you can say '2x the 30-day average' rather than citing raw numbers with no anchor."
         ),
         "parameters": {
             "type": "object",
             "properties": {
-                "city_id": {"type": "string"},
+                "city_id": {"type": "integer"},
                 "dt": {"type": "string"},
                 "window": {
                     "type": "integer",
@@ -397,11 +397,11 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
         "function": get_stockout_baseline,
     },
     "get_discount_context": {
-        "description": "Get discount evidence for one store-day.",
+        "description": "Get discount evidence for one city-day.",
         "parameters": {
             "type": "object",
             "properties": {
-                "city_id": {"type": "string"},
+                "city_id": {"type": "integer"},
                 "dt": {"type": "string"},
             },
             "required": ["city_id", "dt"],
@@ -410,11 +410,11 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
         "function": get_discount_context,
     },
     "get_activity_context": {
-        "description": "Get promotional activity evidence for one store-day.",
+        "description": "Get promotional activity evidence for one city-day.",
         "parameters": {
             "type": "object",
             "properties": {
-                "city_id": {"type": "string"},
+                "city_id": {"type": "integer"},
                 "dt": {"type": "string"},
             },
             "required": ["city_id", "dt"],
@@ -423,11 +423,11 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
         "function": get_activity_context,
     },
     "get_calendar_weather_context": {
-        "description": "Get holiday, weekday, weekend, and weather context for one store-day.",
+        "description": "Get holiday, weekday, weekend, and weather context for one city-day.",
         "parameters": {
             "type": "object",
             "properties": {
-                "city_id": {"type": "string"},
+                "city_id": {"type": "integer"},
                 "dt": {"type": "string"},
             },
             "required": ["city_id", "dt"],
@@ -436,7 +436,7 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
         "function": get_calendar_weather_context,
     },
     "get_peer_city_context": {
-        "description": "Compare the city against same-day peers and its density tier group.",
+        "description": "Compare this city against same-day peers in its density tier group.",
         "parameters": {
             "type": "object",
             "properties": {
@@ -462,11 +462,11 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
         "function": search_news,
     },
     "get_prior_rca": {
-        "description": "Get prior RCA outcomes for this store from the local run history.",
+        "description": "Get prior RCA outcomes for this city from Supabase run history.",
         "parameters": {
             "type": "object",
             "properties": {
-                "city_id": {"type": "string"},
+                "city_id": {"type": "integer"},
             },
             "required": ["city_id"],
             "additionalProperties": False,
@@ -499,6 +499,9 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         return {"error": f"Unknown tool: {name}"}
     function: ToolFunction = TOOL_REGISTRY[name]["function"]
     try:
-        return function(**arguments)
+        coerced = dict(arguments)
+        if "city_id" in coerced:
+            coerced["city_id"] = int(coerced["city_id"])
+        return function(**coerced)
     except Exception as e:
         return {"error": str(e)}
