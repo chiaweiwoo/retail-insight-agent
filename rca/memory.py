@@ -46,17 +46,20 @@ def write_memory(
     signal_label: str,
 ) -> None:
     client = make_supabase_schema_client()
-    client.table(TABLE_MEMORY).insert(
-        {
-            "city_id": city_id,
-            "dt": dt,
-            "run_id": run_id,
-            "memory_type": memory_type,
-            "topic": topic,
-            "content": content,
-            "signal_label": signal_label,
-        }
-    ).execute()
+    try:
+        client.table(TABLE_MEMORY).insert(
+            {
+                "city_id": city_id,
+                "dt": dt,
+                "run_id": run_id,
+                "memory_type": memory_type,
+                "topic": topic,
+                "content": content,
+                "signal_label": signal_label,
+            }
+        ).execute()
+    except Exception:
+        return
 
 
 def get_cached_evidence(tool_name: str, params: dict[str, Any]) -> dict[str, Any] | None:
@@ -80,18 +83,21 @@ def put_cached_evidence(tool_name: str, params: dict[str, Any], result_json: dic
     build_version = get_current_build_version()
     cache_key = _cache_key(tool_name, params, build_version)
     client = make_supabase_schema_client()
-    client.table(TABLE_EVIDENCE_CACHE).upsert(
-        {
-            "cache_key": cache_key,
-            "build_version": build_version,
-            "city_id": params.get("city_id"),
-            "dt": params.get("dt"),
-            "tool_name": tool_name,
-            "params_json": params,
-            "result_json": result_json,
-        },
-        on_conflict="cache_key",
-    ).execute()
+    try:
+        client.table(TABLE_EVIDENCE_CACHE).upsert(
+            {
+                "cache_key": cache_key,
+                "build_version": build_version,
+                "city_id": params.get("city_id"),
+                "dt": params.get("dt"),
+                "tool_name": tool_name,
+                "params_json": params,
+                "result_json": result_json,
+            },
+            on_conflict="cache_key",
+        ).execute()
+    except Exception:
+        return
 
 
 def get_cached_external_events(city_id: int, dt: str, query: str) -> list[dict[str, Any]]:
@@ -127,4 +133,7 @@ def cache_external_events(city_id: int, dt: str, query: str, rows: list[dict[str
                 "result_json": row,
             }
         )
-    client.table(TABLE_EXTERNAL_EVENTS).insert(records).execute()
+    try:
+        client.table(TABLE_EXTERNAL_EVENTS).insert(records).execute()
+    except Exception:
+        return

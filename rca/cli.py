@@ -6,11 +6,21 @@ import argparse
 def _cmd_build(_: argparse.Namespace) -> None:
     from rca.database import ingest_to_supabase
 
-    print("Rebuilding RCA tables from parquet...")
+    print("Rebuilding RCA base tables from parquet...")
     counts = ingest_to_supabase()
     for table, count in counts.items():
         print(f"  {table}: {count} rows")
     print("Build complete.")
+
+
+def _cmd_signal(_: argparse.Namespace) -> None:
+    from rca.database import materialize_signals_to_supabase
+
+    print("Materializing signal table from ingested RCA tables...")
+    counts = materialize_signals_to_supabase()
+    for table, count in counts.items():
+        print(f"  {table}: {count} rows")
+    print("Signal build complete.")
 
 
 def _cmd_run(args: argparse.Namespace) -> None:
@@ -37,9 +47,15 @@ def main() -> None:
 
     build_parser = subparsers.add_parser(
         "build",
-        help="Reset and repopulate RCA schema tables from parquet",
+        help="Reset and repopulate base RCA tables from parquet",
     )
     build_parser.set_defaults(func=_cmd_build)
+
+    signal_parser = subparsers.add_parser(
+        "signal",
+        help="Rebuild the RCA signal table from ingested city/date tables",
+    )
+    signal_parser.set_defaults(func=_cmd_signal)
 
     run_parser = subparsers.add_parser(
         "run",

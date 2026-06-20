@@ -8,7 +8,6 @@ import numpy as np
 import pandas as pd
 
 from rca.config import (
-    ALL_TABLES,
     CITY_IDS,
     DATE_END,
     DATE_START,
@@ -35,6 +34,33 @@ from rca.config import (
     current_timestamp_sgt_label,
     make_supabase_schema_client,
 )
+
+INGESTION_TABLES = [
+    TABLE_SALES,
+    TABLE_INVENTORY,
+    TABLE_PRICING,
+    TABLE_PROMOTIONS,
+    TABLE_CALENDAR,
+    TABLE_WEATHER,
+    TABLE_GOALS,
+]
+
+RESET_TABLES_FOR_BUILD = [
+    TABLE_SALES,
+    TABLE_INVENTORY,
+    TABLE_PRICING,
+    TABLE_PROMOTIONS,
+    TABLE_CALENDAR,
+    TABLE_WEATHER,
+    TABLE_GOALS,
+    TABLE_SIGNALS,
+    TABLE_OUTCOMES,
+    TABLE_EVENTS,
+    TABLE_COMPLETIONS,
+    TABLE_MEMORY,
+    TABLE_EVIDENCE_CACHE,
+    TABLE_EXTERNAL_EVENTS,
+]
 
 
 def _hour_columns(prefix: str) -> list[str]:
@@ -323,7 +349,7 @@ def _upsert_df(client: Any, table: str, df: pd.DataFrame, on_conflict: str, batc
     return total
 
 
-def reset_supabase_tables() -> None:
+def reset_supabase_tables(tables: list[str] | None = None) -> None:
     client = make_supabase_schema_client()
     filters = {
         TABLE_SALES: ("city_id", 0),
@@ -341,7 +367,7 @@ def reset_supabase_tables() -> None:
         TABLE_EVIDENCE_CACHE: ("id", 0),
         TABLE_EXTERNAL_EVENTS: ("id", 0),
     }
-    for table in ALL_TABLES:
+    for table in tables or RESET_TABLES_FOR_BUILD:
         column, cutoff = filters[table]
         client.table(table).delete().gte(column, cutoff).execute()
 
@@ -359,7 +385,6 @@ def ingest_to_supabase(raw_data_path: Path = RAW_DATA_PATH) -> dict[str, int]:
     calendar_df = build_calendar_df(scoped)
     weather_df = build_weather_df(scoped)
     goals_df = build_goals_df(sales_df)
-    signals_df = build_signals_df(sales_df, goals_df, calendar_df, build_version)
 
     print("Resetting RCA schema tables...")
     reset_supabase_tables()
@@ -373,8 +398,40 @@ def ingest_to_supabase(raw_data_path: Path = RAW_DATA_PATH) -> dict[str, int]:
     counts[TABLE_CALENDAR] = _upsert_df(client, TABLE_CALENDAR, calendar_df, "city_id,dt")
     counts[TABLE_WEATHER] = _upsert_df(client, TABLE_WEATHER, weather_df, "city_id,dt")
     counts[TABLE_GOALS] = _upsert_df(client, TABLE_GOALS, goals_df, "city_id,dt")
-    counts[TABLE_SIGNALS] = _upsert_df(client, TABLE_SIGNALS, signals_df, "city_id,dt")
     return counts
+
+
+def _load_table_df(table: str, columns: str = "*", batch_size: int = 1000) -> pd.DataFrame:
+    client = make_supabase_schema_client()
+    start = 0
+    rows: list[dict[str, Any]] = []
+    while True:
+        result = client.table(table).select(columns).range(start, start + batch_size - 1).execute()
+        batch = result.data or []
+        if not batch:
+            break
+        rows.extend(batch)
+        if len(batch) < batch_size:
+            break
+        start += batch_size
+    return pd.DataFrame(rows)
+
+
+def materialize_signals_to_supabase() -> dict[str, int]:
+    build_version = current_timestamp_sgt_label()
+    sales_df = _load_table_df(TABLE_SALES, "city_id,dt,total_sales")
+    goals_df = _load_table_df(
+        TABLE_GOALS,
+        "city_id,dt,expected_sales,goal_method,recent_7d_avg_sales,same_weekday_4w_avg_sales",
+    )
+    calendar_df = _load_table_df(TABLE_CALENDAR, "city_id,dt,weekday,holiday_name_inferred")
+    if sales_df.empty or goals_df.empty or calendar_df.empty:
+        raise ValueError("Cannot build signals before sales, goals, and calendar tables are populated.")
+
+    signals_df = build_signals_df(sales_df, goals_df, calendar_df, build_version)
+    reset_supabase_tables([TABLE_SIGNALS])
+    client = make_supabase_schema_client()
+    return {TABLE_SIGNALS: _upsert_df(client, TABLE_SIGNALS, signals_df, "city_id,dt")}
 
 
 def get_current_build_version() -> str | None:

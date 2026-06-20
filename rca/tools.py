@@ -67,11 +67,12 @@ def _fetch_city_history(table: str, city_id: int, dt: str, columns: str = "*", l
         .select(columns)
         .eq("city_id", city_id)
         .lte("dt", dt)
-        .order("dt")
+        .order("dt", desc=True)
         .limit(limit)
         .execute()
     )
-    return result.data or []
+    rows = result.data or []
+    return list(reversed(rows))
 
 
 def get_signal_evidence(city_id: int, dt: str) -> dict[str, Any]:

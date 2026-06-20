@@ -45,23 +45,26 @@ class RunLogger:
         if not self.events:
             return
         client = make_supabase_schema_client()
-        client.table(TABLE_EVENTS).insert(
-            [
-                {
-                    "run_id": event["run_id"],
-                    "city_id": event["city_id"],
-                    "dt": event["dt"],
-                    "seq": event["seq"],
-                    "ts": event["timestamp_sgt"],
-                    "actor_type": event["actor_type"],
-                    "actor_name": event["actor_name"],
-                    "action": event["action"],
-                    "source": event["source"],
-                    "details": event["details"],
-                }
-                for event in self.events
-            ]
-        ).execute()
+        try:
+            client.table(TABLE_EVENTS).insert(
+                [
+                    {
+                        "run_id": event["run_id"],
+                        "city_id": event["city_id"],
+                        "dt": event["dt"],
+                        "seq": event["seq"],
+                        "ts": event["timestamp_sgt"],
+                        "actor_type": event["actor_type"],
+                        "actor_name": event["actor_name"],
+                        "action": event["action"],
+                        "source": event["source"],
+                        "details": event["details"],
+                    }
+                    for event in self.events
+                ]
+            ).execute()
+        except Exception:
+            return
 
     def to_jsonl(self) -> str:
         return "\n".join(json.dumps(event, ensure_ascii=False) for event in self.events) + "\n"

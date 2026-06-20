@@ -5,7 +5,7 @@ import re
 from dataclasses import asdict, dataclass
 from typing import Any, Callable
 
-from rca.config import AGENT_SKILLS_PATH, DEFAULT_LLM_MAX_TOOL_ROUNDS, SALES_FIELD_SEMANTICS
+from rca.config import AGENT_SKILLS_PATH, DEFAULT_LLM_MAX_TOOL_ROUNDS, SALES_FIELD_SEMANTICS, get_research_enabled
 from rca.llm import LLMSettings, build_chat_completion_kwargs, build_openai_compatible_client
 from rca.memory import get_memory_notes, write_memory
 from rca.outcomes import record_completion
@@ -158,6 +158,7 @@ def plan_investigation(
     client_factory: ClientFactory,
     run_id: str,
 ) -> PlannerDecision:
+    research_enabled = get_research_enabled()
     signal = get_signal_evidence(city_id, dt)
     sales = get_sales_context(city_id, dt, history_days=10)
     calendar_weather = get_calendar_weather_context(city_id, dt)
@@ -170,7 +171,8 @@ def plan_investigation(
         "Allowed agents: statistician, sales_agent, inventory_agent, pricing_agent, "
         "promotions_agent, calendar_weather_agent, news_agent.\n"
         "Always include statistician and sales_agent.\n"
-        f"{skill}\n"
+        + ("External web research is enabled.\n" if research_enabled else "External web research is disabled, so do not select news_agent.\n")
+        + f"{skill}\n"
     )
     user = {
         "signal": signal,
@@ -209,8 +211,10 @@ def plan_investigation(
             selected_agents.insert(0, "statistician")
         if "sales_agent" not in selected_agents:
             selected_agents.insert(1, "sales_agent")
-        if "news_agent" not in selected_agents:
+        if research_enabled and "news_agent" not in selected_agents:
             selected_agents.append("news_agent")
+        if not research_enabled:
+            selected_agents = [name for name in selected_agents if name != "news_agent"]
         decision = PlannerDecision(
             selected_agents=selected_agents,
             rationale=str(parsed.get("rationale") or ""),
@@ -225,11 +229,12 @@ def plan_investigation(
                 "pricing_agent",
                 "promotions_agent",
                 "calendar_weather_agent",
-                "news_agent",
             ],
             rationale="Fallback planner path used because structured parsing failed.",
             news_query=f"city {city_id} retail news {dt}",
         )
+        if research_enabled:
+            decision.selected_agents.append("news_agent")
     logger.log(
         actor_type="workflow",
         actor_name="planner",
@@ -252,6 +257,20 @@ def run_agent(
     news_query: str = "",
     max_tool_rounds: int = DEFAULT_LLM_MAX_TOOL_ROUNDS,
 ) -> AgentRunResult:
+    if spec.name == "news_agent" and not get_research_enabled():
+        content = (
+            "## Why It Matters\n"
+            "External factors may still matter for a city-wide move.\n\n"
+            "## Evidence\n"
+            "- Web research is disabled by configuration (`RCA_RESEARCH_ENABLED=false`).\n\n"
+            "## Interpretation\n"
+            "- No external news evidence was gathered in this run.\n\n"
+            "## Caveats\n"
+            "- Any external explanation remains untested until research is enabled.\n"
+        )
+        logger.log(actor_type="agent", actor_name=spec.name, action="completed", source="system", details={"research_enabled": False})
+        return AgentRunResult(name=spec.name, focus=spec.focus, memo_markdown=content, tool_calls=[])
+
     client = client_factory(spec.name)
     system_prompt = (
         f"You are a retail RCA agent focused on {spec.focus}.\n"

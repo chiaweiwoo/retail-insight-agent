@@ -143,6 +143,10 @@ def get_llm_thinking_enabled() -> bool:
     return os.getenv("DEEPSEEK_THINKING", "false").strip().lower() in {"1", "true", "yes", "on"}
 
 
+def get_research_enabled() -> bool:
+    return os.getenv("RCA_RESEARCH_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
+
+
 def get_model_fast() -> str:
     return os.getenv("DEEPSEEK_MODEL_FAST", "deepseek-v4-flash")
 

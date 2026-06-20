@@ -66,17 +66,20 @@ def record_completion(
     tool_calls_json: list[dict[str, Any]] | None = None,
 ) -> None:
     client = make_supabase_schema_client()
-    client.table(TABLE_COMPLETIONS).insert(
-        {
-            "run_id": run_id,
-            "city_id": city_id,
-            "dt": dt,
-            "ts": current_timestamp_sgt_iso(),
-            "node_name": node_name,
-            "model": model,
-            "prompt_tokens": prompt_tokens,
-            "completion_tokens": completion_tokens,
-            "content": content,
-            "tool_calls_json": tool_calls_json or [],
-        }
-    ).execute()
+    try:
+        client.table(TABLE_COMPLETIONS).insert(
+            {
+                "run_id": run_id,
+                "city_id": city_id,
+                "dt": dt,
+                "ts": current_timestamp_sgt_iso(),
+                "node_name": node_name,
+                "model": model,
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+                "content": content,
+                "tool_calls_json": tool_calls_json or [],
+            }
+        ).execute()
+    except Exception:
+        return
