@@ -54,11 +54,22 @@ class _TracedCompletions:
             if response.choices:
                 output = response.choices[0].message.content or ""
             if gen is not None:
-                gen.end(output=output)
+                update_kwargs: dict[str, Any] = {"output": output}
+                if hasattr(response, "usage") and response.usage:
+                    update_kwargs["usage"] = {
+                        "input": getattr(response.usage, "prompt_tokens", 0),
+                        "output": getattr(response.usage, "completion_tokens", 0),
+                        "total": getattr(response.usage, "total_tokens", 0),
+                    }
+                if hasattr(response, "model") and response.model:
+                    update_kwargs["model"] = response.model
+                gen.update(**update_kwargs)
+                gen.end()
             return response
         except Exception as exc:
             if gen is not None:
-                gen.end(level="ERROR", status_message=str(exc))
+                gen.update(level="ERROR", status_message=str(exc))
+                gen.end()
             raise
 
 
@@ -175,7 +186,9 @@ class RcaObserver:
             return
         try:
             if self._root_span is not None:
-                self._root_span.end(output=output)
+                if output is not None:
+                    self._root_span.update(output=output)
+                self._root_span.end()
             if self._lf is not None:
                 self._lf.flush()
         except Exception:
