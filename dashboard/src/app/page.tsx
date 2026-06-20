@@ -68,15 +68,14 @@ export default async function CitiesPage() {
         <table className="w-full text-left border-collapse">
           <thead>
             <tr>
-              <th className="sticky left-0 z-20 bg-slate-900/90 backdrop-blur border-b border-r border-white/10 p-4 min-w-[200px]">
-                <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">City / Avg Volume</div>
+              <th className="sticky left-0 z-20 bg-slate-900/90 backdrop-blur border-b border-r border-white/10 p-3 min-w-[140px]">
+                <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">City / Avg Vol</div>
               </th>
               {displayDates.map((date) => {
                 const d = new Date(date);
                 return (
-                  <th key={date} className="border-b border-white/10 p-3 min-w-[120px] text-center">
-                    <div className="text-xs font-medium text-slate-300">{d.toLocaleDateString('en-US', { weekday: 'short' })}</div>
-                    <div className="text-xs text-slate-500">{d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
+                  <th key={date} className="border-b border-white/10 p-2 text-center whitespace-nowrap">
+                    <div className="text-[11px] font-medium text-slate-400">{d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
                   </th>
                 );
               })}
@@ -88,14 +87,14 @@ export default async function CitiesPage() {
               
               return (
                 <tr key={city.city_id} className="group hover:bg-white/[0.02] transition-colors">
-                  <td className="sticky left-0 z-10 bg-slate-900/90 group-hover:bg-slate-800/90 backdrop-blur border-b border-r border-white/10 p-4">
-                    <div className="flex flex-col">
+                  <td className="sticky left-0 z-10 bg-slate-900/90 group-hover:bg-slate-800/90 backdrop-blur border-b border-r border-white/10 p-3">
+                    <div className="flex items-center justify-between">
                       <Link href={`/cities/${city.city_id}`} className="text-sm font-medium text-indigo-300 hover:text-indigo-200 hover:underline flex items-center space-x-1">
                         <span>City {city.city_id}</span>
                         <ArrowRight size={12} />
                       </Link>
-                      <div className="text-xs text-slate-500 mt-0.5">
-                        Vol: {Math.round(city.avg_sale).toLocaleString()}
+                      <div className="text-[10px] text-slate-500 font-medium">
+                        {Math.round(city.avg_sale / 1000)}k
                       </div>
                     </div>
                   </td>
@@ -138,21 +137,14 @@ export default async function CitiesPage() {
                     }
 
                     return (
-                      <td key={date} className="border-b border-white/5 p-2 text-center">
-                        <div className={`mx-auto w-full h-full min-h-[3.5rem] rounded flex flex-col justify-center items-center border border-transparent transition-colors ${cellBg}`}>
-                          {currentSales > 0 ? (
-                            <>
-                              <div className="text-xs font-medium text-slate-300">
-                                {Math.round(currentSales).toLocaleString()}
-                              </div>
-                              {trailingAvg > 0 && (
-                                <div className={`text-[10px] font-semibold ${textClass}`}>
-                                  {pctStr}
-                                </div>
-                              )}
-                            </>
+                      <td key={date} className="border-b border-white/5 p-1 text-center" title={`Raw volume: ${Math.round(currentSales).toLocaleString()}`}>
+                        <div className={`mx-auto w-full h-full py-1.5 px-2 rounded flex items-center justify-center transition-colors ${cellBg}`}>
+                          {currentSales > 0 && trailingAvg > 0 ? (
+                            <span className={`text-[11px] font-semibold ${textClass}`}>
+                              {pctStr}
+                            </span>
                           ) : (
-                            <span className="text-xs text-slate-600">-</span>
+                            <span className="text-[11px] text-slate-600">-</span>
                           )}
                         </div>
                       </td>
