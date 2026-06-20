@@ -56,8 +56,8 @@ export default async function CitiesPage() {
               <Info size={16} className="text-indigo-400" />
               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-3 bg-slate-800 text-xs text-slate-200 rounded shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 border border-slate-700">
                 <strong className="text-white block mb-1">RCA Triggers:</strong>
-                <span className="text-rose-400 font-semibold">Drop:</span> Sales ≤ -15% vs 7-day trailing avg<br/>
-                <span className="text-emerald-400 font-semibold">Lift:</span> Sales ≥ +15% vs 7-day trailing avg
+                <span className="text-rose-400 font-semibold">Drop:</span> Sales ≤ -20% vs 7-day trailing avg<br/>
+                <span className="text-emerald-400 font-semibold">Lift:</span> Sales ≥ +35% vs 7-day trailing avg
               </div>
             </span>
           </p>
@@ -123,8 +123,8 @@ export default async function CitiesPage() {
                     }
 
                     const pctStr = (pctChange > 0 ? '+' : '') + (pctChange * 100).toFixed(1) + '%';
-                    const isDrop = pctChange <= -0.15;
-                    const isLift = pctChange >= 0.15;
+                    const isDrop = pctChange <= -0.20;
+                    const isLift = pctChange >= 0.35;
 
                     let cellBg = '';
                     let textClass = 'text-slate-400';

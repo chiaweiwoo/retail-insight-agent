@@ -88,7 +88,7 @@ DEFAULT_DROP_THRESHOLD_Z = -2.0
 DEFAULT_LIFT_THRESHOLD_Z = 2.0
 # Legacy pct-change thresholds kept for context/signals.py historical analysis
 DEFAULT_DROP_THRESHOLD_PCT = -20.0
-DEFAULT_LIFT_THRESHOLD_PCT = 30.0
+DEFAULT_LIFT_THRESHOLD_PCT = 35.0
 
 DEFAULT_LLM_BASE_URL = "https://api.deepseek.com"
 DEFAULT_LLM_MODEL = "deepseek-v4-flash"
