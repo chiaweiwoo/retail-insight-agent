@@ -153,22 +153,31 @@ def load_context_pack(pack_path: Path = CONTEXT_PACK_PATH) -> dict[str, Any] | N
     return json.loads(pack_path.read_text(encoding="utf-8"))
 
 
-def build_context_preamble(store_alias: str, dt: str, pack: dict[str, Any] | None = None) -> str:
+def build_context_preamble(
+    store_alias: str,
+    dt: str,
+    pack: dict[str, Any] | None = None,
+    profile_text: str | None = None,
+) -> str:
     """Return a short grounding preamble for analyst/coordinator prompts.
 
     Keeps the preamble small — every byte here costs in every LLM call.
     Falls back to a minimal preamble if the pack is not available.
+    profile_text: optional LLM-distilled episodic memory for this store.
     """
     if pack is None:
         pack = load_context_pack()
 
     if pack is None:
-        return (
+        base = (
             "CONTEXT: Dataset is FreshRetailNet-50K, anonymized 2024 retail data. "
             "Store aliases and product IDs are opaque — do not assume business meaning. "
             f"{SALES_FIELD_SEMANTICS} "
             f"Analysis date is {dt}; do not reference events after the data window.\n"
         )
+        if profile_text:
+            base += f"\nSTORE MEMORY ({store_alias}) — treat as context, not ground truth:\n{profile_text}\n"
+        return base
 
     dataset = pack["dataset"]
     fleet = pack["fleet"]
@@ -205,6 +214,11 @@ def build_context_preamble(store_alias: str, dt: str, pack: dict[str, Any] | Non
     lines.append(
         f"- Analysis date: {dt}. Do not reference events after the data window or invent company facts."
     )
+
+    if profile_text:
+        lines.append(f"")
+        lines.append(f"STORE MEMORY ({store_alias}) — distilled from prior RCA runs, treat as context not ground truth:")
+        lines.append(profile_text)
 
     return "\n".join(lines) + "\n"
 

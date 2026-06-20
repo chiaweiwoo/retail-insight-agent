@@ -377,6 +377,69 @@ def _cmd_story(args: argparse.Namespace) -> None:
     print(f"Story HTML written to {html_path}")
 
 
+def _cmd_distil(args: argparse.Namespace) -> None:
+    import os
+    from rca.llm import load_llm_settings, LLMSettings
+    from rca.profiles import distil_store_profile, distil_all_stores
+
+    dry_run = getattr(args, "dry_run", False)
+    client_factory = None
+    settings = None
+
+    if dry_run:
+        from rca.stubclient import stub_client_factory
+        client_factory = stub_client_factory
+        settings = LLMSettings(
+            api_key="dry-run",
+            base_url="https://api.deepseek.com",
+            model="deepseek-v4-flash",
+            thinking_enabled=False,
+        )
+        print("[dry-run] Using stub LLM — profile will not be written to Supabase.")
+    else:
+        if not os.getenv("SUPABASE_URL"):
+            print("SUPABASE_URL not set — cannot write profiles.")
+            return
+        settings = load_llm_settings()
+
+    if args.store:
+        profile = distil_store_profile(
+            args.store, settings=settings, client_factory=client_factory, dry_run=dry_run
+        )
+        print(f"Profile for {args.store}:")
+        print(profile)
+        if not dry_run:
+            print(f"\nWritten to Supabase rca_store_profile.")
+    else:
+        results = distil_all_stores(settings=settings, client_factory=client_factory, dry_run=dry_run)
+        if not results:
+            print("No stores with prior outcomes found.")
+            return
+        for store_alias, profile in results:
+            print(f"\n--- {store_alias} ---")
+            print(profile)
+        if not dry_run:
+            print(f"\nWritten {len(results)} profiles to Supabase rca_store_profile.")
+
+
+def _cmd_reset_memory(args: argparse.Namespace) -> None:
+    import os
+    from rca.profiles import reset_store_profile
+
+    if not os.getenv("SUPABASE_URL"):
+        print("SUPABASE_URL not set — nothing to reset.")
+        return
+
+    if args.store:
+        count = reset_store_profile(args.store)
+        print(f"Deleted profile for {args.store} ({count} row(s) removed).")
+    elif args.all:
+        count = reset_store_profile(store_alias=None)
+        print(f"Deleted all store profiles ({count} row(s) removed).")
+    else:
+        print("Specify --store ALIAS or --all.")
+
+
 def _cmd_sync(args: argparse.Namespace) -> None:
     from rca.database import sync_normals_to_supabase, sync_series_to_supabase
     from rca.config import DB_PATH
@@ -475,6 +538,34 @@ def main() -> None:
         help="Build data/context_pack.json and context_pack.md from the local DuckDB",
     )
     profile_parser.set_defaults(func=_cmd_profile)
+
+    # rca distil
+    distil_parser = subparsers.add_parser(
+        "distil",
+        help="Generate episodic store memory profiles from prior RCA outcomes",
+    )
+    distil_parser.add_argument(
+        "--store",
+        help="Store alias to distil (omit to distil all stores with history)",
+    )
+    distil_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        dest="dry_run",
+        help="Generate profile without writing to Supabase",
+    )
+    distil_parser.set_defaults(func=_cmd_distil)
+
+    # rca reset-memory
+    reset_mem_parser = subparsers.add_parser(
+        "reset-memory",
+        help="Delete stored episodic profiles from Supabase rca_store_profile",
+    )
+    reset_mem_parser.add_argument("--store", help="Store alias to reset")
+    reset_mem_parser.add_argument(
+        "--all", action="store_true", help="Reset profiles for all stores"
+    )
+    reset_mem_parser.set_defaults(func=_cmd_reset_memory)
 
     # rca sync
     sync_parser = subparsers.add_parser(

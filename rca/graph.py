@@ -29,6 +29,7 @@ from rca.agents import (
     _run_specialist,
     _synthesize,
 )
+from rca.profiles import get_store_profile
 from rca.llm import (
     ClientFactory,
     LLMSettings,
@@ -60,6 +61,9 @@ class RcaState(TypedDict):
     planning_inputs: dict | None
     prior_rca_summary: dict
     skipped_analysts: list[dict]
+
+    # Fetched in plan_node, threaded into all LLM preambles
+    store_profile: str | None
 
     # Accumulated via Send fan-out (operator.add merges results from each branch)
     analyst_results: Annotated[list[dict], operator.add]
@@ -112,15 +116,16 @@ def plan_node(state: RcaState, config: RunnableConfig) -> dict:
 
     with observer.node_span("plan"):
         prior_rca_summary = get_prior_rca(store_alias)
+        store_profile = get_store_profile(store_alias)
 
         if state.get("specialists"):
             # Pre-specified by caller — skip re-planning, use as-is
             logger.log(
                 actor_type="workflow", actor_name="coordinator_pipeline",
                 action="started", subject=subject, source="system",
-                details={"analyst_count": len(state["specialists"]), "planning_inputs": None, "prior_rca_summary": prior_rca_summary},
+                details={"analyst_count": len(state["specialists"]), "planning_inputs": None, "prior_rca_summary": prior_rca_summary, "has_store_profile": store_profile is not None},
             )
-            return {"prior_rca_summary": prior_rca_summary, "planning_inputs": None, "skipped_analysts": []}
+            return {"prior_rca_summary": prior_rca_summary, "planning_inputs": None, "skipped_analysts": [], "store_profile": store_profile}
 
         specialists, skipped_analysts, planning_inputs = _plan_specialists_with_reasons(
             store_alias=store_alias, dt=dt, include_research=include_research
@@ -129,7 +134,7 @@ def plan_node(state: RcaState, config: RunnableConfig) -> dict:
         logger.log(
             actor_type="workflow", actor_name="coordinator_pipeline",
             action="started", subject=subject, source="system",
-            details={"analyst_count": len(specialists), "planning_inputs": planning_inputs, "prior_rca_summary": prior_rca_summary},
+            details={"analyst_count": len(specialists), "planning_inputs": planning_inputs, "prior_rca_summary": prior_rca_summary, "has_store_profile": store_profile is not None},
         )
         logger.log(
             actor_type="workflow", actor_name="plan_specialists",
@@ -147,6 +152,7 @@ def plan_node(state: RcaState, config: RunnableConfig) -> dict:
             "planning_inputs": planning_inputs,
             "prior_rca_summary": prior_rca_summary,
             "skipped_analysts": skipped_analysts,
+            "store_profile": store_profile,
         }
 
 
@@ -188,6 +194,7 @@ def run_specialist_node(state: dict, config: RunnableConfig) -> dict:
             settings=node_settings,
             logger=logger,
             client_factory=client_factory,
+            profile_text=state.get("store_profile"),
         )
     result_dict = asdict(result)
     result_dict["memo_markdown"] = sanitize_generated_markdown(result_dict["memo_markdown"])
@@ -221,6 +228,7 @@ def critic_node(state: RcaState, config: RunnableConfig) -> dict:
             settings=node_settings,
             logger=logger,
             client_factory=client_factory,
+            profile_text=state.get("store_profile"),
         )
     logger.log(
         actor_type="workflow", actor_name="coordinator_pipeline",
@@ -249,6 +257,7 @@ def synthesize_node(state: RcaState, config: RunnableConfig) -> dict:
             settings=node_settings,
             logger=logger,
             client_factory=client_factory,
+            profile_text=state.get("store_profile"),
         )
     return {"coordinator_report": coordinator_report}
 
@@ -270,6 +279,7 @@ def controller_node(state: RcaState, config: RunnableConfig) -> dict:
             settings=node_settings,
             logger=logger,
             client_factory=client_factory,
+            profile_text=state.get("store_profile"),
         )
     return {"controller_note": controller_note}
 
@@ -293,6 +303,7 @@ def slt_node(state: RcaState, config: RunnableConfig) -> dict:
             settings=node_settings,
             logger=logger,
             client_factory=client_factory,
+            profile_text=state.get("store_profile"),
         )
     return {"decision_card": decision_card}
 
@@ -473,6 +484,7 @@ def run_rca_graph(
         "planning_inputs": None,
         "prior_rca_summary": {},
         "skipped_analysts": [],
+        "store_profile": None,
         "analyst_results": [],
         "critic_note": "",
         "coordinator_report": "",

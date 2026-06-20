@@ -13,6 +13,10 @@ uv run python -m rca.cli bench
 uv run python -m rca.cli eval --dry-run
 uv run python -m rca.cli story --run-dir data/analysis/agent_benchmark_runs/<run_folder>
 uv run python -m rca.cli runs
+uv run python -m rca.cli distil --store h555          # generate store memory profile
+uv run python -m rca.cli distil                       # distil all stores with history
+uv run python -m rca.cli reset-memory --store h555    # delete one store's profile
+uv run python -m rca.cli reset-memory --all           # delete all profiles
 ```
 
 ## Important Behavior

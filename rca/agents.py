@@ -354,6 +354,7 @@ def _run_specialist(
     logger: RunLogger,
     client_factory: ClientFactory,
     max_tool_rounds: int = DEFAULT_LLM_MAX_TOOL_ROUNDS,
+    profile_text: str | None = None,
 ) -> AnalystRunResult:
     subject = f"{store_alias}:{dt}"
     client = client_factory(spec.name)
@@ -368,7 +369,7 @@ def _run_specialist(
     messages: list[dict[str, Any]] = [
         {
             "role": "system",
-            "content": build_context_preamble(store_alias, dt) + "\n" + spec.system_prompt,
+            "content": build_context_preamble(store_alias, dt, profile_text=profile_text) + "\n" + spec.system_prompt,
         },
         {
             "role": "user",
@@ -485,6 +486,7 @@ def _synthesize(
     settings: LLMSettings,
     logger: RunLogger,
     client_factory: ClientFactory,
+    profile_text: str | None = None,
 ) -> str:
     subject = f"{store_alias}:{dt}"
     client = client_factory("coordinator_analyst")
@@ -495,7 +497,7 @@ def _synthesize(
     messages = [
         {
             "role": "system",
-            "content": build_context_preamble(store_alias, dt) + "\n" + COORDINATOR_SYSTEM_PROMPT,
+            "content": build_context_preamble(store_alias, dt, profile_text=profile_text) + "\n" + COORDINATOR_SYSTEM_PROMPT,
         },
         {
             "role": "user",
@@ -536,6 +538,7 @@ def _run_critic(
     settings: LLMSettings,
     logger: RunLogger,
     client_factory: ClientFactory,
+    profile_text: str | None = None,
 ) -> str:
     subject = f"{store_alias}:{dt}"
     client = client_factory("critic")
@@ -546,7 +549,7 @@ def _run_critic(
     messages = [
         {
             "role": "system",
-            "content": build_context_preamble(store_alias, dt) + "\n" + CRITIC_SYSTEM_PROMPT,
+            "content": build_context_preamble(store_alias, dt, profile_text=profile_text) + "\n" + CRITIC_SYSTEM_PROMPT,
         },
         {
             "role": "user",
@@ -587,13 +590,14 @@ def _run_finance_controller(
     settings: LLMSettings,
     logger: RunLogger,
     client_factory: ClientFactory,
+    profile_text: str | None = None,
 ) -> str:
     subject = f"{store_alias}:{dt}"
     client = client_factory("finance_controller")
     messages = [
         {
             "role": "system",
-            "content": build_context_preamble(store_alias, dt) + "\n" + FINANCE_CONTROLLER_SYSTEM_PROMPT,
+            "content": build_context_preamble(store_alias, dt, profile_text=profile_text) + "\n" + FINANCE_CONTROLLER_SYSTEM_PROMPT,
         },
         {
             "role": "user",
@@ -637,13 +641,14 @@ def _run_slt_brief(
     settings: LLMSettings,
     logger: RunLogger,
     client_factory: ClientFactory,
+    profile_text: str | None = None,
 ) -> str:
     subject = f"{store_alias}:{dt}"
     client = client_factory("slt_brief")
     messages = [
         {
             "role": "system",
-            "content": build_context_preamble(store_alias, dt) + "\n" + SLT_BRIEF_SYSTEM_PROMPT,
+            "content": build_context_preamble(store_alias, dt, profile_text=profile_text) + "\n" + SLT_BRIEF_SYSTEM_PROMPT,
         },
         {
             "role": "user",
