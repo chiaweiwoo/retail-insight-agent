@@ -1,278 +1,95 @@
+"""Signal computation: actuals vs business target → drop/lift/neutral labels.
+
+Called by `rca analyze`. Populates rca_city_signal in Supabase.
+"""
 from __future__ import annotations
 
 import pandas as pd
 
-from rca.config import make_supabase_client
+from rca.config import (
+    BUSINESS_TARGET_GROWTH_FACTOR,
+    DEFAULT_DROP_THRESHOLD_PCT,
+    DEFAULT_LIFT_THRESHOLD_PCT,
+    make_supabase_client,
+)
+
+_MIN_BASELINE_OBS = 3
 
 
-MIN_BASELINE_OBSERVATIONS = 3
+def build_signal_series(actuals_df: pd.DataFrame, forecast_df: pd.DataFrame) -> pd.DataFrame:
+    """Merge actuals with finance forecast, apply business target, label each city-day.
+
+    actuals_df columns required: city_id, dt, total_sales, weekday, density_tier,
+                                  holiday_name_inferred
+    forecast_df columns required: city_id, dt, forecast_sales
+
+    Returns a DataFrame ready for push_city_signal(), with signal_label set and
+    rolling-baseline context columns included for agent tools.
+    """
+    df = actuals_df[
+        ["city_id", "dt", "total_sales", "weekday", "density_tier", "holiday_name_inferred"]
+    ].copy()
+    df["dt"] = pd.to_datetime(df["dt"])
+    df = df.sort_values(["city_id", "dt"]).reset_index(drop=True)
+
+    forecast = forecast_df[["city_id", "dt"]].copy()
+    forecast["dt"] = pd.to_datetime(forecast["dt"])
+    forecast["forecast_sales"] = forecast_df["forecast_sales"].values
+    df = df.merge(forecast, on=["city_id", "dt"], how="left")
+
+    # Business target = statistical forecast × growth factor
+    df["business_target"] = df["forecast_sales"] * BUSINESS_TARGET_GROWTH_FACTOR
+
+    # Rolling baselines
+    by_city = df.groupby("city_id", group_keys=False)
+    df["previous_day_sales"] = by_city["total_sales"].shift(1)
+    df["trailing_7d_avg_sales"] = by_city["total_sales"].transform(
+        lambda s: s.shift(1).rolling(window=7, min_periods=_MIN_BASELINE_OBS).mean()
+    )
+    by_city_dow = df.groupby(["city_id", df["dt"].dt.dayofweek], group_keys=False)
+    df["same_weekday_4w_avg_sales"] = by_city_dow["total_sales"].transform(
+        lambda s: s.shift(1).rolling(window=4, min_periods=_MIN_BASELINE_OBS).mean()
+    )
+
+    # Pct-change context
+    def _pct(current: pd.Series, base: pd.Series) -> pd.Series:
+        return ((current - base) / base * 100.0).where(base > 0)
+
+    df["day_over_day_pct_change"] = _pct(df["total_sales"], df["previous_day_sales"])
+    df["trailing_7d_pct_change"] = _pct(df["total_sales"], df["trailing_7d_avg_sales"])
+    df["same_weekday_4w_pct_change"] = _pct(df["total_sales"], df["same_weekday_4w_avg_sales"])
+    df["target_deviation_pct"] = _pct(df["total_sales"], df["business_target"])
+
+    # Signal label
+    def _label(row: pd.Series) -> str:
+        if pd.isna(row["business_target"]):
+            return "insufficient_history"
+        if row["target_deviation_pct"] <= DEFAULT_DROP_THRESHOLD_PCT:
+            return "drop"
+        if row["target_deviation_pct"] >= DEFAULT_LIFT_THRESHOLD_PCT:
+            return "lift"
+        return "neutral"
+
+    df["signal_label"] = df.apply(_label, axis=1)
+    df["dt"] = df["dt"].dt.strftime("%Y-%m-%d")
+
+    return df[[
+        "city_id", "dt", "total_sales", "business_target", "target_deviation_pct",
+        "signal_label", "previous_day_sales", "trailing_7d_avg_sales",
+        "same_weekday_4w_avg_sales", "day_over_day_pct_change", "trailing_7d_pct_change",
+        "same_weekday_4w_pct_change", "weekday", "density_tier", "holiday_name_inferred",
+    ]]
 
 
-def load_sales_history() -> pd.DataFrame:
-    """Load city-day sales history from Supabase rca_city_series."""
+def get_trigger_dates_for_city(city_id: int) -> list[str]:
+    """Return sorted list of triggered (drop/lift) dates for a city from rca_city_signal."""
     client = make_supabase_client()
     resp = (
-        client.table("rca_city_series")
-        .select("city_id,dt,total_sales,weekday,is_weekend,holiday_name_inferred")
-        .limit(2000)
+        client.table("rca_city_signal")
+        .select("dt,signal_label")
+        .eq("city_id", city_id)
+        .in_("signal_label", ["drop", "lift"])
+        .order("dt")
         .execute()
     )
-    frame = pd.DataFrame(resp.data or [])
-    if frame.empty:
-        raise RuntimeError(
-            "rca_city_series returned no rows. Run 'rca build' to populate Supabase."
-        )
-    frame["dt"] = pd.to_datetime(frame["dt"])
-    frame.sort_values(["city_id", "dt"], inplace=True)
-    frame.reset_index(drop=True, inplace=True)
-    return frame
-
-
-def load_finance_forecast() -> pd.DataFrame:
-    client = make_supabase_client()
-    # Fetch all forecast data from Supabase directly
-    response = client.table("rca_finance_forecast").select("city_id,dt,forecast_sales").execute()
-    df = pd.DataFrame(response.data)
-    if not df.empty:
-        df["dt"] = pd.to_datetime(df["dt"])
-    return df
-
-
-def _safe_pct_change(current: pd.Series, baseline: pd.Series) -> pd.Series:
-    result = ((current - baseline) / baseline) * 100.0
-    return result.where(baseline > 0)
-
-
-def build_sales_signal_frame(frame: pd.DataFrame) -> pd.DataFrame:
-    signals = frame.copy().sort_values(["city_id", "dt"]).reset_index(drop=True)
-    
-    # Merge Finance Forecast from Supabase
-    forecast_df = load_finance_forecast()
-    if not forecast_df.empty:
-        signals = pd.merge(signals, forecast_df, on=["city_id", "dt"], how="left")
-    else:
-        signals["forecast_sales"] = pd.NA
-
-    by_city = signals.groupby("city_id", group_keys=False)
-    signals["previous_day_sales"] = by_city["total_sales"].shift(1)
-    signals["trailing_7d_avg_sales"] = by_city["total_sales"].transform(
-        lambda series: series.shift(1).rolling(window=7, min_periods=MIN_BASELINE_OBSERVATIONS).mean()
-    )
-
-    by_city_weekday = signals.groupby(["city_id", "weekday"], group_keys=False)
-    signals["same_weekday_4w_avg_sales"] = by_city_weekday["total_sales"].transform(
-        lambda series: series.shift(1).rolling(window=4, min_periods=MIN_BASELINE_OBSERVATIONS).mean()
-    )
-
-    signals["day_over_day_abs_change"] = signals["total_sales"] - signals["previous_day_sales"]
-    signals["day_over_day_pct_change"] = _safe_pct_change(
-        signals["total_sales"], signals["previous_day_sales"]
-    )
-
-    signals["trailing_7d_abs_change"] = signals["total_sales"] - signals["trailing_7d_avg_sales"]
-    signals["trailing_7d_pct_change"] = _safe_pct_change(
-        signals["total_sales"], signals["trailing_7d_avg_sales"]
-    )
-
-    signals["same_weekday_4w_abs_change"] = (
-        signals["total_sales"] - signals["same_weekday_4w_avg_sales"]
-    )
-    signals["same_weekday_4w_pct_change"] = _safe_pct_change(
-        signals["total_sales"], signals["same_weekday_4w_avg_sales"]
-    )
-
-    signals["baseline_sales_floor"] = signals[
-        ["previous_day_sales", "trailing_7d_avg_sales", "same_weekday_4w_avg_sales", "forecast_sales"]
-    ].max(axis=1)
-
-    # Compute the new Finance Forecast signal
-    signals["finance_forecast_abs_change"] = signals["total_sales"] - signals["forecast_sales"]
-    signals["finance_forecast_pct_change"] = _safe_pct_change(
-        signals["total_sales"], signals["forecast_sales"]
-    )
-
-    return signals
-
-
-def summarize_signal_distribution(signals: pd.DataFrame) -> dict[str, pd.DataFrame]:
-    metric_columns = [
-        "day_over_day_abs_change",
-        "day_over_day_pct_change",
-        "trailing_7d_abs_change",
-        "trailing_7d_pct_change",
-        "same_weekday_4w_abs_change",
-        "same_weekday_4w_pct_change",
-        "finance_forecast_abs_change",
-        "finance_forecast_pct_change",
-    ]
-
-    distribution_rows: list[dict[str, float | str | int]] = []
-    for metric in metric_columns:
-        series = signals[metric].dropna()
-        distribution_rows.append(
-            {
-                "metric": metric,
-                "rows_with_baseline": int(series.shape[0]),
-                "min": float(series.min()),
-                "p10": float(series.quantile(0.10)),
-                "p25": float(series.quantile(0.25)),
-                "median": float(series.quantile(0.50)),
-                "p75": float(series.quantile(0.75)),
-                "p90": float(series.quantile(0.90)),
-                "max": float(series.max()),
-                "mean": float(series.mean()),
-                "std": float(series.std()),
-            }
-        )
-
-    threshold_rows: list[dict[str, float | str | int]] = []
-    pct_metrics = [
-        "day_over_day_pct_change",
-        "trailing_7d_pct_change",
-        "same_weekday_4w_pct_change",
-        "finance_forecast_pct_change",
-    ]
-    pct_thresholds = [10, 15, 20, 25, 30]
-    abs_thresholds = [10, 20, 30, 40, 50]
-
-    for metric in pct_metrics:
-        metric_series = signals[metric]
-        abs_series = signals[metric.replace("_pct_", "_abs_")]
-        baseline_floor = signals["baseline_sales_floor"]
-        for pct_threshold in pct_thresholds:
-            for abs_threshold in abs_thresholds:
-                drop_mask = (
-                    (metric_series <= -pct_threshold)
-                    & (abs_series <= -abs_threshold)
-                    & (baseline_floor >= abs_threshold)
-                )
-                lift_mask = (
-                    (metric_series >= pct_threshold)
-                    & (abs_series >= abs_threshold)
-                    & (baseline_floor >= abs_threshold)
-                )
-                threshold_rows.append(
-                    {
-                        "metric": metric,
-                        "pct_threshold": pct_threshold,
-                        "abs_threshold": abs_threshold,
-                        "drop_count": int(drop_mask.sum()),
-                        "lift_count": int(lift_mask.sum()),
-                        "trigger_count": int((drop_mask | lift_mask).sum()),
-                    }
-                )
-
-    city_rows: list[dict[str, float | str | int]] = []
-    for city_id, city_frame in signals.groupby("city_id"):
-        city_rows.append(
-            {
-                "city_id": str(city_id),
-                "avg_sales": float(city_frame["total_sales"].mean()),
-                "sales_std": float(city_frame["total_sales"].std()),
-                "day_over_day_pct_std": float(city_frame["day_over_day_pct_change"].dropna().std()),
-                "trailing_7d_pct_std": float(city_frame["trailing_7d_pct_change"].dropna().std()),
-                "same_weekday_4w_pct_std": float(
-                    city_frame["same_weekday_4w_pct_change"].dropna().std()
-                ),
-            }
-        )
-
-    return {
-        "distribution": pd.DataFrame(distribution_rows),
-        "thresholds": pd.DataFrame(threshold_rows),
-        "city_stability": pd.DataFrame(city_rows).sort_values("avg_sales", ascending=False),
-    }
-
-
-def summarize_pct_trigger_distribution(
-    signals: pd.DataFrame,
-    metric: str,
-    thresholds: tuple[int, ...] = (10, 15, 20, 25, 30),
-) -> dict[str, pd.DataFrame]:
-    eligible = signals[signals[metric].notna()].copy()
-
-    overall_rows: list[dict[str, float | str | int]] = []
-    per_city_rows: list[dict[str, float | str | int]] = []
-    per_date_rows: list[dict[str, float | str | int]] = []
-
-    for pct_threshold in thresholds:
-        drop_mask = eligible[metric] <= -pct_threshold
-        lift_mask = eligible[metric] >= pct_threshold
-        trigger_mask = drop_mask | lift_mask
-        triggered = eligible[trigger_mask].copy()
-
-        overall_rows.append(
-            {
-                "metric": metric,
-                "pct_threshold": pct_threshold,
-                "eligible_store_days": int(eligible.shape[0]),
-                "triggered_city_days": int(trigger_mask.sum()),
-                "drop_store_days": int(drop_mask.sum()),
-                "lift_store_days": int(lift_mask.sum()),
-                "triggered_dates": int(triggered["dt"].nunique()),
-                "triggered_stores": int(triggered["city_id"].nunique()),
-            }
-        )
-
-        for city_id, city_frame in eligible.groupby("city_id"):
-            city_drop_mask = city_frame[metric] <= -pct_threshold
-            city_lift_mask = city_frame[metric] >= pct_threshold
-            city_trigger_count = int((city_drop_mask | city_lift_mask).sum())
-            per_city_rows.append(
-                {
-                    "metric": metric,
-                    "pct_threshold": pct_threshold,
-                    "city_id": str(city_id),
-                    "eligible_days": int(city_frame.shape[0]),
-                    "drop_days": int(city_drop_mask.sum()),
-                    "lift_days": int(city_lift_mask.sum()),
-                    "triggered_days": city_trigger_count,
-                    "trigger_rate_pct": float((city_trigger_count / city_frame.shape[0]) * 100.0),
-                }
-            )
-
-        if not triggered.empty:
-            per_date = (
-                triggered.groupby("dt", as_index=False)
-                .agg(triggered_city_days=("city_id", "count"))
-                .sort_values(["triggered_city_days", "dt"], ascending=[False, True])
-            )
-            for row in per_date.itertuples(index=False):
-                per_date_rows.append(
-                    {
-                        "metric": metric,
-                        "pct_threshold": pct_threshold,
-                        "dt": row.dt.strftime("%Y-%m-%d"),
-                        "triggered_city_days": int(row.triggered_city_days),
-                    }
-                )
-
-    return {
-        "overall": pd.DataFrame(overall_rows),
-        "per_store": pd.DataFrame(per_city_rows),
-        "per_date": pd.DataFrame(per_date_rows),
-    }
-
-
-def build_pct_trigger_grid(
-    signals: pd.DataFrame,
-    metric: str,
-    pct_threshold: int,
-) -> pd.DataFrame:
-    eligible = signals[signals[metric].notna()].copy()
-    eligible["trigger_flag"] = "."
-    eligible.loc[eligible[metric] <= -pct_threshold, "trigger_flag"] = "D"
-    eligible.loc[eligible[metric] >= pct_threshold, "trigger_flag"] = "L"
-    eligible["dt_label"] = eligible["dt"].dt.strftime("%Y-%m-%d")
-
-    grid = eligible.pivot(
-        index="city_id",
-        columns="dt_label",
-        values="trigger_flag",
-    ).fillna(".")
-    return grid.sort_index()
-
-
-def recommend_primary_signal(summary_tables: dict[str, pd.DataFrame]) -> str:
-    # Always use the finance forecast if available, as it is the corporate S&OP target
-    return "finance_forecast_pct_change"
+    return [row["dt"] for row in (resp.data or [])]

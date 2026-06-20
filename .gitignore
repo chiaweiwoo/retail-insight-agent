@@ -21,7 +21,14 @@ data/raw/*.parquet
 
 # Generated run logs and benchmark artifacts — not committed.
 data/runs.duckdb
+data/rca.duckdb
 data/analysis/agent_benchmark_runs/
+
+# Precomputed signal CSVs (now stored in Supabase, not git)
+data/analysis/*.csv
+data/analysis/trigger_grids/
+data/context_pack.json
+data/context_pack.md
 
 # Story report outputs — stored in Supabase, not git.
 output/

@@ -25,16 +25,16 @@ def test_rca_city_series_has_rows() -> None:
     assert resp.data, "rca_city_series is empty — run 'rca build' first"
 
 
-def test_rca_city_signal_v_returns_rows() -> None:
+def test_rca_city_signal_returns_rows() -> None:
     from rca.config import make_supabase_client
     client = make_supabase_client()
     resp = (
-        client.table("rca_city_signal_v")
-        .select("city_id,dt,signal_label")
+        client.table("rca_city_signal")
+        .select("city_id,dt,signal_label,business_target,target_deviation_pct")
         .limit(5)
         .execute()
     )
-    assert resp.data, "rca_city_signal_v is empty — check migration 0009"
+    assert resp.data, "rca_city_signal is empty — run 'rca analyze' first"
     for row in resp.data:
         assert row["signal_label"] in {"drop", "lift", "neutral", "insufficient_history"}
 

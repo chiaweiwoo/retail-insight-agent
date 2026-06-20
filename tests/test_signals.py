@@ -1,106 +1,103 @@
+"""Tests for the signals module (build_signal_series)."""
 from __future__ import annotations
 
 import pandas as pd
 import pytest
 
-from rca.signals import (
-    build_pct_trigger_grid,
-    build_sales_signal_frame,
-    load_sales_history,
-    recommend_primary_signal,
-    summarize_pct_trigger_distribution,
-    summarize_signal_distribution,
-)
+from rca.signals import build_signal_series
 
 
-@pytest.mark.skip(reason="store-era: asserts 1350 rows (15 stores) and store_alias column — rewritten for city grain in Round E1")
-def test_load_sales_history_shape() -> None:
-    frame = load_sales_history()
-    assert frame.shape[0] == 1350
-    assert set(["store_alias", "dt", "total_sales", "weekday"]).issubset(frame.columns)
+def _toy_actuals(n: int = 10) -> pd.DataFrame:
+    dates = pd.date_range("2024-03-28", periods=n, freq="D")
+    return pd.DataFrame({
+        "city_id": [0] * n,
+        "dt": dates.strftime("%Y-%m-%d"),
+        "total_sales": [100.0 + i * 5 for i in range(n)],
+        "weekday": [d.day_name().lower() for d in dates],
+        "density_tier": ["2"] * n,
+        "holiday_name_inferred": ["normal_weekday"] * n,
+    })
 
 
-@pytest.mark.skip(reason="store-era: asserts 1350 rows (15 stores) — rewritten for city grain in Round E1")
-def test_build_sales_signal_frame_adds_candidate_metrics() -> None:
-    frame = load_sales_history()
-    signals = build_sales_signal_frame(frame)
-    assert signals.shape[0] == 1350
-    assert "day_over_day_pct_change" in signals.columns
-    assert "trailing_7d_pct_change" in signals.columns
-    assert "same_weekday_4w_pct_change" in signals.columns
-    assert signals["same_weekday_4w_pct_change"].notna().sum() > 0
+def _toy_forecast(actuals: pd.DataFrame) -> pd.DataFrame:
+    # Provide forecast for second half only (simulates 28-day warm-up)
+    rows = actuals.iloc[5:].copy()
+    rows["forecast_sales"] = [110.0 + i * 5 for i in range(len(rows))]
+    return rows[["city_id", "dt", "forecast_sales"]]
 
 
-@pytest.mark.skip(reason="store-era: uses store_alias groupby key — rewritten for city grain in Round E1")
-def test_build_sales_signal_frame_on_toy_data() -> None:
-    toy = pd.DataFrame(
-        {
-            "store_alias": ["h263"] * 8,
-            "dt": pd.date_range("2024-03-28", periods=8, freq="D"),
-            "total_sales": [100.0, 110.0, 90.0, 120.0, 130.0, 140.0, 150.0, 160.0],
-            "weekday": [
-                "thursday",
-                "friday",
-                "saturday",
-                "sunday",
-                "monday",
-                "tuesday",
-                "wednesday",
-                "thursday",
-            ],
-            "is_weekend": [False, False, True, True, False, False, False, False],
-            "holiday_name_inferred": ["normal_weekday"] * 8,
-        }
-    )
-    signals = build_sales_signal_frame(toy)
-    last_row = signals.iloc[-1]
-    assert last_row["previous_day_sales"] == pytest.approx(150.0)
-    assert last_row["day_over_day_abs_change"] == pytest.approx(10.0)
-    assert last_row["day_over_day_pct_change"] == pytest.approx((10.0 / 150.0) * 100.0)
-    assert last_row["trailing_7d_avg_sales"] == pytest.approx(120.0)
+def test_build_signal_series_returns_expected_columns() -> None:
+    actuals = _toy_actuals()
+    forecast = _toy_forecast(actuals)
+    result = build_signal_series(actuals, forecast)
 
-
-def test_summarize_signal_distribution_outputs_tables() -> None:
-    signals = build_sales_signal_frame(load_sales_history())
-    summary = summarize_signal_distribution(signals)
-    assert set(summary.keys()) == {"distribution", "thresholds", "city_stability"}
-    assert not summary["distribution"].empty
-    assert not summary["thresholds"].empty
-    assert not summary["city_stability"].empty
-
-
-def test_recommend_primary_signal_is_supported_metric() -> None:
-    signals = build_sales_signal_frame(load_sales_history())
-    summary = summarize_signal_distribution(signals)
-    recommended = recommend_primary_signal(summary)
-    assert recommended in {
-        "day_over_day_pct_change",
-        "trailing_7d_pct_change",
-        "same_weekday_4w_pct_change",
+    required = {
+        "city_id", "dt", "total_sales", "business_target", "target_deviation_pct",
+        "signal_label", "previous_day_sales", "trailing_7d_avg_sales",
+        "same_weekday_4w_avg_sales", "day_over_day_pct_change", "trailing_7d_pct_change",
+        "same_weekday_4w_pct_change", "weekday", "density_tier", "holiday_name_inferred",
     }
+    assert required.issubset(result.columns)
 
 
-@pytest.mark.skip(reason="store-era: asserts per_store==75 (15 stores×5 thresholds) — rewritten for city grain in Round E1")
-def test_summarize_pct_trigger_distribution_outputs_expected_shapes() -> None:
-    signals = build_sales_signal_frame(load_sales_history())
-    summary = summarize_pct_trigger_distribution(
-        signals,
-        metric="trailing_7d_pct_change",
-    )
-    assert set(summary.keys()) == {"overall", "per_store", "per_date"}
-    assert len(summary["overall"]) == 5
-    assert len(summary["per_store"]) == 75
-    assert not summary["per_date"].empty
+def test_build_signal_series_row_count_matches_actuals() -> None:
+    actuals = _toy_actuals(10)
+    forecast = _toy_forecast(actuals)
+    result = build_signal_series(actuals, forecast)
+    assert len(result) == len(actuals)
 
 
-@pytest.mark.skip(reason="store-era: asserts grid.shape[0]==15 (15 stores) — rewritten for city grain in Round E1")
-def test_build_pct_trigger_grid_shape() -> None:
-    signals = build_sales_signal_frame(load_sales_history())
-    grid = build_pct_trigger_grid(
-        signals,
-        metric="trailing_7d_pct_change",
-        pct_threshold=20,
-    )
-    assert grid.shape[0] == 15
-    assert grid.shape[1] == 87
-    assert set(grid.to_numpy().ravel()).issubset({".", "D", "L"})
+def test_build_signal_series_insufficient_history_when_no_forecast() -> None:
+    actuals = _toy_actuals(10)
+    # No forecast rows → all insufficient_history
+    empty_forecast = pd.DataFrame(columns=["city_id", "dt", "forecast_sales"])
+    result = build_signal_series(actuals, empty_forecast)
+    assert (result["signal_label"] == "insufficient_history").all()
+
+
+def test_build_signal_series_business_target_is_scaled() -> None:
+    from rca.config import BUSINESS_TARGET_GROWTH_FACTOR
+    actuals = _toy_actuals(10)
+    forecast = _toy_forecast(actuals)
+    result = build_signal_series(actuals, forecast)
+    with_forecast = result[result["business_target"].notna()]
+    assert not with_forecast.empty
+    # business_target should be strictly > forecast_sales (growth factor > 1)
+    assert (with_forecast["business_target"] > 0).all()
+
+
+def test_build_signal_series_drop_label() -> None:
+    actuals = pd.DataFrame({
+        "city_id": [0] * 5,
+        "dt": pd.date_range("2024-03-28", periods=5, freq="D").strftime("%Y-%m-%d"),
+        "total_sales": [50.0, 50.0, 50.0, 50.0, 50.0],
+        "weekday": ["thursday"] * 5,
+        "density_tier": ["2"] * 5,
+        "holiday_name_inferred": ["normal_weekday"] * 5,
+    })
+    # Forecast much higher → actual is far below target → drop
+    forecast = pd.DataFrame({
+        "city_id": [0] * 5,
+        "dt": actuals["dt"].tolist(),
+        "forecast_sales": [100.0] * 5,  # business_target ≈ 103; actual 50 → ~-51% → drop
+    })
+    result = build_signal_series(actuals, forecast)
+    assert (result["signal_label"] == "drop").all()
+
+
+def test_build_signal_series_lift_label() -> None:
+    actuals = pd.DataFrame({
+        "city_id": [0] * 5,
+        "dt": pd.date_range("2024-03-28", periods=5, freq="D").strftime("%Y-%m-%d"),
+        "total_sales": [200.0, 200.0, 200.0, 200.0, 200.0],
+        "weekday": ["thursday"] * 5,
+        "density_tier": ["2"] * 5,
+        "holiday_name_inferred": ["normal_weekday"] * 5,
+    })
+    forecast = pd.DataFrame({
+        "city_id": [0] * 5,
+        "dt": actuals["dt"].tolist(),
+        "forecast_sales": [100.0] * 5,  # business_target ≈ 103; actual 200 → ~+94% → lift
+    })
+    result = build_signal_series(actuals, forecast)
+    assert (result["signal_label"] == "lift").all()

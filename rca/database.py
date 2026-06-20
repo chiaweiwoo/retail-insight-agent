@@ -513,6 +513,35 @@ def push_city_segments(df: pd.DataFrame, client: Any = None) -> int:
     return len(records)
 
 
+def push_city_signal(df: pd.DataFrame, client: Any = None) -> int:
+    """Upsert computed signal rows into rca_city_signal. Called by rca analyze."""
+    if df.empty:
+        return 0
+    if client is None:
+        client = make_supabase_client()
+
+    float_cols = {
+        "total_sales", "business_target", "target_deviation_pct",
+        "previous_day_sales", "trailing_7d_avg_sales", "same_weekday_4w_avg_sales",
+        "day_over_day_pct_change", "trailing_7d_pct_change", "same_weekday_4w_pct_change",
+    }
+    records = []
+    for row in df.itertuples(index=False):
+        r = row._asdict()
+        rec: dict = {}
+        for k, v in r.items():
+            if k in float_cols:
+                rec[k] = None if (v is None or (isinstance(v, float) and np.isnan(v))) else float(v)
+            elif isinstance(v, (np.integer,)):
+                rec[k] = int(v)
+            elif isinstance(v, (np.bool_,)):
+                rec[k] = bool(v)
+            else:
+                rec[k] = v
+        records.append(rec)
+    return _push_batch(client, "rca_city_signal", records, "city_id,dt")
+
+
 def push_city_correlations(df: pd.DataFrame, client: Any = None) -> int:
     if df.empty:
         return 0
@@ -592,7 +621,8 @@ def validate_supabase_counts(expected_city_days: int = 1620) -> dict[str, int]:
     client = make_supabase_client()
     counts: dict[str, int] = {}
     for table in ["rca_city_series", "rca_city_hourly", "rca_city_normals",
-                  "rca_finance_forecast", "rca_city_segment", "rca_city_correlations"]:
+                  "rca_finance_forecast", "rca_city_segment", "rca_city_correlations",
+                  "rca_city_signal"]:
         result = client.table(table).select("*", count="exact", head=True).execute()
         counts[table] = result.count or 0
 

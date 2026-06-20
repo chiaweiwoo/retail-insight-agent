@@ -6,8 +6,10 @@ Read `README.md` first for the current workflow.
 
 ```bash
 uv run python -m rca.cli build                         # ingest parquet → push all tables to Supabase
-uv run python -m rca.cli analyze                       # compute signal CSVs from Supabase
+uv run python -m rca.cli analyze                       # compute business-target deviations → push rca_city_signal
 uv run python -m rca.cli profile                       # build data/context_pack.json from Supabase
+uv run python -m rca.cli run --city 0                  # scan triggered dates, run oldest→latest
+uv run python -m rca.cli run --city 0 --dt 2024-05-16  # single-day override
 uv run python -m rca.cli run --city 0 --dt 2024-05-16 --dry-run --full
 uv run python -m rca.cli run --city 0 --dt 2024-05-16 --dry-run --reflect  # adds reflection pass
 uv run python -m rca.cli bench
@@ -38,10 +40,12 @@ Three-layer split:
 | Layer | Tables | Updated by |
 | --- | --- | --- |
 | **Fixed / precomputed** | `rca_city_series`, `rca_city_hourly`, `rca_city_normals`, `rca_finance_forecast`, `rca_city_segment`, `rca_city_correlations` | `rca build` (offline ETL) |
-| **Real-time view** | `rca_city_signal_v` | Postgres VIEW — computed at read time from `rca_city_series` + `rca_finance_forecast` |
+| **Precomputed triggers** | `rca_city_signal` | `rca analyze` — actual vs business target, all 1620 city-days |
 | **Agent output** | `rca_outcome`, `rca_city_profile` | `rca run` / `rca story` / `rca distil` |
 
-**Signal trigger**: Finance S&OP forecast only. Drop ≤ −10%, Lift ≥ +25% vs `forecast_sales`. STL is gone.
+**Signal trigger**: Business target = `rca_finance_forecast.forecast_sales × BUSINESS_TARGET_GROWTH_FACTOR` (default 1.03). Drop ≤ −10%, Lift ≥ +25% vs business target. Thresholds live in `config.py` only — not in SQL. STL is gone.
+
+**Runbook**: `rca build` → `rca analyze` → `rca run --city N` → `rca distil --city N`
 
 **No local database**: DuckDB is fully removed. `rca build` reads parquet from disk and pushes directly to Supabase. All agent runtime reads go to Supabase.
 

@@ -28,187 +28,128 @@ def _cmd_build(args: argparse.Namespace) -> None:
 
 
 def _cmd_analyze(args: argparse.Namespace) -> None:
-    from rca.signals import (
-        build_pct_trigger_grid,
-        build_sales_signal_frame,
-        load_sales_history,
-        recommend_primary_signal,
-        summarize_pct_trigger_distribution,
-        summarize_signal_distribution,
+    from rca.config import make_supabase_client, DEFAULT_DROP_THRESHOLD_PCT, DEFAULT_LIFT_THRESHOLD_PCT, BUSINESS_TARGET_GROWTH_FACTOR
+    from rca.signals import build_signal_series
+    from rca.database import push_city_signal
+    import pandas as pd
+
+    client = make_supabase_client()
+
+    print("Loading actuals from rca_city_series...")
+    resp = client.table("rca_city_series").select(
+        "city_id,dt,total_sales,weekday,density_tier,holiday_name_inferred"
+    ).limit(2000).execute()
+    actuals = pd.DataFrame(resp.data or [])
+    if actuals.empty:
+        print("rca_city_series is empty — run 'rca build' first.")
+        return
+
+    print("Loading finance forecast from rca_finance_forecast...")
+    resp = client.table("rca_finance_forecast").select("city_id,dt,forecast_sales").execute()
+    forecast = pd.DataFrame(resp.data or [])
+    if forecast.empty:
+        print("rca_finance_forecast is empty — run 'rca build' first.")
+        return
+
+    print(f"Computing signal series (business target = forecast × {BUSINESS_TARGET_GROWTH_FACTOR})...")
+    signals = build_signal_series(actuals, forecast)
+
+    # Distribution summary
+    eligible = signals[signals["business_target"].notna()]
+    total = len(eligible)
+    drop_count = int((eligible["signal_label"] == "drop").sum())
+    lift_count = int((eligible["signal_label"] == "lift").sum())
+    triggered = drop_count + lift_count
+    trigger_rate = triggered / total * 100 if total else 0.0
+
+    print()
+    print(f"  Eligible city-days (with forecast): {total}")
+    print(f"  Drop  (≤ {DEFAULT_DROP_THRESHOLD_PCT:+.0f}%): {drop_count:>4}  ({drop_count / total * 100:.1f}%)")
+    print(f"  Lift  (≥ +{DEFAULT_LIFT_THRESHOLD_PCT:.0f}%):   {lift_count:>4}  ({lift_count / total * 100:.1f}%)")
+    print(f"  Triggered total:            {triggered:>4}  ({trigger_rate:.1f}%)")
+
+    pct = eligible["target_deviation_pct"].dropna()
+    print()
+    print(f"  target_deviation_pct — p10: {pct.quantile(0.10):+.1f}%  median: {pct.quantile(0.50):+.1f}%  p90: {pct.quantile(0.90):+.1f}%")
+    print()
+
+    print("Pushing to Supabase rca_city_signal...")
+    pushed = push_city_signal(signals, client)
+    print(f"  {pushed} rows upserted.")
+    print("Done.")
+
+
+def _run_single_day(
+    city_id: int,
+    dt: str,
+    *,
+    quick: bool,
+    dry_run: bool,
+    full: bool,
+    reflect: bool,
+    client_factory,
+) -> None:
+    from rca.graph import run_rca_graph
+    from rca.agents import ANALYST_SPECS
+    from rca.config import current_timestamp_sgt_label, PROJECT_ROOT
+
+    specialists = None
+    if quick:
+        sales_spec = next(s for s in ANALYST_SPECS if s.name == "sales_analyst")
+        specialists = [sales_spec]
+
+    output_dir = None
+    if not quick:
+        label = "dry_run" if dry_run else current_timestamp_sgt_label()
+        output_dir = PROJECT_ROOT / "data" / "analysis" / "agent_benchmark_runs" / f"city{city_id}_{dt}_{label}"
+
+    result = run_rca_graph(
+        city_id=city_id,
+        dt=dt,
+        specialists=specialists,
+        client_factory=client_factory,
+        output_dir=output_dir,
+        enable_reflection=reflect,
     )
-    from rca.config import ANALYSIS_PATH, PROJECT_ROOT
-
-    def _as_markdown_table(frame) -> str:
-        headers = ["index", *list(frame.columns)]
-        rows = [headers, ["---"] * len(headers)]
-        for index, row in zip(frame.index, frame.itertuples(index=False, name=None)):
-            rows.append([str(index), *[str(value) for value in row]])
-        return "\n".join("| " + " | ".join(row) + " |" for row in rows)
-
-    def _as_markdown_value_table(frame) -> str:
-        headers = list(frame.columns)
-        rows = [headers, ["---"] * len(headers)]
-        for row in frame.itertuples(index=False, name=None):
-            rows.append([str(value) for value in row])
-        return "\n".join("| " + " | ".join(row) + " |" for row in rows)
-
-    def _write_markdown_summary(output_path, recommended_metric, summary_tables, pct_trigger_tables):
-        distribution = summary_tables["distribution"]
-        thresholds = summary_tables["thresholds"]
-
-        best_threshold_rows = (
-            thresholds.loc[thresholds["metric"] == recommended_metric]
-            .sort_values(["trigger_count", "pct_threshold", "abs_threshold"])
-            .reset_index(drop=True)
-        )
-        moderate_band = best_threshold_rows[
-            (best_threshold_rows["trigger_count"] >= 60)
-            & (best_threshold_rows["trigger_count"] <= 240)
-        ]
-        candidate_rows = moderate_band.head(5) if not moderate_band.empty else best_threshold_rows.head(5)
-        distribution_lookup = distribution.set_index("metric")
-        same_weekday_coverage_ratio = (
-            distribution_lookup.loc["same_weekday_4w_pct_change", "rows_with_baseline"]
-            / distribution_lookup.loc["day_over_day_pct_change", "rows_with_baseline"]
-        )
-        same_weekday_bias = distribution_lookup.loc["same_weekday_4w_pct_change", "mean"]
-        trigger_overall = pct_trigger_tables["overall"]
-        anomaly_candidate = trigger_overall.loc[trigger_overall["pct_threshold"] == 25].iloc[0]
-        discussion_candidate = trigger_overall.loc[trigger_overall["pct_threshold"] == 20].iloc[0]
-        city_spread = (
-            pct_trigger_tables["per_store"]
-            .loc[
-                pct_trigger_tables["per_store"]["pct_threshold"] == 20,
-                ["city_id", "triggered_days", "trigger_rate_pct"],
-            ]
-            .sort_values(["triggered_days", "city_id"], ascending=[False, True])
-            .head(8)
-        )
-
-        lines = [
-            "# Sales Signal Distribution Summary",
-            "",
-            f"Recommended primary signal candidate: `{recommended_metric}`",
-            "",
-            "## Distribution Snapshot",
-            "",
-            _as_markdown_value_table(distribution),
-            "",
-            "## Threshold Grid Candidates",
-            "",
-            _as_markdown_value_table(candidate_rows),
-            "",
-            "## Pure Percent Trigger Distribution",
-            "",
-            _as_markdown_value_table(trigger_overall),
-            "",
-            "## Per-Store Spread At 20%",
-            "",
-            _as_markdown_value_table(city_spread),
-            "",
-            "## Grid Legend",
-            "",
-            "- `D` = drop trigger",
-            "- `L` = lift trigger",
-            "- `.` = no trigger",
-            "",
-            "## Notes",
-            "",
-            "- `day_over_day` captures immediate swings but is the noisiest candidate.",
-            "- `trailing_7d` is smoother and currently the best default operational trigger when we want broad coverage.",
-            f"- `same_weekday_4w` is the most retail-shaped benchmark, but it only covers {same_weekday_coverage_ratio:.1%} of the rows that `day_over_day` covers in this 90-day slice.",
-            f"- `same_weekday_4w` also has an upward mean drift of {same_weekday_bias:.2f}% in this sample, so it is better as a reasoning baseline than as the first trigger baseline.",
-            f"- Pure `trailing_7d_pct_change` at 20% gives {int(discussion_candidate['triggered_city_days'])} triggered city-days across {int(discussion_candidate['triggered_dates'])} calendar dates.",
-            f"- Pure `trailing_7d_pct_change` at 25% gives {int(anomaly_candidate['triggered_city_days'])} triggered city-days across {int(anomaly_candidate['triggered_dates'])} calendar dates, which is a better anomaly-style discussion set.",
-            "- The current trigger exploration is per store-day, not a single global daily alarm.",
-            "",
-        ]
-        output_path.write_text("\n".join(lines), encoding="utf-8")
-
-    sales_history = load_sales_history()
-    signals = build_sales_signal_frame(sales_history)
-    summary_tables = summarize_signal_distribution(signals)
-    pct_trigger_tables = summarize_pct_trigger_distribution(
-        signals,
-        metric="trailing_7d_pct_change",
-    )
-    recommended_metric = recommend_primary_signal(summary_tables)
-
-    analysis_dir = ANALYSIS_PATH
-    analysis_dir.mkdir(parents=True, exist_ok=True)
-    docs_dir = PROJECT_ROOT / "docs" / "analysis"
-    docs_dir.mkdir(parents=True, exist_ok=True)
-
-    signals.to_csv(analysis_dir / "city_day_sales_signals.csv", index=False)
-    summary_tables["distribution"].to_csv(analysis_dir / "signal_distribution_summary.csv", index=False)
-    summary_tables["thresholds"].to_csv(analysis_dir / "signal_threshold_grid.csv", index=False)
-    summary_tables["city_stability"].to_csv(analysis_dir / "city_signal_stability.csv", index=False)
-    pct_trigger_tables["overall"].to_csv(analysis_dir / "pct_trigger_overall_summary.csv", index=False)
-    pct_trigger_tables["per_store"].to_csv(analysis_dir / "pct_trigger_by_store.csv", index=False)
-    pct_trigger_tables["per_date"].to_csv(analysis_dir / "pct_trigger_by_date.csv", index=False)
-
-    grid_dir = analysis_dir / "trigger_grids"
-    grid_dir.mkdir(parents=True, exist_ok=True)
-
-    for pct_threshold in (20, 25, 30):
-        grid = build_pct_trigger_grid(
-            signals,
-            metric="trailing_7d_pct_change",
-            pct_threshold=pct_threshold,
-        )
-        active_grid = grid.loc[:, (grid != ".").any(axis=0)]
-        grid.to_csv(grid_dir / f"trailing_7d_pct_trigger_grid_{pct_threshold}.csv")
-        active_grid.to_csv(grid_dir / f"trailing_7d_pct_trigger_grid_{pct_threshold}_active_only.csv")
-
-    _write_markdown_summary(
-        docs_dir / "sales_signal_distribution_summary.md",
-        recommended_metric,
-        summary_tables,
-        pct_trigger_tables,
-    )
-
-    print(f"Signals exported to {analysis_dir}")
-    print(f"Recommended primary signal: {recommended_metric}")
+    if quick:
+        _safe_print(result.coordinator_report_markdown)
+    else:
+        _safe_print(result.decision_card_markdown)
+        if full:
+            _safe_print("\n" + result.coordinator_report_markdown)
+    if output_dir:
+        print(f"\nArtifacts written to {output_dir}")
 
 
 def _cmd_run(args: argparse.Namespace) -> None:
-    from rca.graph import run_rca_graph
-    from rca.agents import ANALYST_SPECS
-    from rca.config import AGENT_BENCHMARK_PATH, current_timestamp_sgt_label
-
     client_factory = None
     if args.dry_run:
         from rca.stubclient import stub_client_factory
         client_factory = stub_client_factory
         print("[dry-run] Using stub LLM client — no API calls will be made.")
 
-    specialists = None
-    if args.quick:
-        sales_spec = next(s for s in ANALYST_SPECS if s.name == "sales_analyst")
-        specialists = [sales_spec]
-
-    output_dir = None
-    if not args.quick:
-        from rca.config import PROJECT_ROOT
-        label = "dry_run" if args.dry_run else current_timestamp_sgt_label()
-        output_dir = PROJECT_ROOT / "data" / "analysis" / "agent_benchmark_runs" / f"city{args.city}_{args.dt}_{label}"
-
-    result = run_rca_graph(
-        city_id=args.city,
-        dt=args.dt,
-        specialists=specialists,
-        client_factory=client_factory,
-        output_dir=output_dir,
-        enable_reflection=getattr(args, "reflect", False),
-    )
-    if args.quick:
-        _safe_print(result.coordinator_report_markdown)
+    if args.dt:
+        # Single-day mode
+        _run_single_day(
+            args.city, args.dt,
+            quick=args.quick, dry_run=args.dry_run, full=args.full,
+            reflect=getattr(args, "reflect", False), client_factory=client_factory,
+        )
     else:
-        _safe_print(result.decision_card_markdown)
-        if args.full:
-            _safe_print("\n" + result.coordinator_report_markdown)
-    if output_dir:
-        print(f"\nArtifacts written to {output_dir}")
+        # Trigger-scan mode: run all triggered dates oldest→latest
+        from rca.signals import get_trigger_dates_for_city
+        dates = get_trigger_dates_for_city(args.city)
+        if not dates:
+            print(f"No triggered dates found for city {args.city}. Run 'rca analyze' first.")
+            return
+        print(f"City {args.city}: {len(dates)} triggered date(s). Running oldest→latest...")
+        for i, dt in enumerate(dates, 1):
+            print(f"\n[{i}/{len(dates)}] city {args.city} — {dt}")
+            _run_single_day(
+                args.city, dt,
+                quick=args.quick, dry_run=args.dry_run, full=args.full,
+                reflect=getattr(args, "reflect", False), client_factory=client_factory,
+            )
 
 
 def _cmd_bench(args: argparse.Namespace) -> None:
@@ -442,7 +383,7 @@ def main() -> None:
     # rca analyze
     analyze_parser = subparsers.add_parser(
         "analyze",
-        help="Compute sales signals and export CSVs to data/analysis/",
+        help="Compute business-target deviations, label triggers, push to rca_city_signal",
     )
     analyze_parser.set_defaults(func=_cmd_analyze)
 
@@ -452,7 +393,11 @@ def main() -> None:
         help="Run the coordinator pipeline for one city-day",
     )
     run_parser.add_argument("--city", required=True, type=int, help="City ID (integer 0–17)")
-    run_parser.add_argument("--dt", required=True, help="Date (YYYY-MM-DD)")
+    run_parser.add_argument(
+        "--dt",
+        default=None,
+        help="Date (YYYY-MM-DD). Omit to run all triggered dates for the city oldest→latest.",
+    )
     run_parser.add_argument(
         "--quick",
         action="store_true",

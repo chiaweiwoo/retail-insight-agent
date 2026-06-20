@@ -69,6 +69,9 @@ End your memo with this exact section (fill in every field):
 DEFAULT_DROP_THRESHOLD_PCT = -10.0
 DEFAULT_LIFT_THRESHOLD_PCT = 25.0
 
+# Business target = statistical forecast × this factor (simulation only; adjust as needed)
+BUSINESS_TARGET_GROWTH_FACTOR = 1.03
+
 DEFAULT_LLM_BASE_URL = "https://api.deepseek.com"
 DEFAULT_LLM_MODEL = "deepseek-v4-flash"
 DEFAULT_LLM_MAX_TOOL_ROUNDS = 8

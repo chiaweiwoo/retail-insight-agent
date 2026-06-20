@@ -1,6 +1,6 @@
 """Agent tool implementations — all reads from Supabase.
 
-The signal frame is loaded once per process from rca_city_signal_v and cached.
+The signal frame is loaded once per process from rca_city_signal and cached.
 """
 from __future__ import annotations
 
@@ -29,21 +29,21 @@ def _round_float(value: float | None, digits: int = 4) -> float | None:
 
 
 # ---------------------------------------------------------------------------
-# Cached signal frame — loaded once from Supabase rca_city_signal_v
+# Cached signal frame — loaded once from Supabase rca_city_signal
 # ---------------------------------------------------------------------------
 
 
 @lru_cache(maxsize=1)
 def _signal_frame() -> pd.DataFrame:
-    """Load all city-days from the rca_city_signal_v view and cache."""
+    """Load all city-days from rca_city_signal and cache for the process lifetime."""
     client = make_supabase_client()
     resp = (
-        client.table("rca_city_signal_v")
+        client.table("rca_city_signal")
         .select(
-            "city_id,dt,total_sales,weekday,density_tier,holiday_name_inferred,"
+            "city_id,dt,total_sales,business_target,target_deviation_pct,signal_label,"
             "previous_day_sales,trailing_7d_avg_sales,same_weekday_4w_avg_sales,"
-            "forecast_sales,day_over_day_pct_change,trailing_7d_pct_change,"
-            "same_weekday_4w_pct_change,finance_forecast_pct_change,signal_label"
+            "day_over_day_pct_change,trailing_7d_pct_change,same_weekday_4w_pct_change,"
+            "weekday,density_tier,holiday_name_inferred"
         )
         .limit(2000)
         .execute()
@@ -51,8 +51,8 @@ def _signal_frame() -> pd.DataFrame:
     frame = pd.DataFrame(resp.data or [])
     if frame.empty:
         raise RuntimeError(
-            "rca_city_signal_v returned no rows. "
-            "Run 'rca build' to populate Supabase, then ensure migration 0009 has been applied."
+            "rca_city_signal is empty. "
+            "Run 'rca analyze' to compute and push signal rows."
         )
     frame["dt"] = pd.to_datetime(frame["dt"])
     frame["dt_label"] = frame["dt"].dt.strftime("%Y-%m-%d")
@@ -91,14 +91,14 @@ def get_signal_evidence(city_id: int, dt: str) -> dict[str, Any]:
         "dt": dt,
         "signal_label": signal_label,
         "current_sales": _round_float(row["total_sales"]),
-        "forecast_sales": _round_float(row.get("forecast_sales")),
+        "business_target": _round_float(row.get("business_target")),
+        "target_deviation_pct": _round_float(row.get("target_deviation_pct")),
         "previous_day_sales": _round_float(row["previous_day_sales"]),
         "trailing_7d_avg_sales": _round_float(row["trailing_7d_avg_sales"]),
         "same_weekday_4w_avg_sales": _round_float(row["same_weekday_4w_avg_sales"]),
         "day_over_day_pct_change": _round_float(row["day_over_day_pct_change"]),
         "trailing_7d_pct_change": _round_float(row["trailing_7d_pct_change"]),
         "same_weekday_4w_pct_change": _round_float(row["same_weekday_4w_pct_change"]),
-        "finance_forecast_pct_change": _round_float(row.get("finance_forecast_pct_change")),
         "thresholds": {
             "drop_lte_pct": DEFAULT_DROP_THRESHOLD_PCT,
             "lift_gte_pct": DEFAULT_LIFT_THRESHOLD_PCT,
@@ -172,7 +172,7 @@ def get_sales_context(city_id: int, dt: str, history_days: int = 7) -> dict[str,
             "previous_day_sales": _round_float(signal_row["previous_day_sales"]),
             "trailing_7d_avg_sales": _round_float(signal_row["trailing_7d_avg_sales"]),
             "same_weekday_4w_avg_sales": _round_float(signal_row["same_weekday_4w_avg_sales"]),
-            "forecast_sales": _round_float(signal_row.get("forecast_sales")),
+            "business_target": _round_float(signal_row.get("business_target")),
         },
     }
 

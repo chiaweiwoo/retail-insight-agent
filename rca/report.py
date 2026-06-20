@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import csv
 import json
 from html import escape
 from pathlib import Path
@@ -77,7 +76,6 @@ blockquote {
 """
 
 
-_DASHBOARD_THRESHOLD = 20
 ClientFactory = Callable[[str], Any]
 
 STORY_WRITER_SYSTEM_PROMPT = """You are writing a story-style RCA walkthrough for a human reader.
@@ -104,39 +102,6 @@ Return sections:
 4. Where The System Challenged Itself
 5. Final Decision
 """
-
-
-def _read_csv(path: Path) -> list[dict[str, str]]:
-    with open(path, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
-
-
-def _load_grid(analysis_dir: Path) -> tuple[list[str], list[str], dict]:
-    path = analysis_dir / "trigger_grids" / f"trailing_7d_pct_trigger_grid_{_DASHBOARD_THRESHOLD}.csv"
-    rows = _read_csv(path)
-    stores = [r["city_id"] for r in rows]
-    dates = [k for k in rows[0].keys() if k != "city_id"]
-    cells = {r["city_id"]: {d: r[d] for d in dates} for r in rows}
-    return stores, dates, cells
-
-
-def _load_store_stats(analysis_dir: Path) -> dict:
-    rows = _read_csv(analysis_dir / "pct_trigger_by_store.csv")
-    return {
-        r["city_id"]: r
-        for r in rows
-        if r["metric"] == "trailing_7d_pct_change" and int(r["pct_threshold"]) == _DASHBOARD_THRESHOLD
-    }
-
-
-def _load_summary(analysis_dir: Path) -> dict:
-    rows = _read_csv(analysis_dir / "pct_trigger_overall_summary.csv")
-    for r in rows:
-        if r["metric"] == "trailing_7d_pct_change" and int(r["pct_threshold"]) == _DASHBOARD_THRESHOLD:
-            return r
-    return {}
-
-
 
 
 def _build_dashboard_html_content(
