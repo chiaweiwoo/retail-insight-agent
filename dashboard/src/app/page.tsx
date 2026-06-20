@@ -7,18 +7,11 @@ import { Badge, Card, Title, Text, Metric, Flex, Grid, Select, SelectItem } from
 export default async function StoresPage() {
   // Fetch stores and their latest signal
   const { data: stores, error } = await supabase
-    .from("dim_store")
+    .from("rca_store_normals")
     .select(`
       store_id,
-      city_id,
-      signals (
-        dt,
-        signal_label,
-        value
-      )
+      city_id
     `)
-    // Using a simple fetch, assuming there's at least some signals.
-    // In a real app, we'd limit this or use a view to get latest.
     .limit(100);
 
   if (error) {
@@ -30,20 +23,30 @@ export default async function StoresPage() {
     );
   }
 
+  // Fetch recent outcomes to get latest signal per store
+  const { data: outcomes } = await supabase
+    .from("rca_outcome")
+    .select("store_id, dt, signal_label")
+    .order("dt", { ascending: false });
+
+  const latestSignalMap = new Map();
+  if (outcomes) {
+    for (const out of outcomes) {
+      if (!latestSignalMap.has(out.store_id)) {
+        latestSignalMap.set(out.store_id, out);
+      }
+    }
+  }
+
   // Process data to get the latest signal per store
   const processedStores = stores?.map((store: any) => {
-    // Sort signals by date descending to get the latest
-    const sortedSignals = store.signals?.sort((a: any, b: any) => 
-      new Date(b.dt).getTime() - new Date(a.dt).getTime()
-    ) || [];
-    const latestSignal = sortedSignals[0];
+    const latestSignal = latestSignalMap.get(store.store_id);
 
     return {
       store_id: store.store_id,
       city_id: store.city_id,
       latest_dt: latestSignal?.dt || "N/A",
       signal_label: latestSignal?.signal_label || "none",
-      value: latestSignal?.value || 0,
     };
   }) || [];
 
@@ -77,9 +80,6 @@ export default async function StoresPage() {
               <div className="mt-4 pt-4 border-t border-slate-800/50">
                 <Flex>
                   <Text className="text-slate-500">Last Signal: {store.latest_dt}</Text>
-                  <Text className={`font-medium ${store.value < 0 ? 'text-red-400' : store.value > 0 ? 'text-emerald-400' : 'text-slate-400'}`}>
-                    {store.value > 0 ? '+' : ''}{(store.value * 100).toFixed(1)}%
-                  </Text>
                 </Flex>
               </div>
             </Card>

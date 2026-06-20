@@ -5,7 +5,7 @@ import { Card, Title, Text, Metric, Grid } from "@tremor/react";
 export default async function ProfilePage({ params }: { params: Promise<{ storeId: string }> }) {
   const { storeId } = await params;
   const { data: profile, error } = await supabase
-    .from("store_profile")
+    .from("rca_store_profile")
     .select("*")
     .eq("store_id", storeId)
     .single();

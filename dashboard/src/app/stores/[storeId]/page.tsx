@@ -5,13 +5,13 @@ import { Card, Title, AreaChart, Grid, Metric, Text, Flex } from "@tremor/react"
 export default async function StoreOverview({ params }: { params: Promise<{ storeId: string }> }) {
   const { storeId } = await params;
   const { data: salesData, error } = await supabase
-    .from("fact_sales_store_day")
+    .from("rca_store_series")
     .select("dt, total_sales")
-    .eq("store_alias", storeId)
+    .eq("store_id", storeId)
     .order("dt", { ascending: true });
 
   const { data: signals } = await supabase
-    .from("signals")
+    .from("rca_outcome")
     .select("dt, signal_label")
     .eq("store_id", storeId)
     .neq("signal_label", "none");
