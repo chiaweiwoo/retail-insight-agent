@@ -6,9 +6,9 @@
 > real, **adds an intraday (24-hour) explanatory layer and a statistical/ML layer**, fixes the trigger science,
 > and moves logging mostly to the cloud.
 >
-> **Status: under discussion. Two forks awaiting confirmation — see "Open confirmations" below.**
-> The plan currently reflects the *recommended* choice on each fork; if the user picks differently it is a
-> small edit, not a rewrite.
+> **Status: City-Grain Pivot and Dashboard Heatmap are Complete.** The core metrics, database logic, agent prompts, and the Next.js frontend have been successfully refactored to focus on City-Level aggregations (18 cities, 90 days). The Fleet Overview dashboard now uses an elegant 14-day heatmap.
+> 
+> The next phase will focus on the Statistical/ML layer (STL detrending, KMeans clustering, Intraday anomaly tracking).
 
 ---
 
