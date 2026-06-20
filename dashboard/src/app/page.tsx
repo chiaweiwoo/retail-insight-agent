@@ -73,8 +73,10 @@ export default async function CitiesPage() {
               </th>
               {displayDates.map((date) => {
                 const d = new Date(date);
+                const isMonday = d.getDay() === 1;
+                const borderLeft = isMonday ? "border-l-2 border-l-white/20" : "border-l border-l-transparent";
                 return (
-                  <th key={date} className="border-b border-white/10 p-2 text-center whitespace-nowrap">
+                  <th key={date} className={`border-b border-white/10 p-2 text-center whitespace-nowrap ${borderLeft}`}>
                     <div className="text-[11px] font-medium text-slate-400">{d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
                   </th>
                 );
@@ -150,6 +152,9 @@ export default async function CitiesPage() {
                   </td>
                   
                   {sparklineData.map((cell) => {
+                    const d = new Date(cell.date);
+                    const isMonday = d.getDay() === 1;
+                    const borderLeft = isMonday ? "border-l-2 border-l-white/20" : "border-l border-l-transparent";
                     const pctStr = (cell.pctChange > 0 ? '+' : '') + (cell.pctChange * 100).toFixed(1) + '%';
                     
                     let cellBg = '';
@@ -163,7 +168,7 @@ export default async function CitiesPage() {
                     }
 
                     return (
-                      <td key={cell.date} className="border-b border-white/5 p-1 text-center" title={`Raw volume: ${Math.round(cell.currentSales).toLocaleString()}`}>
+                      <td key={cell.date} className={`border-b border-white/5 p-1 text-center ${borderLeft}`} title={`Raw volume: ${Math.round(cell.currentSales).toLocaleString()}`}>
                         <div className={`mx-auto w-full h-full py-1.5 px-2 rounded flex items-center justify-center transition-colors ${cellBg}`}>
                           {cell.currentSales > 0 && cell.trailingAvg > 0 ? (
                             <span className={`text-[11px] font-semibold ${textClass}`}>
