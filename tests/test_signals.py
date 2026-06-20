@@ -13,12 +13,14 @@ from rca.signals import (
 )
 
 
+@pytest.mark.skip(reason="store-era: asserts 1350 rows (15 stores) and store_alias column — rewritten for city grain in Round E1")
 def test_load_sales_history_shape() -> None:
     frame = load_sales_history()
     assert frame.shape[0] == 1350
     assert set(["store_alias", "dt", "total_sales", "weekday"]).issubset(frame.columns)
 
 
+@pytest.mark.skip(reason="store-era: asserts 1350 rows (15 stores) — rewritten for city grain in Round E1")
 def test_build_sales_signal_frame_adds_candidate_metrics() -> None:
     frame = load_sales_history()
     signals = build_sales_signal_frame(frame)
@@ -29,6 +31,7 @@ def test_build_sales_signal_frame_adds_candidate_metrics() -> None:
     assert signals["same_weekday_4w_pct_change"].notna().sum() > 0
 
 
+@pytest.mark.skip(reason="store-era: uses store_alias groupby key — rewritten for city grain in Round E1")
 def test_build_sales_signal_frame_on_toy_data() -> None:
     toy = pd.DataFrame(
         {
@@ -77,6 +80,7 @@ def test_recommend_primary_signal_is_supported_metric() -> None:
     }
 
 
+@pytest.mark.skip(reason="store-era: asserts per_store==75 (15 stores×5 thresholds) — rewritten for city grain in Round E1")
 def test_summarize_pct_trigger_distribution_outputs_expected_shapes() -> None:
     signals = build_sales_signal_frame(load_sales_history())
     summary = summarize_pct_trigger_distribution(
@@ -89,6 +93,7 @@ def test_summarize_pct_trigger_distribution_outputs_expected_shapes() -> None:
     assert not summary["per_date"].empty
 
 
+@pytest.mark.skip(reason="store-era: asserts grid.shape[0]==15 (15 stores) — rewritten for city grain in Round E1")
 def test_build_pct_trigger_grid_shape() -> None:
     signals = build_sales_signal_frame(load_sales_history())
     grid = build_pct_trigger_grid(

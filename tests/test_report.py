@@ -18,7 +18,7 @@ def test_render_markdown_document_creates_html_shell() -> None:
 
 def test_build_story_markdown_fallback_creates_layered_narrative() -> None:
     trace = {
-        "store_alias": "h555",
+        "city_id": 0,
         "dt": "2024-05-16",
         "planner": {
             "selected_analysts": ["sales_analyst", "ops_analyst"],
