@@ -50,7 +50,7 @@ export default async function CityOverview({ params }: { params: Promise<{ cityI
             <Target size={18} className="text-indigo-400" />
             <span className="text-sm font-medium">Avg Daily Sales</span>
           </div>
-          <div className="text-3xl font-bold text-white">{mean.toFixed(1)}</div>
+          <div className="text-3xl font-bold text-white">{Math.round(mean).toLocaleString()}</div>
           <div className="mt-2 text-xs text-slate-500">Normalized Coefficient</div>
         </div>
         
@@ -59,7 +59,7 @@ export default async function CityOverview({ params }: { params: Promise<{ cityI
             <Activity size={18} className="text-purple-400" />
             <span className="text-sm font-medium">Sales Volatility (σ)</span>
           </div>
-          <div className="text-3xl font-bold text-white">{stddev.toFixed(1)}</div>
+          <div className="text-3xl font-bold text-white">{Math.round(stddev).toLocaleString()}</div>
           <div className="mt-2 text-xs text-slate-500">Standard Deviation</div>
         </div>
         

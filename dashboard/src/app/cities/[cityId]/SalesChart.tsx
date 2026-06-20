@@ -43,6 +43,7 @@ export default function SalesChart({ data }: { data: ChartData[] }) {
             axisLine={false} 
             tickLine={false} 
             tick={{ fill: "#64748b", fontSize: 12 }} 
+            tickFormatter={(val) => Math.round(val).toLocaleString()}
             dx={-10}
           />
           <Tooltip 
@@ -54,7 +55,7 @@ export default function SalesChart({ data }: { data: ChartData[] }) {
                     <p className="text-slate-400 text-xs mb-1 font-medium">{label}</p>
                     <p className="text-white font-semibold flex items-center space-x-2">
                       <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
-                      <span>{Number(payload[0].value).toFixed(2)} Sales</span>
+                      <span>{Math.round(Number(payload[0].value)).toLocaleString()} Sales</span>
                     </p>
                     {isTrigger && (
                       <div className={`mt-2 text-xs font-medium px-2 py-1 rounded border inline-block ${
