@@ -36,6 +36,7 @@ from rca.llm import (
     load_llm_settings,
     make_routed_settings,
 )
+from rca.obs import RcaObserver
 from rca.outcomes import build_outcome_record, get_prior_rca, record_outcome
 from rca.report import render_markdown_document, sanitize_generated_markdown
 from rca.runlog import RunLogger
@@ -103,48 +104,50 @@ def _restore_analyst_results(state: RcaState) -> list[AnalystRunResult]:
 def plan_node(state: RcaState, config: RunnableConfig) -> dict:
     cfg = _cfg(config)
     logger: RunLogger = cfg["logger"]
+    observer: RcaObserver = cfg["observer"]
     store_alias = state["store_alias"]
     dt = state["dt"]
     include_research = state.get("include_research", False)
     subject = f"{store_alias}:{dt}"
 
-    prior_rca_summary = get_prior_rca(store_alias)
+    with observer.node_span("plan"):
+        prior_rca_summary = get_prior_rca(store_alias)
 
-    if state.get("specialists"):
-        # Pre-specified by caller — skip re-planning, use as-is
+        if state.get("specialists"):
+            # Pre-specified by caller — skip re-planning, use as-is
+            logger.log(
+                actor_type="workflow", actor_name="coordinator_pipeline",
+                action="started", subject=subject, source="system",
+                details={"analyst_count": len(state["specialists"]), "planning_inputs": None, "prior_rca_summary": prior_rca_summary},
+            )
+            return {"prior_rca_summary": prior_rca_summary, "planning_inputs": None, "skipped_analysts": []}
+
+        specialists, skipped_analysts, planning_inputs = _plan_specialists_with_reasons(
+            store_alias=store_alias, dt=dt, include_research=include_research
+        )
+
         logger.log(
             actor_type="workflow", actor_name="coordinator_pipeline",
             action="started", subject=subject, source="system",
-            details={"analyst_count": len(state["specialists"]), "planning_inputs": None, "prior_rca_summary": prior_rca_summary},
+            details={"analyst_count": len(specialists), "planning_inputs": planning_inputs, "prior_rca_summary": prior_rca_summary},
         )
-        return {"prior_rca_summary": prior_rca_summary, "planning_inputs": None, "skipped_analysts": []}
+        logger.log(
+            actor_type="workflow", actor_name="plan_specialists",
+            action="completed", subject=subject, source="system",
+            details={
+                "selected_analysts": [s.name for s in specialists],
+                "skipped_analysts": skipped_analysts,
+                "include_research": include_research,
+                "prior_rca_summary": prior_rca_summary,
+            },
+        )
 
-    specialists, skipped_analysts, planning_inputs = _plan_specialists_with_reasons(
-        store_alias=store_alias, dt=dt, include_research=include_research
-    )
-
-    logger.log(
-        actor_type="workflow", actor_name="coordinator_pipeline",
-        action="started", subject=subject, source="system",
-        details={"analyst_count": len(specialists), "planning_inputs": planning_inputs, "prior_rca_summary": prior_rca_summary},
-    )
-    logger.log(
-        actor_type="workflow", actor_name="plan_specialists",
-        action="completed", subject=subject, source="system",
-        details={
-            "selected_analysts": [s.name for s in specialists],
-            "skipped_analysts": skipped_analysts,
-            "include_research": include_research,
+        return {
+            "specialists": [asdict(s) for s in specialists],
+            "planning_inputs": planning_inputs,
             "prior_rca_summary": prior_rca_summary,
-        },
-    )
-
-    return {
-        "specialists": [asdict(s) for s in specialists],
-        "planning_inputs": planning_inputs,
-        "prior_rca_summary": prior_rca_summary,
-        "skipped_analysts": skipped_analysts,
-    }
+            "skipped_analysts": skipped_analysts,
+        }
 
 
 def route_specialists(state: RcaState) -> list[Send]:
@@ -166,6 +169,7 @@ def run_specialist_node(state: dict, config: RunnableConfig) -> dict:
     base_settings: LLMSettings = cfg["settings"]
     client_factory: ClientFactory = cfg["client_factory"]
     logger: RunLogger = cfg["logger"]
+    observer: RcaObserver = cfg["observer"]
 
     spec_dict = state["spec_dict"]
     spec = AnalystSpec(
@@ -176,14 +180,15 @@ def run_specialist_node(state: dict, config: RunnableConfig) -> dict:
     )
     node_settings = make_routed_settings(base_settings, spec.name)
 
-    result = _run_specialist(
-        spec=spec,
-        store_alias=state["store_alias"],
-        dt=state["dt"],
-        settings=node_settings,
-        logger=logger,
-        client_factory=client_factory,
-    )
+    with observer.node_span(spec.name):
+        result = _run_specialist(
+            spec=spec,
+            store_alias=state["store_alias"],
+            dt=state["dt"],
+            settings=node_settings,
+            logger=logger,
+            client_factory=client_factory,
+        )
     result_dict = asdict(result)
     result_dict["memo_markdown"] = sanitize_generated_markdown(result_dict["memo_markdown"])
     return {"analyst_results": [result_dict]}
@@ -194,6 +199,7 @@ def critic_node(state: RcaState, config: RunnableConfig) -> dict:
     base_settings: LLMSettings = cfg["settings"]
     client_factory: ClientFactory = cfg["client_factory"]
     logger: RunLogger = cfg["logger"]
+    observer: RcaObserver = cfg["observer"]
     subject = f"{state['store_alias']}:{state['dt']}"
 
     analyst_results = _restore_analyst_results(state)
@@ -207,14 +213,15 @@ def critic_node(state: RcaState, config: RunnableConfig) -> dict:
     )
 
     node_settings = make_routed_settings(base_settings, "critic")
-    critic_note = _run_critic(
-        store_alias=state["store_alias"],
-        dt=state["dt"],
-        analyst_results=analyst_results,
-        settings=node_settings,
-        logger=logger,
-        client_factory=client_factory,
-    )
+    with observer.node_span("critic"):
+        critic_note = _run_critic(
+            store_alias=state["store_alias"],
+            dt=state["dt"],
+            analyst_results=analyst_results,
+            settings=node_settings,
+            logger=logger,
+            client_factory=client_factory,
+        )
     logger.log(
         actor_type="workflow", actor_name="coordinator_pipeline",
         action="critic_completed", subject=subject, source="system",
@@ -228,19 +235,21 @@ def synthesize_node(state: RcaState, config: RunnableConfig) -> dict:
     base_settings: LLMSettings = cfg["settings"]
     client_factory: ClientFactory = cfg["client_factory"]
     logger: RunLogger = cfg["logger"]
+    observer: RcaObserver = cfg["observer"]
 
     analyst_results = _restore_analyst_results(state)
     node_settings = make_routed_settings(base_settings, "coordinator_analyst")
 
-    coordinator_report = _synthesize(
-        store_alias=state["store_alias"],
-        dt=state["dt"],
-        analyst_results=analyst_results,
-        critic_note_markdown=state["critic_note"],
-        settings=node_settings,
-        logger=logger,
-        client_factory=client_factory,
-    )
+    with observer.node_span("synthesize"):
+        coordinator_report = _synthesize(
+            store_alias=state["store_alias"],
+            dt=state["dt"],
+            analyst_results=analyst_results,
+            critic_note_markdown=state["critic_note"],
+            settings=node_settings,
+            logger=logger,
+            client_factory=client_factory,
+        )
     return {"coordinator_report": coordinator_report}
 
 
@@ -249,17 +258,19 @@ def controller_node(state: RcaState, config: RunnableConfig) -> dict:
     base_settings: LLMSettings = cfg["settings"]
     client_factory: ClientFactory = cfg["client_factory"]
     logger: RunLogger = cfg["logger"]
+    observer: RcaObserver = cfg["observer"]
     node_settings = make_routed_settings(base_settings, "finance_controller")
 
-    controller_note = _run_finance_controller(
-        store_alias=state["store_alias"],
-        dt=state["dt"],
-        coordinator_report_markdown=state["coordinator_report"],
-        critic_note_markdown=state["critic_note"],
-        settings=node_settings,
-        logger=logger,
-        client_factory=client_factory,
-    )
+    with observer.node_span("controller"):
+        controller_note = _run_finance_controller(
+            store_alias=state["store_alias"],
+            dt=state["dt"],
+            coordinator_report_markdown=state["coordinator_report"],
+            critic_note_markdown=state["critic_note"],
+            settings=node_settings,
+            logger=logger,
+            client_factory=client_factory,
+        )
     return {"controller_note": controller_note}
 
 
@@ -268,19 +279,21 @@ def slt_node(state: RcaState, config: RunnableConfig) -> dict:
     base_settings: LLMSettings = cfg["settings"]
     client_factory: ClientFactory = cfg["client_factory"]
     logger: RunLogger = cfg["logger"]
+    observer: RcaObserver = cfg["observer"]
     node_settings = make_routed_settings(base_settings, "slt_brief")
 
-    decision_card = _run_slt_brief(
-        store_alias=state["store_alias"],
-        dt=state["dt"],
-        coordinator_report_markdown=state["coordinator_report"],
-        controller_note_markdown=state["controller_note"],
-        critic_note_markdown=state["critic_note"],
-        prior_rca_summary=state["prior_rca_summary"],
-        settings=node_settings,
-        logger=logger,
-        client_factory=client_factory,
-    )
+    with observer.node_span("slt"):
+        decision_card = _run_slt_brief(
+            store_alias=state["store_alias"],
+            dt=state["dt"],
+            coordinator_report_markdown=state["coordinator_report"],
+            controller_note_markdown=state["controller_note"],
+            critic_note_markdown=state["critic_note"],
+            prior_rca_summary=state["prior_rca_summary"],
+            settings=node_settings,
+            logger=logger,
+            client_factory=client_factory,
+        )
     return {"decision_card": decision_card}
 
 
@@ -443,9 +456,12 @@ def run_rca_graph(
 ) -> CoordinatorResult:
     settings = settings or load_llm_settings()
     is_dry_run = client_factory is not None
-    effective_client_factory: ClientFactory = client_factory or (lambda node_name: build_openai_compatible_client(settings))
     run_name = f"{store_alias}_{dt}"
     logger = RunLogger(run_name=run_name)
+
+    base_factory: ClientFactory = client_factory or (lambda node_name: build_openai_compatible_client(settings))
+    observer = RcaObserver(store_alias=store_alias, dt=dt, run_name=run_name, is_dry_run=is_dry_run)
+    traced_factory = observer.wrap_client_factory(base_factory)
 
     initial_state: dict = {
         "store_alias": store_alias,
@@ -467,14 +483,16 @@ def run_rca_graph(
     graph_config: dict = {
         "configurable": {
             "settings": settings,
-            "client_factory": effective_client_factory,
+            "client_factory": traced_factory,
             "logger": logger,
+            "observer": observer,
             "is_dry_run": is_dry_run,
         }
     }
 
     graph = build_rca_graph()
     final_state: RcaState = graph.invoke(initial_state, config=graph_config)
+    observer.finalize(output={"store_alias": store_alias, "dt": dt})
 
     analyst_results = _restore_analyst_results(final_state)
     return CoordinatorResult(
