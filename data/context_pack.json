@@ -1,142 +1,163 @@
 {
   "dataset": {
     "source": "FreshRetailNet-50K (anonymized 2024 dataset)",
-    "stores": 15,
+    "cities": 18,
     "days": 90,
     "date_min": "2024-03-28",
     "date_max": "2024-06-25",
-    "granularity": "store-day",
-    "note": "Store aliases, city IDs, and product IDs are opaque anonymized identifiers. Do not assign business meaning to them beyond what is computed from the data. holiday_name_inferred values are themselves inferred — treat as uncertain priors."
+    "granularity": "city-day",
+    "note": "City IDs (integers 0–17) and product IDs are opaque anonymized identifiers. Do not assign business meaning to them beyond what is computed from the data. holiday_name_inferred values are themselves inferred — treat as uncertain priors. sale_amount and hours_sale are normalized sales amounts multiplied by a specific coefficient in the source dataset. Treat aggregated sales values as relative sales amounts for comparison, not literal unit counts and not currency revenue."
   },
   "fleet": {
-    "avg_daily_sales": 103.06,
+    "avg_daily_sales": 2773.86,
     "weekday_avg_sales": {
-      "friday": 98.12,
-      "monday": 98.6,
-      "saturday": 117.23,
-      "sunday": 120.02,
-      "thursday": 89.55,
-      "tuesday": 103.25,
-      "wednesday": 93.94
+      "friday": 2574.38,
+      "monday": 2618.28,
+      "saturday": 3272.58,
+      "sunday": 3335.26,
+      "thursday": 2405.66,
+      "tuesday": 2672.18,
+      "wednesday": 2519.12
     },
     "weekend_vs_weekday_avg_sales": {
-      "weekday": 96.73,
-      "weekend": 118.62
+      "weekday": 2558.53,
+      "weekend": 3303.92
     }
   },
-  "store_prefix_empirical": {
-    "description": "Average daily sales grouped by the first letter of store_alias. This is a computed grouping only — the prefix is an opaque identifier and is NOT labelled as a tier or size category.",
-    "by_prefix": {
-      "h": 188.36,
-      "l": 36.71,
-      "m": 84.11
+  "density_tier_empirical": {
+    "description": "Average daily sales grouped by density tier (1 = >100 stores, 2 = 20-99, 3 = <20). Use as a weak prior for relative scale comparisons only.",
+    "by_tier": {
+      "1": 10985.62,
+      "2": 2219.92,
+      "3": 405.91
     }
   },
-  "per_store_normal": {
-    "h018": {
-      "store_alias": "h018",
-      "avg_daily_sales": 187.54,
-      "stddev_daily_sales": 25.85,
-      "min_daily_sales": 130.27,
-      "max_daily_sales": 253.57
+  "per_city_normal": {
+    "0": {
+      "city_id": 0,
+      "avg_daily_sales": 26384.71,
+      "stddev_daily_sales": 4331.9,
+      "min_daily_sales": 18829.16,
+      "max_daily_sales": 37557.31
     },
-    "h182": {
-      "store_alias": "h182",
-      "avg_daily_sales": 191.89,
-      "stddev_daily_sales": 30.51,
-      "min_daily_sales": 148.2,
-      "max_daily_sales": 274.6
+    "1": {
+      "city_id": 1,
+      "avg_daily_sales": 456.49,
+      "stddev_daily_sales": 87.14,
+      "min_daily_sales": 300.25,
+      "max_daily_sales": 688.96
     },
-    "h235": {
-      "store_alias": "h235",
-      "avg_daily_sales": 194.56,
-      "stddev_daily_sales": 30.36,
-      "min_daily_sales": 138.77,
-      "max_daily_sales": 270.8
+    "2": {
+      "city_id": 2,
+      "avg_daily_sales": 393.06,
+      "stddev_daily_sales": 77.3,
+      "min_daily_sales": 277.05,
+      "max_daily_sales": 613.0
     },
-    "h263": {
-      "store_alias": "h263",
-      "avg_daily_sales": 193.42,
-      "stddev_daily_sales": 28.23,
-      "min_daily_sales": 141.67,
-      "max_daily_sales": 254.7
+    "3": {
+      "city_id": 3,
+      "avg_daily_sales": 1798.65,
+      "stddev_daily_sales": 348.18,
+      "min_daily_sales": 1224.05,
+      "max_daily_sales": 2945.67
     },
-    "h555": {
-      "store_alias": "h555",
-      "avg_daily_sales": 174.37,
-      "stddev_daily_sales": 21.29,
-      "min_daily_sales": 126.23,
-      "max_daily_sales": 220.05
+    "4": {
+      "city_id": 4,
+      "avg_daily_sales": 1520.24,
+      "stddev_daily_sales": 404.95,
+      "min_daily_sales": 818.66,
+      "max_daily_sales": 2417.61
     },
-    "l164": {
-      "store_alias": "l164",
-      "avg_daily_sales": 35.5,
-      "stddev_daily_sales": 6.56,
-      "min_daily_sales": 22.6,
-      "max_daily_sales": 53.47
+    "5": {
+      "city_id": 5,
+      "avg_daily_sales": 593.31,
+      "stddev_daily_sales": 115.78,
+      "min_daily_sales": 374.25,
+      "max_daily_sales": 923.2
     },
-    "l165": {
-      "store_alias": "l165",
-      "avg_daily_sales": 36.88,
-      "stddev_daily_sales": 7.5,
-      "min_daily_sales": 22.3,
-      "max_daily_sales": 57.2
+    "6": {
+      "city_id": 6,
+      "avg_daily_sales": 2462.59,
+      "stddev_daily_sales": 494.39,
+      "min_daily_sales": 1564.34,
+      "max_daily_sales": 4236.77
     },
-    "l175": {
-      "store_alias": "l175",
-      "avg_daily_sales": 34.28,
-      "stddev_daily_sales": 5.54,
-      "min_daily_sales": 23.04,
-      "max_daily_sales": 47.6
+    "7": {
+      "city_id": 7,
+      "avg_daily_sales": 420.9,
+      "stddev_daily_sales": 86.06,
+      "min_daily_sales": 280.72,
+      "max_daily_sales": 671.17
     },
-    "l185": {
-      "store_alias": "l185",
-      "avg_daily_sales": 37.59,
-      "stddev_daily_sales": 7.97,
-      "min_daily_sales": 25.5,
-      "max_daily_sales": 55.3
+    "8": {
+      "city_id": 8,
+      "avg_daily_sales": 51.37,
+      "stddev_daily_sales": 11.32,
+      "min_daily_sales": 32.47,
+      "max_daily_sales": 96.67
     },
-    "l260": {
-      "store_alias": "l260",
-      "avg_daily_sales": 39.28,
-      "stddev_daily_sales": 7.05,
-      "min_daily_sales": 24.55,
-      "max_daily_sales": 62.9
+    "9": {
+      "city_id": 9,
+      "avg_daily_sales": 184.01,
+      "stddev_daily_sales": 38.4,
+      "min_daily_sales": 122.49,
+      "max_daily_sales": 288.51
     },
-    "m041": {
-      "store_alias": "m041",
-      "avg_daily_sales": 84.41,
-      "stddev_daily_sales": 20.51,
-      "min_daily_sales": 48.57,
-      "max_daily_sales": 146.4
+    "10": {
+      "city_id": 10,
+      "avg_daily_sales": 413.06,
+      "stddev_daily_sales": 89.62,
+      "min_daily_sales": 245.05,
+      "max_daily_sales": 658.88
     },
-    "m236": {
-      "store_alias": "m236",
-      "avg_daily_sales": 82.97,
-      "stddev_daily_sales": 15.45,
-      "min_daily_sales": 53.56,
-      "max_daily_sales": 122.78
+    "11": {
+      "city_id": 11,
+      "avg_daily_sales": 2121.69,
+      "stddev_daily_sales": 460.21,
+      "min_daily_sales": 1253.27,
+      "max_daily_sales": 3257.25
     },
-    "m386": {
-      "store_alias": "m386",
-      "avg_daily_sales": 82.86,
-      "stddev_daily_sales": 14.85,
-      "min_daily_sales": 48.24,
-      "max_daily_sales": 112.84
+    "12": {
+      "city_id": 12,
+      "avg_daily_sales": 4773.5,
+      "stddev_daily_sales": 1075.62,
+      "min_daily_sales": 2975.74,
+      "max_daily_sales": 7759.91
     },
-    "m648": {
-      "store_alias": "m648",
-      "avg_daily_sales": 84.99,
-      "stddev_daily_sales": 14.51,
-      "min_daily_sales": 61.68,
-      "max_daily_sales": 127.1
+    "13": {
+      "city_id": 13,
+      "avg_daily_sales": 2324.31,
+      "stddev_daily_sales": 517.29,
+      "min_daily_sales": 1517.16,
+      "max_daily_sales": 3533.5
     },
-    "m679": {
-      "store_alias": "m679",
-      "avg_daily_sales": 85.34,
-      "stddev_daily_sales": 13.45,
-      "min_daily_sales": 62.0,
-      "max_daily_sales": 122.5
+    "14": {
+      "city_id": 14,
+      "avg_daily_sales": 519.98,
+      "stddev_daily_sales": 121.84,
+      "min_daily_sales": 310.12,
+      "max_daily_sales": 877.99
+    },
+    "15": {
+      "city_id": 15,
+      "avg_daily_sales": 756.46,
+      "stddev_daily_sales": 131.69,
+      "min_daily_sales": 497.07,
+      "max_daily_sales": 1203.52
+    },
+    "16": {
+      "city_id": 16,
+      "avg_daily_sales": 4469.79,
+      "stddev_daily_sales": 828.52,
+      "min_daily_sales": 2924.15,
+      "max_daily_sales": 6774.26
+    },
+    "17": {
+      "city_id": 17,
+      "avg_daily_sales": 285.45,
+      "stddev_daily_sales": 79.97,
+      "min_daily_sales": 151.75,
+      "max_daily_sales": 456.45
     }
   },
   "holidays_in_window": [
@@ -302,7 +323,8 @@
       "No cost, margin, or product-category data available.",
       "No real-time or external data — this is a historical anonymized dataset.",
       "Treat all context as a weak prior, not ground truth.",
-      "The analysis window is fixed: 2024-03-28 to 2024-06-25."
+      "The analysis window is fixed: 2024-03-28 to 2024-06-25.",
+      "sale_amount and hours_sale are normalized sales amounts multiplied by a specific coefficient in the source dataset. Treat aggregated sales values as relative sales amounts for comparison, not literal unit counts and not currency revenue."
     ]
   }
 }

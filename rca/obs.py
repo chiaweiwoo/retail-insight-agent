@@ -1,7 +1,7 @@
 """Langfuse observability wrapper for RCA pipeline runs.
 
 Usage pattern:
-    observer = RcaObserver(store_alias, dt, run_name, is_dry_run)
+    observer = RcaObserver(city_id, dt, run_name, is_dry_run)
     client_factory = observer.wrap_client_factory(base_factory)
     with observer.node_span("plan"):
         ...
@@ -96,7 +96,7 @@ class RcaObserver:
 
     def __init__(
         self,
-        store_alias: str,
+        city_id: int,
         dt: str,
         run_name: str,
         is_dry_run: bool = False,
@@ -127,7 +127,7 @@ class RcaObserver:
             self._root_span = self._lf.start_observation(
                 name="rca_run",
                 as_type="span",
-                input={"store_alias": store_alias, "dt": dt},
+                input={"city_id": city_id, "dt": dt},
                 metadata={"run_name": run_name},
             )
             self._trace_id = self._root_span.trace_id

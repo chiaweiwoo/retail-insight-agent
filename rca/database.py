@@ -18,7 +18,6 @@ from rca.config import (
     RAW_DATA_PATH,
     REQUIRED_RAW_COLUMNS,
     SCHEMA_PATH,
-    STORE_ID_TO_ALIAS,
     make_supabase_client,
 )
 
@@ -87,9 +86,8 @@ def _validate_scope_counts(scoped: pd.DataFrame) -> None:
             f"Expected date range {DATE_START} to {DATE_END}, found {min_date} to {max_date}."
         )
 
-    store_count = int(scoped["store_alias"].nunique())
     city_count = int(scoped["city_id"].nunique())
-    print(f"  Scope: {store_count} stores across {city_count} cities, {day_count} days.")
+    print(f"  Scope: {city_count} cities, {day_count} days.")
 
 
 def _expand_hourly_column(
@@ -118,10 +116,6 @@ def _infer_holiday_name(dt: pd.Timestamp) -> str:
     return "normal_weekday"
 
 
-def _make_store_alias(store_id: int) -> str:
-    """Map numeric store_id → alias. Known city-0 stores get h/m/l prefix; others get 's{id}'."""
-    return STORE_ID_TO_ALIAS.get(store_id, f"s{store_id}")
-
 
 def load_scoped_raw_data(raw_data_path: Path = RAW_DATA_PATH) -> pd.DataFrame:
     if not raw_data_path.exists():
@@ -133,22 +127,21 @@ def load_scoped_raw_data(raw_data_path: Path = RAW_DATA_PATH) -> pd.DataFrame:
     scoped = frame.loc[frame["city_id"].isin(CITY_IDS)].copy()
 
     if scoped.empty:
-        raise ValueError(f"Scoped raw data is empty after filtering to city_ids={CITY_IDS}.")
+        raise ValueError("Scoped raw data is empty.")
 
     scoped["dt"] = pd.to_datetime(scoped["dt"], format="%Y-%m-%d", errors="raise")
     _validate_hourly_lists(scoped["hours_sale"], "hours_sale")
     _validate_hourly_lists(scoped["hours_stock_status"], "hours_stock_status")
 
-    scoped["store_alias"] = scoped["store_id"].map(_make_store_alias)
     _validate_scope_counts(scoped)
     return scoped
 
 
-def build_dim_store(scoped: pd.DataFrame) -> pd.DataFrame:
+def build_dim_city(scoped: pd.DataFrame) -> pd.DataFrame:
     return (
-        scoped[["store_alias", "city_id"]]
-        .drop_duplicates()
-        .sort_values("store_alias")
+        scoped.groupby("city_id", as_index=False)
+        .agg(store_count=("store_id", "nunique"))
+        .sort_values("city_id")
         .reset_index(drop=True)
     )
 
@@ -193,16 +186,16 @@ def build_dim_weather_day(scoped: pd.DataFrame) -> pd.DataFrame:
     )
 
 
-def build_fact_sales_store_day(scoped: pd.DataFrame) -> pd.DataFrame:
+def build_fact_sales_city_day(scoped: pd.DataFrame) -> pd.DataFrame:
     sales = pd.concat(
         [
-            scoped[["store_alias", "dt", "product_id", "sale_amount"]],
+            scoped[["city_id", "dt", "product_id", "sale_amount"]],
             _expand_hourly_column(scoped, "hours_sale", "sales"),
         ],
         axis=1,
     )
     aggregated = (
-        sales.groupby(["store_alias", "dt"], as_index=False)
+        sales.groupby(["city_id", "dt"], as_index=False)
         .agg(
             product_count=("product_id", "count"),
             active_product_count=("sale_amount", lambda series: int((series > 0).sum())),
@@ -210,22 +203,22 @@ def build_fact_sales_store_day(scoped: pd.DataFrame) -> pd.DataFrame:
             avg_sales_per_product=("sale_amount", "mean"),
             **{column: (column, "sum") for column in _hour_columns("sales")},
         )
-        .sort_values(["store_alias", "dt"])
+        .sort_values(["city_id", "dt"])
         .reset_index(drop=True)
     )
     return aggregated
 
 
-def build_fact_stockout_store_day(scoped: pd.DataFrame) -> pd.DataFrame:
+def build_fact_stockout_city_day(scoped: pd.DataFrame) -> pd.DataFrame:
     stockout = pd.concat(
         [
-            scoped[["store_alias", "dt", "stock_hour6_22_cnt"]],
+            scoped[["city_id", "dt", "stock_hour6_22_cnt"]],
             _expand_hourly_column(scoped, "hours_stock_status", "stockout_rate"),
         ],
         axis=1,
     )
     aggregated = (
-        stockout.groupby(["store_alias", "dt"], as_index=False)
+        stockout.groupby(["city_id", "dt"], as_index=False)
         .agg(
             avg_stockout_hours=("stock_hour6_22_cnt", "mean"),
             stockout_product_rate=(
@@ -242,15 +235,15 @@ def build_fact_stockout_store_day(scoped: pd.DataFrame) -> pd.DataFrame:
             ),
             **{column: (column, "mean") for column in _hour_columns("stockout_rate")},
         )
-        .sort_values(["store_alias", "dt"])
+        .sort_values(["city_id", "dt"])
         .reset_index(drop=True)
     )
     return aggregated
 
 
-def build_fact_discount_store_day(scoped: pd.DataFrame) -> pd.DataFrame:
+def build_fact_discount_city_day(scoped: pd.DataFrame) -> pd.DataFrame:
     return (
-        scoped.groupby(["store_alias", "dt"], as_index=False)
+        scoped.groupby(["city_id", "dt"], as_index=False)
         .agg(
             avg_discount=("discount", "mean"),
             discounted_product_rate=(
@@ -262,13 +255,13 @@ def build_fact_discount_store_day(scoped: pd.DataFrame) -> pd.DataFrame:
                 lambda series: float((series < 0.5).mean()),
             ),
         )
-        .sort_values(["store_alias", "dt"])
+        .sort_values(["city_id", "dt"])
         .reset_index(drop=True)
     )
 
 
-def build_fact_activity_store_day(scoped: pd.DataFrame) -> pd.DataFrame:
-    grouped = scoped.groupby(["store_alias", "dt"], as_index=False)
+def build_fact_activity_city_day(scoped: pd.DataFrame) -> pd.DataFrame:
+    grouped = scoped.groupby(["city_id", "dt"], as_index=False)
     activity = grouped.agg(
         activity_product_rate=("activity_flag", "mean"),
         total_sales=("sale_amount", "sum"),
@@ -286,21 +279,21 @@ def build_fact_activity_store_day(scoped: pd.DataFrame) -> pd.DataFrame:
         axis=1,
     )
     return (
-        activity[["store_alias", "dt", "activity_product_rate", "activity_sales_share"]]
-        .sort_values(["store_alias", "dt"])
+        activity[["city_id", "dt", "activity_product_rate", "activity_sales_share"]]
+        .sort_values(["city_id", "dt"])
         .reset_index(drop=True)
     )
 
 
 def build_all_tables(scoped: pd.DataFrame) -> dict[str, pd.DataFrame]:
     return {
-        "dim_store": build_dim_store(scoped),
+        "dim_city": build_dim_city(scoped),
         "dim_holiday_day": build_dim_holiday_day(scoped),
         "dim_weather_day": build_dim_weather_day(scoped),
-        "fact_sales_store_day": build_fact_sales_store_day(scoped),
-        "fact_stockout_store_day": build_fact_stockout_store_day(scoped),
-        "fact_discount_store_day": build_fact_discount_store_day(scoped),
-        "fact_activity_store_day": build_fact_activity_store_day(scoped),
+        "fact_sales_city_day": build_fact_sales_city_day(scoped),
+        "fact_stockout_city_day": build_fact_stockout_city_day(scoped),
+        "fact_discount_city_day": build_fact_discount_city_day(scoped),
+        "fact_activity_city_day": build_fact_activity_city_day(scoped),
     }
 
 
@@ -325,6 +318,12 @@ def ingest_to_duckdb() -> dict[str, int]:
         connection.close()
 
     return row_counts
+
+
+def run_analytics(db_path: Path = DB_PATH) -> dict[str, int]:
+    """Run the analytics pipeline (STL, intraday, segments, correlations) on local DuckDB."""
+    from rca.analytics import run_analytics_pipeline
+    return run_analytics_pipeline(db_path)
 
 
 # ---------------------------------------------------------------------------
@@ -376,38 +375,37 @@ def validate_fact_shape(
     result = connection.execute(
         f"""
         SELECT
-            COUNT(*) FILTER (WHERE store_alias IS NULL) AS null_store_alias,
+            COUNT(*) FILTER (WHERE city_id IS NULL) AS null_city_id,
             COUNT(*) FILTER (WHERE dt IS NULL) AS null_dt,
-            COUNT(DISTINCT store_alias) AS distinct_stores,
+            COUNT(DISTINCT city_id) AS distinct_cities,
             COUNT(DISTINCT dt) AS distinct_dates
         FROM {table_name}
         """
     ).fetchone()
-    null_store_alias, null_dt, distinct_stores, distinct_dates = [int(value) for value in result]
+    null_city_id, null_dt, distinct_cities, distinct_dates = [int(value) for value in result]
 
-    _assert(null_store_alias == 0, f"{table_name} contains null store_alias values.")
+    _assert(null_city_id == 0, f"{table_name} contains null city_id values.")
     _assert(null_dt == 0, f"{table_name} contains null dt values.")
     _assert(
         distinct_dates == EXPECTED_DAY_COUNT,
         f"{table_name} should contain {EXPECTED_DAY_COUNT} dates, found {distinct_dates}.",
     )
-    # Store count is dynamic with multi-city scope — just sanity-check it's non-zero.
-    _assert(distinct_stores > 0, f"{table_name} contains zero stores.")
+    _assert(distinct_cities > 0, f"{table_name} contains zero cities.")
 
 
 def validate_rate_columns(connection: duckdb.DuckDBPyConnection) -> None:
     rate_tables = {
-        "fact_stockout_store_day": [
+        "fact_stockout_city_day": [
             "stockout_product_rate",
             "severe_stockout_product_rate",
             "full_stockout_product_rate",
-            *[f"hour_{hour:02d}_stockout_rate" for hour in range(24)],
+            *_hour_columns("stockout_rate"),
         ],
-        "fact_discount_store_day": [
+        "fact_discount_city_day": [
             "discounted_product_rate",
             "deep_discount_product_rate",
         ],
-        "fact_activity_store_day": [
+        "fact_activity_city_day": [
             "activity_product_rate",
             "activity_sales_share",
         ],
@@ -430,16 +428,13 @@ def validate_rate_columns(connection: duckdb.DuckDBPyConnection) -> None:
 
 def validate_hourly_sales(connection: duckdb.DuckDBPyConnection) -> None:
     expressions = ", ".join(
-        [
-            f"SUM(CASE WHEN hour_{hour:02d}_sales < 0 THEN 1 ELSE 0 END) AS hour_{hour:02d}_sales"
-            for hour in range(24)
-        ]
+        f"MIN(hour_{hour:02d}_sales) AS min_h{hour:02d}" for hour in range(HOURLY_LENGTH)
     )
-    result = connection.execute(f"SELECT {expressions} FROM fact_sales_store_day").fetchone()
-    for hour, violation_count in enumerate(result):
+    result = connection.execute(f"SELECT {expressions} FROM fact_sales_city_day").fetchone()
+    for hour, min_val in enumerate(result):
         _assert(
-            int(violation_count) == 0,
-            f"fact_sales_store_day.hour_{hour:02d}_sales contains negative values.",
+            float(min_val) >= 0,
+            f"fact_sales_city_day.hour_{hour:02d}_sales contains negative values.",
         )
 
 
@@ -480,13 +475,17 @@ validate_database = validate_daily_tables
 # ---------------------------------------------------------------------------
 
 
-def _store_prefix(store_alias: str) -> str:
-    """Return single-char prefix from alias: 'h555' → 'h', 's41' → 's'."""
-    return store_alias[0] if store_alias else "s"
+def _city_tier(store_count: int) -> str:
+    """Return density tier: 1 (>100), 2 (20-99), 3 (<20)."""
+    if store_count >= 100:
+        return "1"
+    if store_count >= 20:
+        return "2"
+    return "3"
 
 
 def sync_series_to_supabase(db_path: Path = DB_PATH, batch_size: int = 500) -> int:
-    """Push daily store aggregates from local DuckDB → Supabase store_series.
+    """Push daily city aggregates from local DuckDB → Supabase city_series.
 
     Returns total rows upserted.
     """
@@ -495,13 +494,13 @@ def sync_series_to_supabase(db_path: Path = DB_PATH, batch_size: int = 500) -> i
         rows = connection.execute(
             """
             SELECT
-                s.store_alias,
-                ds.city_id,
-                CAST(s.dt AS VARCHAR) AS dt,
-                s.total_sales,
-                s.product_count,
-                s.active_product_count,
-                s.avg_sales_per_product,
+                c.city_id,
+                dc.store_count,
+                CAST(c.dt AS VARCHAR) AS dt,
+                c.total_sales,
+                c.product_count,
+                c.active_product_count,
+                c.avg_sales_per_product,
                 st.stockout_product_rate,
                 st.severe_stockout_product_rate,
                 d.avg_discount,
@@ -511,13 +510,13 @@ def sync_series_to_supabase(db_path: Path = DB_PATH, batch_size: int = 500) -> i
                 h.holiday_flag,
                 h.is_weekend,
                 h.weekday
-            FROM fact_sales_store_day s
-            JOIN dim_store ds USING (store_alias)
-            JOIN fact_stockout_store_day st USING (store_alias, dt)
-            JOIN fact_discount_store_day d USING (store_alias, dt)
-            JOIN fact_activity_store_day a USING (store_alias, dt)
+            FROM fact_sales_city_day c
+            JOIN dim_city dc USING (city_id)
+            JOIN fact_stockout_city_day st USING (city_id, dt)
+            JOIN fact_discount_city_day d USING (city_id, dt)
+            JOIN fact_activity_city_day a USING (city_id, dt)
             JOIN dim_holiday_day h USING (dt)
-            ORDER BY s.store_alias, s.dt
+            ORDER BY c.city_id, c.dt
             """
         ).fetchall()
     finally:
@@ -530,11 +529,11 @@ def sync_series_to_supabase(db_path: Path = DB_PATH, batch_size: int = 500) -> i
     total = 0
     batch = []
     for row in rows:
-        store_alias = str(row[0])
+        city_id = int(row[0])
+        store_count = int(row[1])
         batch.append({
-            "store_id": store_alias,
-            "city_id": int(row[1]),
-            "prefix": _store_prefix(store_alias),
+            "city_id": city_id,
+            "density_tier": _city_tier(store_count),
             "dt": str(row[2]),
             "total_sales": float(row[3]) if row[3] is not None else None,
             "product_count": int(row[4]) if row[4] is not None else None,
@@ -551,15 +550,15 @@ def sync_series_to_supabase(db_path: Path = DB_PATH, batch_size: int = 500) -> i
             "weekday": str(row[15]) if row[15] is not None else None,
         })
         if len(batch) >= batch_size:
-            client.table("rca_store_series").upsert(
-                batch, on_conflict="store_id,dt"
+            client.table("rca_city_series").upsert(
+                batch, on_conflict="city_id,dt"
             ).execute()
             total += len(batch)
             batch = []
 
     if batch:
-        client.table("rca_store_series").upsert(
-            batch, on_conflict="store_id,dt"
+        client.table("rca_city_series").upsert(
+            batch, on_conflict="city_id,dt"
         ).execute()
         total += len(batch)
 
@@ -567,35 +566,35 @@ def sync_series_to_supabase(db_path: Path = DB_PATH, batch_size: int = 500) -> i
 
 
 def sync_normals_to_supabase(db_path: Path = DB_PATH) -> int:
-    """Compute per-store baselines and upsert to Supabase store_normals."""
+    """Compute per-city baselines and upsert to Supabase city_normals."""
     connection = duckdb.connect(str(db_path), read_only=True)
     try:
         rows = connection.execute(
             """
             SELECT
-                s.store_alias,
-                ds.city_id,
-                PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY s.total_sales) AS p25,
-                PERCENTILE_CONT(0.50) WITHIN GROUP (ORDER BY s.total_sales) AS p50,
-                PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY s.total_sales) AS p75,
-                AVG(s.total_sales) AS avg_sale,
-                STDDEV(s.total_sales) AS stddev_sale
-            FROM fact_sales_store_day s
-            JOIN dim_store ds USING (store_alias)
-            GROUP BY s.store_alias, ds.city_id
+                c.city_id,
+                dc.store_count,
+                PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY c.total_sales) AS p25,
+                PERCENTILE_CONT(0.50) WITHIN GROUP (ORDER BY c.total_sales) AS p50,
+                PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY c.total_sales) AS p75,
+                AVG(c.total_sales) AS avg_sale,
+                STDDEV(c.total_sales) AS stddev_sale
+            FROM fact_sales_city_day c
+            JOIN dim_city dc USING (city_id)
+            GROUP BY c.city_id, dc.store_count
             """
         ).fetchall()
 
-        # Weekday pattern per store: avg sales by day-of-week, normalised to fleet mean=1
+        # Weekday pattern per city: avg sales by day-of-week, normalised to fleet mean=1
         dow_rows = connection.execute(
             """
             SELECT
-                s.store_alias,
-                DAYOFWEEK(s.dt) - 1 AS dow,
-                AVG(s.total_sales) AS dow_avg
-            FROM fact_sales_store_day s
-            GROUP BY s.store_alias, DAYOFWEEK(s.dt)
-            ORDER BY s.store_alias, dow
+                c.city_id,
+                DAYOFWEEK(c.dt) - 1 AS dow,
+                AVG(c.total_sales) AS dow_avg
+            FROM fact_sales_city_day c
+            GROUP BY c.city_id, DAYOFWEEK(c.dt)
+            ORDER BY c.city_id, dow
             """
         ).fetchall()
     finally:
@@ -604,28 +603,126 @@ def sync_normals_to_supabase(db_path: Path = DB_PATH) -> int:
     import json
 
     dow_map: dict[str, dict[str, float]] = {}
-    for store_alias, dow, avg in dow_rows:
-        dow_map.setdefault(str(store_alias), {})[str(int(dow))] = float(avg) if avg else 0.0
+    for city_id_val, dow, avg in dow_rows:
+        dow_map.setdefault(str(city_id_val), {})[str(int(dow))] = float(avg) if avg else 0.0
 
     client = make_supabase_client()
     records = []
     for row in rows:
-        store_alias = str(row[0])
+        city_id = int(row[0])
+        store_count = int(row[1])
         records.append({
-            "store_id": store_alias,
-            "city_id": int(row[1]),
-            "prefix": _store_prefix(store_alias),
+            "city_id": city_id,
+            "density_tier": _city_tier(store_count),
             "p25_sale": float(row[2]) if row[2] is not None else None,
             "p50_sale": float(row[3]) if row[3] is not None else None,
             "p75_sale": float(row[4]) if row[4] is not None else None,
             "avg_sale": float(row[5]) if row[5] is not None else None,
             "stddev_sale": float(row[6]) if row[6] is not None else None,
-            "dow_pattern": dow_map.get(store_alias),
+            "dow_pattern": dow_map.get(str(city_id)),
         })
 
     if records:
-        client.table("rca_store_normals").upsert(
-            records, on_conflict="store_id"
+        client.table("rca_city_normals").upsert(
+            records, on_conflict="city_id"
         ).execute()
 
     return len(records)
+
+
+def sync_analytics_to_supabase(db_path: Path = DB_PATH, batch_size: int = 500) -> dict[str, int]:
+    """Push analytics tables from local DuckDB → Supabase rca_city_* analytics tables."""
+    connection = duckdb.connect(str(db_path), read_only=True)
+    try:
+        signal_rows = connection.execute(
+            "SELECT city_id, CAST(dt AS VARCHAR), stl_residual, residual_zscore, signal_label "
+            "FROM analytics_city_signal ORDER BY city_id, dt"
+        ).fetchall()
+
+        hourly_rows = connection.execute(
+            "SELECT city_id, CAST(dt AS VARCHAR), hour, sales, sales_share, deviation_z, stockout_rate "
+            "FROM analytics_city_hourly ORDER BY city_id, dt, hour"
+        ).fetchall()
+
+        segment_rows = connection.execute(
+            "SELECT city_id, cluster_id, segment_label FROM analytics_city_segment ORDER BY city_id"
+        ).fetchall()
+
+        corr_rows = connection.execute(
+            "SELECT city_id, corr_stockout, corr_discount, corr_activity, corr_precpt, corr_temperature "
+            "FROM analytics_city_correlations ORDER BY city_id"
+        ).fetchall()
+    finally:
+        connection.close()
+
+    client = make_supabase_client()
+    totals: dict[str, int] = {}
+
+    # --- rca_city_signal ---
+    batch: list[dict] = []
+    total = 0
+    for r in signal_rows:
+        batch.append({
+            "city_id": int(r[0]),
+            "dt": str(r[1]),
+            "stl_residual": float(r[2]) if r[2] is not None else None,
+            "residual_zscore": float(r[3]) if r[3] is not None else None,
+            "signal_label": str(r[4]) if r[4] is not None else None,
+        })
+        if len(batch) >= batch_size:
+            client.table("rca_city_signal").upsert(batch, on_conflict="city_id,dt").execute()
+            total += len(batch)
+            batch = []
+    if batch:
+        client.table("rca_city_signal").upsert(batch, on_conflict="city_id,dt").execute()
+        total += len(batch)
+    totals["rca_city_signal"] = total
+
+    # --- rca_city_hourly ---
+    batch = []
+    total = 0
+    for r in hourly_rows:
+        batch.append({
+            "city_id": int(r[0]),
+            "dt": str(r[1]),
+            "hour": int(r[2]),
+            "sales": float(r[3]) if r[3] is not None else None,
+            "sales_share": float(r[4]) if r[4] is not None else None,
+            "deviation_z": float(r[5]) if r[5] is not None else None,
+            "stockout_rate": float(r[6]) if r[6] is not None else None,
+        })
+        if len(batch) >= batch_size:
+            client.table("rca_city_hourly").upsert(batch, on_conflict="city_id,dt,hour").execute()
+            total += len(batch)
+            batch = []
+    if batch:
+        client.table("rca_city_hourly").upsert(batch, on_conflict="city_id,dt,hour").execute()
+        total += len(batch)
+    totals["rca_city_hourly"] = total
+
+    # --- rca_city_segment ---
+    records = [
+        {"city_id": int(r[0]), "cluster_id": int(r[1]) if r[1] is not None else None, "segment_label": str(r[2]) if r[2] is not None else None}
+        for r in segment_rows
+    ]
+    if records:
+        client.table("rca_city_segment").upsert(records, on_conflict="city_id").execute()
+    totals["rca_city_segment"] = len(records)
+
+    # --- rca_city_correlations ---
+    records = [
+        {
+            "city_id": int(r[0]),
+            "corr_stockout": float(r[1]) if r[1] is not None else None,
+            "corr_discount": float(r[2]) if r[2] is not None else None,
+            "corr_activity": float(r[3]) if r[3] is not None else None,
+            "corr_precpt": float(r[4]) if r[4] is not None else None,
+            "corr_temperature": float(r[5]) if r[5] is not None else None,
+        }
+        for r in corr_rows
+    ]
+    if records:
+        client.table("rca_city_correlations").upsert(records, on_conflict="city_id").execute()
+    totals["rca_city_correlations"] = len(records)
+
+    return totals

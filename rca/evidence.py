@@ -11,7 +11,7 @@ from rca.config import DB_PATH
 
 EVIDENCE_SELECT = """
     SELECT
-        s.store_alias,
+        s.city_id,
         CAST(s.dt AS VARCHAR) AS dt,
         s.product_count,
         s.active_product_count,
@@ -47,10 +47,10 @@ EVIDENCE_SELECT = """
         w.avg_temperature,
         w.avg_humidity,
         w.avg_wind_level
-    FROM fact_sales_store_day AS s
-    JOIN fact_stockout_store_day AS st USING (store_alias, dt)
-    JOIN fact_discount_store_day AS d USING (store_alias, dt)
-    JOIN fact_activity_store_day AS a USING (store_alias, dt)
+    FROM fact_sales_city_day AS s
+    JOIN fact_stockout_city_day AS st USING (city_id, dt)
+    JOIN fact_discount_city_day AS d USING (city_id, dt)
+    JOIN fact_activity_city_day AS a USING (city_id, dt)
     JOIN dim_holiday_day AS h USING (dt)
     JOIN dim_weather_day AS w USING (dt)
 """
@@ -62,11 +62,11 @@ def _connect(db_path: Path = DB_PATH) -> duckdb.DuckDBPyConnection:
     return duckdb.connect(str(db_path), read_only=True)
 
 
-def list_store_aliases(db_path: Path = DB_PATH) -> list[str]:
+def list_city_ides(db_path: Path = DB_PATH) -> list[str]:
     connection = _connect(db_path)
     try:
         result = connection.execute(
-            "SELECT store_alias FROM dim_store ORDER BY store_alias"
+            "SELECT city_id FROM dim_city ORDER BY city_id"
         ).fetchall()
         return [str(row[0]) for row in result]
     finally:
@@ -86,15 +86,15 @@ def list_dates(db_path: Path = DB_PATH) -> list[str]:
 
 def _assert_store_and_date_exist(
     connection: duckdb.DuckDBPyConnection,
-    store_alias: str,
+    city_id: int,
     dt: str,
 ) -> None:
     store_exists = connection.execute(
-        "SELECT COUNT(*) FROM dim_store WHERE store_alias = ?",
-        [store_alias],
+        "SELECT COUNT(*) FROM dim_city WHERE city_id = ?",
+        [city_id],
     ).fetchone()[0]
     if int(store_exists) != 1:
-        raise ValueError(f"Unknown store_alias: {store_alias}")
+        raise ValueError(f"Unknown city_id: {city_id}")
 
     date_exists = connection.execute(
         "SELECT COUNT(*) FROM dim_holiday_day WHERE dt = CAST(? AS DATE)",
@@ -105,29 +105,29 @@ def _assert_store_and_date_exist(
 
 
 def get_store_day_evidence(
-    store_alias: str,
+    city_id: int,
     dt: str,
     db_path: Path = DB_PATH,
 ) -> dict[str, Any]:
     connection = _connect(db_path)
     try:
-        _assert_store_and_date_exist(connection, store_alias, dt)
+        _assert_store_and_date_exist(connection, city_id, dt)
         result = connection.execute(
             EVIDENCE_SELECT
             + """
-            WHERE s.store_alias = ?
+            WHERE s.city_id = ?
               AND s.dt = CAST(? AS DATE)
             """,
-            [store_alias, dt],
+            [city_id, dt],
         ).fetchone()
         if result is None:
-            raise ValueError(f"No evidence found for store_alias={store_alias} dt={dt}")
+            raise ValueError(f"No evidence found for city_id={city_id} dt={dt}")
 
         sales = [float(value) for value in result[6:30]]
         stockout_rates = [float(value) for value in result[34:58]]
 
         return {
-            "store_alias": str(result[0]),
+            "city_id": str(result[0]),
             "dt": str(result[1]),
             "sales": {
                 "product_count": int(result[2]),
@@ -174,7 +174,7 @@ def fetch_all_evidence_records(db_path: Path = DB_PATH) -> list[dict[str, Any]]:
     connection = _connect(db_path)
     try:
         rows = connection.execute(
-            EVIDENCE_SELECT + " ORDER BY s.store_alias, s.dt"
+            EVIDENCE_SELECT + " ORDER BY s.city_id, s.dt"
         ).fetchall()
         records: list[dict[str, Any]] = []
         for row in rows:
@@ -182,7 +182,7 @@ def fetch_all_evidence_records(db_path: Path = DB_PATH) -> list[dict[str, Any]]:
             stockout_rates = [float(value) for value in row[34:58]]
             records.append(
                 {
-                    "store_alias": str(row[0]),
+                    "city_id": str(row[0]),
                     "dt": str(row[1]),
                     "sales": {
                         "product_count": int(row[2]),
@@ -231,7 +231,7 @@ def export_evidence_dataset(
     output_path: Path,
     db_path: Path = DB_PATH,
 ) -> Path:
-    stores = list_store_aliases(db_path)
+    stores = list_city_ides(db_path)
     dates = list_dates(db_path)
     records = fetch_all_evidence_records(db_path)
 

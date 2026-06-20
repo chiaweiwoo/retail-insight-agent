@@ -5,8 +5,8 @@ import { AlertTriangle, TrendingUp, TrendingDown, Store, ArrowRight, Activity } 
 
 export default async function StoresPage() {
   const { data: stores, error: storesError } = await supabase
-    .from("rca_store_normals")
-    .select("store_id, city_id")
+    .from("rca_city_normals")
+    .select("city_id, city_id")
     .limit(100);
 
   if (storesError) {
@@ -24,7 +24,7 @@ export default async function StoresPage() {
   // Fetch recent signals to get latest signal per store and for the heatmap
   const { data: outcomes } = await supabase
     .from("rca_outcome")
-    .select("store_id, dt, signal_label, escalated")
+    .select("city_id, dt, signal_label, escalated")
     .order("dt", { ascending: false });
 
   // Get unique dates for heatmap (last 14 days with signals)
@@ -32,7 +32,7 @@ export default async function StoresPage() {
 
   // Process data per store
   const processedStores = stores?.map((store: any) => {
-    const storeOutcomes = outcomes?.filter(o => o.store_id === store.store_id) || [];
+    const storeOutcomes = outcomes?.filter(o => o.city_id === store.city_id) || [];
     const latestSignal = storeOutcomes[0];
     
     // Build heatmap data for this store
@@ -46,7 +46,7 @@ export default async function StoresPage() {
     });
 
     return {
-      store_id: store.store_id,
+      city_id: store.city_id,
       city_id: store.city_id,
       latest_dt: latestSignal?.dt || "N/A",
       signal_label: latestSignal?.signal_label || "none",
@@ -74,7 +74,7 @@ export default async function StoresPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {processedStores.map((store) => (
-          <Link key={store.store_id} href={`/stores/${store.store_id}`} className="group outline-none">
+          <Link key={store.city_id} href={`/cities/${store.city_id}`} className="group outline-none">
             <div className="glass-card rounded-2xl p-6 transition-all duration-300 hover:scale-[1.02] hover:bg-white/[0.03] hover:border-indigo-500/30 group-focus:ring-2 ring-indigo-500 ring-offset-2 ring-offset-[#0A0A0B]">
               <div className="flex items-start justify-between">
                 <div className="flex items-center space-x-3">
@@ -82,8 +82,8 @@ export default async function StoresPage() {
                     <Store size={18} />
                   </div>
                   <div>
-                    <h3 className="text-lg font-medium text-slate-200 group-hover:text-white transition-colors">{store.store_id}</h3>
-                    <p className="text-xs text-slate-500 font-medium">City {store.city_id}</p>
+                    <h3 className="text-lg font-medium text-slate-200 group-hover:text-white transition-colors">{store.city_id.replace('city_', 'Regional Zone ')}</h3>
+                    <p className="text-xs text-slate-500 font-medium">City Aggregate</p>
                   </div>
                 </div>
                 

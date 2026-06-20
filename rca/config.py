@@ -22,35 +22,10 @@ DATE_END = "2024-06-25"
 EXPECTED_DAY_COUNT = 90
 HOURLY_LENGTH = 24
 
-# Top-5 cities by store count from FreshRetailNet-50K:
-# city 0=290, city 12=107, city 3=101, city 13=90, city 16=89 stores
-CITY_IDS = [0, 3, 12, 13, 16]
+# Processing all 18 cities in the dataset
+CITY_IDS = list(range(18)) # 0 to 17
 
-# Backward-compatible alias — tools/signals still reference single city builds.
-# Use CITY_IDS for multi-city ingestion.
-CITY_ID = CITY_IDS[0]
-
-# Known city-0 store aliases (used for backward compat with bench scenarios and CLI).
-# Stores from other cities get auto-generated aliases ("s{store_id}").
-STORE_MAP = {
-    "h235": 235,
-    "h263": 263,
-    "h182": 182,
-    "h018": 18,
-    "h555": 555,
-    "m679": 679,
-    "m648": 648,
-    "m041": 41,
-    "m236": 236,
-    "m386": 386,
-    "l260": 260,
-    "l185": 185,
-    "l165": 165,
-    "l164": 164,
-    "l175": 175,
-}
-# Reverse lookup: numeric store_id → alias string
-STORE_ID_TO_ALIAS: dict[int, str] = {v: k for k, v in STORE_MAP.items()}
+CITY_ID = 0  # default fallback
 
 EXPECTED_TABLE_ROWS: dict[str, int] = {
     "dim_holiday_day": EXPECTED_DAY_COUNT,
@@ -76,10 +51,10 @@ REQUIRED_RAW_COLUMNS = {
 }
 
 FACT_TABLES = [
-    "fact_sales_store_day",
-    "fact_stockout_store_day",
-    "fact_discount_store_day",
-    "fact_activity_store_day",
+    "fact_sales_city_day",
+    "fact_stockout_city_day",
+    "fact_discount_city_day",
+    "fact_activity_city_day",
 ]
 
 CONTEXT_PACK_PATH = PROJECT_ROOT / "data" / "context_pack.json"
@@ -108,7 +83,10 @@ End your memo with this exact section (fill in every field):
 - data_gaps: <what you could not see, or "none">
 """.strip()
 
-DEFAULT_SIGNAL_METRIC = "trailing_7d_pct_change"
+DEFAULT_SIGNAL_METRIC = "residual_zscore"
+DEFAULT_DROP_THRESHOLD_Z = -2.0
+DEFAULT_LIFT_THRESHOLD_Z = 2.0
+# Legacy pct-change thresholds kept for context/signals.py historical analysis
 DEFAULT_DROP_THRESHOLD_PCT = -20.0
 DEFAULT_LIFT_THRESHOLD_PCT = 30.0
 

@@ -115,16 +115,16 @@ def _read_csv(path: Path) -> list[dict[str, str]]:
 def _load_grid(analysis_dir: Path) -> tuple[list[str], list[str], dict]:
     path = analysis_dir / "trigger_grids" / f"trailing_7d_pct_trigger_grid_{_DASHBOARD_THRESHOLD}.csv"
     rows = _read_csv(path)
-    stores = [r["store_alias"] for r in rows]
-    dates = [k for k in rows[0].keys() if k != "store_alias"]
-    cells = {r["store_alias"]: {d: r[d] for d in dates} for r in rows}
+    stores = [r["city_id"] for r in rows]
+    dates = [k for k in rows[0].keys() if k != "city_id"]
+    cells = {r["city_id"]: {d: r[d] for d in dates} for r in rows}
     return stores, dates, cells
 
 
 def _load_store_stats(analysis_dir: Path) -> dict:
     rows = _read_csv(analysis_dir / "pct_trigger_by_store.csv")
     return {
-        r["store_alias"]: r
+        r["city_id"]: r
         for r in rows
         if r["metric"] == "trailing_7d_pct_change" and int(r["pct_threshold"]) == _DASHBOARD_THRESHOLD
     }
@@ -454,7 +454,7 @@ def build_story_report(
     )
     html_text = render_story_document(
         markdown_text,
-        title=f"Story Report for {trace['store_alias']} on {trace['dt']}",
+        title=f"Story Report for {trace['city_id']} on {trace['dt']}",
     )
     output_dir = PROJECT_ROOT / "output" / "story_reports" / run_dir.name
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -536,7 +536,7 @@ def _build_story_markdown_with_llm(
     client_factory = client_factory or _default_client_factory(settings)
     client = client_factory("story_writer")
     story_input = {
-        "store_alias": trace["store_alias"],
+        "city_id": trace["city_id"],
         "dt": trace["dt"],
         "planner": {
             "selected_analysts": trace["planner"]["selected_analysts"],
@@ -591,7 +591,7 @@ def _build_story_markdown_fallback(trace: dict[str, Any]) -> str:
 
     return "\n\n".join(
         [
-            f"# Story Report: {trace['store_alias']} on {trace['dt']}",
+            f"# Story Report: {trace['city_id']} on {trace['dt']}",
             "## Executive Takeaway",
             (
                 f"The system ended with **{decision_card.get('confidence', 'unknown')} confidence** and chose "
@@ -601,7 +601,7 @@ def _build_story_markdown_fallback(trace: dict[str, Any]) -> str:
             "## Why This Day Triggered Review",
             (
                 f"The run started because `{signal['metric']}` flagged a **{signal['signal_label']}** for "
-                f"`{trace['store_alias']}` on `{trace['dt']}`. Current sales were **{signal['current_sales']}**, "
+                f"`{trace['city_id']}` on `{trace['dt']}`. Current sales were **{signal['current_sales']}**, "
                 f"versus a trailing 7-day average of **{signal['trailing_7d_avg_sales']}**, which is a "
                 f"**{signal['trailing_7d_pct_change']}%** move."
             ),
@@ -895,11 +895,11 @@ def _render_story_shell(
     executive_body: str,
     body_sections: list[tuple[str, str]],
 ) -> str:
-    store_alias, report_date = _parse_story_title(title)
+    city_id, report_date = _parse_story_title(title)
     summary_markdown, action_markdown = _split_executive_parts(executive_body)
     summary_html = markdown.markdown(summary_markdown, extensions=["extra", "sane_lists"])
     action_html = markdown.markdown(action_markdown, extensions=["extra", "sane_lists"]) if action_markdown else ""
-    hero_title = f"{store_alias} on {report_date}" if store_alias and report_date else executive_title
+    hero_title = f"{city_id} on {report_date}" if city_id and report_date else executive_title
 
     section_html = []
     for heading, section_markdown in body_sections:
@@ -918,7 +918,7 @@ def _render_story_shell(
         )
 
     meta_cards = [
-        ("Store", store_alias or "Unknown"),
+        ("Store", city_id or "Unknown"),
         ("Date", report_date or "Unknown"),
         ("Sections", str(len(body_sections) + 1)),
     ]
