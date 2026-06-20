@@ -7,7 +7,6 @@ from pathlib import Path
 import re
 from typing import Any, Callable
 
-import duckdb
 import markdown
 
 from rca.llm import (
@@ -138,36 +137,6 @@ def _load_summary(analysis_dir: Path) -> dict:
     return {}
 
 
-def _load_recent_runs(log_db_path: Path, limit: int = 20) -> list[dict]:
-    if not log_db_path.exists():
-        return []
-    con = duckdb.connect(str(log_db_path), read_only=True)
-    rows = con.execute(f"""
-        SELECT
-            run_name,
-            MIN(timestamp_sgt) AS started_at,
-            COUNT(*)           AS events,
-            MAX(CASE WHEN action = 'completed' AND actor_name = 'coordinator_pipeline'
-                     THEN details_json END) AS completed_json
-        FROM run_log_event
-        GROUP BY run_name
-        ORDER BY MIN(timestamp_sgt) DESC
-        LIMIT {limit}
-    """).fetchall()
-    con.close()
-    result = []
-    for run_name, started_at, events, completed_json in rows:
-        output_dir = None
-        if completed_json:
-            details = json.loads(completed_json)
-            output_dir = details.get("output_dir")
-        result.append({
-            "run_name": run_name,
-            "started_at": started_at,
-            "events": events,
-            "output_dir": output_dir,
-        })
-    return result
 
 
 def _build_dashboard_html_content(
@@ -397,20 +366,6 @@ const DATA = {data_json};
 </body>
 </html>
 """
-
-
-def build_dashboard_html(output_path: Path) -> None:
-    """Build the dashboard HTML from analysis CSVs and run logs."""
-    from rca.config import ANALYSIS_PATH, LOG_DB_PATH
-
-    stores, dates, cells = _load_grid(ANALYSIS_PATH)
-    store_stats = _load_store_stats(ANALYSIS_PATH)
-    summary = _load_summary(ANALYSIS_PATH)
-    recent_runs = _load_recent_runs(LOG_DB_PATH)
-
-    html = _build_dashboard_html_content(stores, dates, cells, store_stats, summary, recent_runs)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(html, encoding="utf-8")
 
 
 def render_markdown_document(markdown_text: str, title: str) -> str:

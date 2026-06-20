@@ -9,13 +9,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 ENV_FILE_PATH = PROJECT_ROOT / ".env"
 RAW_DATA_PATH = PROJECT_ROOT / "data" / "raw" / "train.parquet"
 RAW_METADATA_PATH = PROJECT_ROOT / "data" / "raw" / "train_metadata.json"
-DB_PATH = PROJECT_ROOT / "data" / "rca.duckdb"
-LOG_DB_PATH = PROJECT_ROOT / "data" / "runs.duckdb"
 ANALYSIS_PATH = PROJECT_ROOT / "data" / "analysis"
 AGENT_BENCHMARK_PATH = ANALYSIS_PATH / "agent_benchmark_runs"
-SCHEMA_PATH = PROJECT_ROOT / "rca" / "schema.sql"
-# Keep old name as alias so existing code that references MIGRATION_PATH still works
-MIGRATION_PATH = SCHEMA_PATH
 
 DATE_START = "2024-03-28"
 DATE_END = "2024-06-25"
@@ -26,11 +21,6 @@ HOURLY_LENGTH = 24
 CITY_IDS = list(range(18)) # 0 to 17
 
 CITY_ID = 0  # default fallback
-
-EXPECTED_TABLE_ROWS: dict[str, int] = {
-    "dim_holiday_day": EXPECTED_DAY_COUNT,
-    "dim_weather_day": EXPECTED_DAY_COUNT,
-}  # Row counts are dynamic now that scope is multi-city; only calendar tables are fixed.
 
 REQUIRED_RAW_COLUMNS = {
     "city_id",
@@ -49,13 +39,6 @@ REQUIRED_RAW_COLUMNS = {
     "avg_humidity",
     "avg_wind_level",
 }
-
-FACT_TABLES = [
-    "fact_sales_city_day",
-    "fact_stockout_city_day",
-    "fact_discount_city_day",
-    "fact_activity_city_day",
-]
 
 CONTEXT_PACK_PATH = PROJECT_ROOT / "data" / "context_pack.json"
 
@@ -83,10 +66,6 @@ End your memo with this exact section (fill in every field):
 - data_gaps: <what you could not see, or "none">
 """.strip()
 
-DEFAULT_SIGNAL_METRIC = "residual_zscore"
-DEFAULT_DROP_THRESHOLD_Z = -2.0
-DEFAULT_LIFT_THRESHOLD_Z = 2.0
-# Legacy pct-change thresholds kept for context/signals.py historical analysis
 DEFAULT_DROP_THRESHOLD_PCT = -10.0
 DEFAULT_LIFT_THRESHOLD_PCT = 25.0
 

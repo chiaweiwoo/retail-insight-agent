@@ -1,245 +1,118 @@
+"""Evidence fetcher — reads from Supabase rca_city_series + rca_city_hourly.
+
+No local database dependency.
+"""
 from __future__ import annotations
 
-import json
-from pathlib import Path
 from typing import Any
 
-import duckdb
-
-from rca.config import DB_PATH
+from rca.config import make_supabase_client
 
 
-EVIDENCE_SELECT = """
-    SELECT
-        s.city_id,
-        CAST(s.dt AS VARCHAR) AS dt,
-        s.product_count,
-        s.active_product_count,
-        s.total_sales,
-        s.avg_sales_per_product,
-        s.hour_00_sales, s.hour_01_sales, s.hour_02_sales, s.hour_03_sales,
-        s.hour_04_sales, s.hour_05_sales, s.hour_06_sales, s.hour_07_sales,
-        s.hour_08_sales, s.hour_09_sales, s.hour_10_sales, s.hour_11_sales,
-        s.hour_12_sales, s.hour_13_sales, s.hour_14_sales, s.hour_15_sales,
-        s.hour_16_sales, s.hour_17_sales, s.hour_18_sales, s.hour_19_sales,
-        s.hour_20_sales, s.hour_21_sales, s.hour_22_sales, s.hour_23_sales,
-        st.avg_stockout_hours,
-        st.stockout_product_rate,
-        st.severe_stockout_product_rate,
-        st.full_stockout_product_rate,
-        st.hour_00_stockout_rate, st.hour_01_stockout_rate, st.hour_02_stockout_rate, st.hour_03_stockout_rate,
-        st.hour_04_stockout_rate, st.hour_05_stockout_rate, st.hour_06_stockout_rate, st.hour_07_stockout_rate,
-        st.hour_08_stockout_rate, st.hour_09_stockout_rate, st.hour_10_stockout_rate, st.hour_11_stockout_rate,
-        st.hour_12_stockout_rate, st.hour_13_stockout_rate, st.hour_14_stockout_rate, st.hour_15_stockout_rate,
-        st.hour_16_stockout_rate, st.hour_17_stockout_rate, st.hour_18_stockout_rate, st.hour_19_stockout_rate,
-        st.hour_20_stockout_rate, st.hour_21_stockout_rate, st.hour_22_stockout_rate, st.hour_23_stockout_rate,
-        d.avg_discount,
-        d.discounted_product_rate,
-        d.deep_discount_product_rate,
-        a.activity_product_rate,
-        a.activity_sales_share,
-        h.weekday,
-        h.is_weekend,
-        h.holiday_flag,
-        h.holiday_name_inferred,
-        h.holiday_note,
-        w.precpt,
-        w.avg_temperature,
-        w.avg_humidity,
-        w.avg_wind_level
-    FROM fact_sales_city_day AS s
-    JOIN fact_stockout_city_day AS st USING (city_id, dt)
-    JOIN fact_discount_city_day AS d USING (city_id, dt)
-    JOIN fact_activity_city_day AS a USING (city_id, dt)
-    JOIN dim_holiday_day AS h USING (dt)
-    JOIN dim_weather_day AS w USING (dt)
-"""
+def _client() -> Any:
+    return make_supabase_client()
 
 
-def _connect(db_path: Path = DB_PATH) -> duckdb.DuckDBPyConnection:
-    if not db_path.exists():
-        raise FileNotFoundError(f"DuckDB file is missing: {db_path}")
-    return duckdb.connect(str(db_path), read_only=True)
+def list_city_ids() -> list[str]:
+    result = _client().table("rca_city_series").select("city_id").execute()
+    ids = sorted({str(r["city_id"]) for r in (result.data or [])})
+    return ids
 
 
-def list_city_ides(db_path: Path = DB_PATH) -> list[str]:
-    connection = _connect(db_path)
-    try:
-        result = connection.execute(
-            "SELECT city_id FROM dim_city ORDER BY city_id"
-        ).fetchall()
-        return [str(row[0]) for row in result]
-    finally:
-        connection.close()
+def list_dates() -> list[str]:
+    result = (
+        _client()
+        .table("rca_city_series")
+        .select("dt")
+        .order("dt")
+        .execute()
+    )
+    dates = sorted({str(r["dt"]) for r in (result.data or [])})
+    return dates
 
 
-def list_dates(db_path: Path = DB_PATH) -> list[str]:
-    connection = _connect(db_path)
-    try:
-        result = connection.execute(
-            "SELECT CAST(dt AS VARCHAR) FROM dim_holiday_day ORDER BY dt"
-        ).fetchall()
-        return [str(row[0]) for row in result]
-    finally:
-        connection.close()
+def get_city_day_evidence(city_id: int, dt: str) -> dict[str, Any]:
+    """Fetch all evidence for one city-day from Supabase.
 
+    Returns the same nested dict shape that the agent tools expect.
+    """
+    client = _client()
 
-def _assert_city_and_date_exist(
-    connection: duckdb.DuckDBPyConnection,
-    city_id: int,
-    dt: str,
-) -> None:
-    city_exists = connection.execute(
-        "SELECT COUNT(*) FROM dim_city WHERE city_id = ?",
-        [city_id],
-    ).fetchone()[0]
-    if int(city_exists) != 1:
-        raise ValueError(f"Unknown city_id: {city_id}")
+    # ── Main facts from rca_city_series ──────────────────────────────────────
+    series_resp = (
+        client.table("rca_city_series")
+        .select(
+            "city_id, dt, total_sales, product_count, active_product_count, avg_sales_per_product,"
+            "avg_stockout_hours, stockout_product_rate, severe_stockout_rate,"
+            "full_stockout_product_rate,"
+            "avg_discount, discounted_product_rate, deep_discount_product_rate,"
+            "activity_product_rate, activity_sales_share,"
+            "weekday, is_weekend, holiday_flag, holiday_name_inferred, holiday_note,"
+            "precpt, avg_temperature, avg_humidity, avg_wind_level"
+        )
+        .eq("city_id", city_id)
+        .eq("dt", dt)
+        .limit(1)
+        .execute()
+    )
+    rows = series_resp.data or []
+    if not rows:
+        raise ValueError(f"No evidence found for city_id={city_id} dt={dt}")
+    s = rows[0]
 
-    date_exists = connection.execute(
-        "SELECT COUNT(*) FROM dim_holiday_day WHERE dt = CAST(? AS DATE)",
-        [dt],
-    ).fetchone()[0]
-    if int(date_exists) != 1:
-        raise ValueError(f"Unknown date: {dt}")
+    # ── Hourly profile from rca_city_hourly ───────────────────────────────────
+    hourly_resp = (
+        client.table("rca_city_hourly")
+        .select("hour, sales, stockout_rate")
+        .eq("city_id", city_id)
+        .eq("dt", dt)
+        .order("hour")
+        .execute()
+    )
+    hourly_rows = hourly_resp.data or []
 
+    # Build 24-element arrays (zero-filled if data is missing)
+    hourly_by_h = {r["hour"]: r for r in hourly_rows}
+    hourly_sales = [float(hourly_by_h[h]["sales"] or 0) if h in hourly_by_h else 0.0 for h in range(24)]
+    hourly_stockout = [float(hourly_by_h[h]["stockout_rate"] or 0) if h in hourly_by_h else 0.0 for h in range(24)]
 
-def get_city_day_evidence(
-    city_id: int,
-    dt: str,
-    db_path: Path = DB_PATH,
-) -> dict[str, Any]:
-    connection = _connect(db_path)
-    try:
-        _assert_city_and_date_exist(connection, city_id, dt)
-        result = connection.execute(
-            EVIDENCE_SELECT
-            + """
-            WHERE s.city_id = ?
-              AND s.dt = CAST(? AS DATE)
-            """,
-            [city_id, dt],
-        ).fetchone()
-        if result is None:
-            raise ValueError(f"No evidence found for city_id={city_id} dt={dt}")
-
-        sales = [float(value) for value in result[6:30]]
-        stockout_rates = [float(value) for value in result[34:58]]
-
-        return {
-            "city_id": str(result[0]),
-            "dt": str(result[1]),
-            "sales": {
-                "product_count": int(result[2]),
-                "active_product_count": int(result[3]),
-                "total_sales": float(result[4]),
-                "avg_sales_per_product": float(result[5]),
-                "hourly_sales": sales,
-            },
-            "stockout": {
-                "avg_stockout_hours": float(result[30]),
-                "stockout_product_rate": float(result[31]),
-                "severe_stockout_product_rate": float(result[32]),
-                "full_stockout_product_rate": float(result[33]),
-                "hourly_stockout_rate": stockout_rates,
-            },
-            "discount": {
-                "avg_discount": float(result[58]),
-                "discounted_product_rate": float(result[59]),
-                "deep_discount_product_rate": float(result[60]),
-            },
-            "activity": {
-                "activity_product_rate": float(result[61]),
-                "activity_sales_share": float(result[62]),
-            },
-            "holiday": {
-                "weekday": str(result[63]),
-                "is_weekend": bool(result[64]),
-                "holiday_flag": bool(result[65]),
-                "holiday_name_inferred": str(result[66]),
-                "holiday_note": str(result[67]),
-            },
-            "weather": {
-                "precpt": float(result[68]),
-                "avg_temperature": float(result[69]),
-                "avg_humidity": float(result[70]),
-                "avg_wind_level": float(result[71]),
-            },
-        }
-    finally:
-        connection.close()
-
-
-def fetch_all_evidence_records(db_path: Path = DB_PATH) -> list[dict[str, Any]]:
-    connection = _connect(db_path)
-    try:
-        rows = connection.execute(
-            EVIDENCE_SELECT + " ORDER BY s.city_id, s.dt"
-        ).fetchall()
-        records: list[dict[str, Any]] = []
-        for row in rows:
-            sales = [float(value) for value in row[6:30]]
-            stockout_rates = [float(value) for value in row[34:58]]
-            records.append(
-                {
-                    "city_id": str(row[0]),
-                    "dt": str(row[1]),
-                    "sales": {
-                        "product_count": int(row[2]),
-                        "active_product_count": int(row[3]),
-                        "total_sales": float(row[4]),
-                        "avg_sales_per_product": float(row[5]),
-                        "hourly_sales": sales,
-                    },
-                    "stockout": {
-                        "avg_stockout_hours": float(row[30]),
-                        "stockout_product_rate": float(row[31]),
-                        "severe_stockout_product_rate": float(row[32]),
-                        "full_stockout_product_rate": float(row[33]),
-                        "hourly_stockout_rate": stockout_rates,
-                    },
-                    "discount": {
-                        "avg_discount": float(row[58]),
-                        "discounted_product_rate": float(row[59]),
-                        "deep_discount_product_rate": float(row[60]),
-                    },
-                    "activity": {
-                        "activity_product_rate": float(row[61]),
-                        "activity_sales_share": float(row[62]),
-                    },
-                    "holiday": {
-                        "weekday": str(row[63]),
-                        "is_weekend": bool(row[64]),
-                        "holiday_flag": bool(row[65]),
-                        "holiday_name_inferred": str(row[66]),
-                        "holiday_note": str(row[67]),
-                    },
-                    "weather": {
-                        "precpt": float(row[68]),
-                        "avg_temperature": float(row[69]),
-                        "avg_humidity": float(row[70]),
-                        "avg_wind_level": float(row[71]),
-                    },
-                }
-            )
-        return records
-    finally:
-        connection.close()
-
-
-def export_evidence_dataset(
-    output_path: Path,
-    db_path: Path = DB_PATH,
-) -> Path:
-    stores = list_city_ides(db_path)
-    dates = list_dates(db_path)
-    records = fetch_all_evidence_records(db_path)
-
-    payload = {
-        "stores": stores,
-        "dates": dates,
-        "records": records,
+    return {
+        "city_id": str(s["city_id"]),
+        "dt": str(s["dt"]),
+        "sales": {
+            "product_count": int(s["product_count"] or 0),
+            "active_product_count": int(s["active_product_count"] or 0),
+            "total_sales": float(s["total_sales"] or 0),
+            "avg_sales_per_product": float(s["avg_sales_per_product"] or 0),
+            "hourly_sales": hourly_sales,
+        },
+        "stockout": {
+            "avg_stockout_hours": float(s["avg_stockout_hours"] or 0),
+            "stockout_product_rate": float(s["stockout_product_rate"] or 0),
+            "severe_stockout_product_rate": float(s["severe_stockout_rate"] or 0),
+            "full_stockout_product_rate": float(s["full_stockout_product_rate"] or 0),
+            "hourly_stockout_rate": hourly_stockout,
+        },
+        "discount": {
+            "avg_discount": float(s["avg_discount"] or 0),
+            "discounted_product_rate": float(s["discounted_product_rate"] or 0),
+            "deep_discount_product_rate": float(s["deep_discount_product_rate"] or 0),
+        },
+        "activity": {
+            "activity_product_rate": float(s["activity_product_rate"] or 0),
+            "activity_sales_share": float(s["activity_sales_share"] or 0),
+        },
+        "holiday": {
+            "weekday": str(s["weekday"] or ""),
+            "is_weekend": bool(s["is_weekend"]),
+            "holiday_flag": bool(s["holiday_flag"]),
+            "holiday_name_inferred": str(s["holiday_name_inferred"] or "normal_weekday"),
+            "holiday_note": str(s["holiday_note"] or ""),
+        },
+        "weather": {
+            "precpt": float(s["precpt"] or 0),
+            "avg_temperature": float(s["avg_temperature"] or 0),
+            "avg_humidity": float(s["avg_humidity"] or 0),
+            "avg_wind_level": float(s["avg_wind_level"] or 0),
+        },
     }
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-    return output_path

@@ -1,8 +1,8 @@
-"""Context pack — factual grounding computed once from the DB, injected into every prompt.
+"""Context pack — factual grounding computed from Supabase, injected into every prompt.
 
 Conservative rule: include ONLY things computed from the data.
 Omit anything uncertain, do not interpret anonymized IDs, do not assign business meaning
-to opaque prefixes (h/m/l city IDes) unless empirically supported in the numbers.
+to opaque integers unless empirically supported in the numbers.
 """
 from __future__ import annotations
 
@@ -10,97 +10,93 @@ import json
 from pathlib import Path
 from typing import Any
 
-import duckdb
-
-from rca.config import CONTEXT_PACK_PATH, DB_PATH, DATE_START, DATE_END, SALES_FIELD_SEMANTICS
+from rca.config import CONTEXT_PACK_PATH, DATE_START, DATE_END, SALES_FIELD_SEMANTICS, make_supabase_client
 
 
-def build_context_pack(db_path: Path = DB_PATH, output_path: Path = CONTEXT_PACK_PATH) -> dict[str, Any]:
-    """Compute factual grounding from the DB and write context_pack.json + .md.
+def build_context_pack(output_path: Path = CONTEXT_PACK_PATH) -> dict[str, Any]:
+    """Compute factual grounding from Supabase and write context_pack.json + .md."""
+    import pandas as pd
 
-    All values are derived from the data. Nothing is asserted about anonymized IDs.
-    """
-    if not db_path.exists():
-        raise RuntimeError(f"DB not found at {db_path}. Run 'rca build' first.")
+    client = make_supabase_client()
 
-    con = duckdb.connect(str(db_path), read_only=True)
+    resp = (
+        client.table("rca_city_series")
+        .select(
+            "city_id,dt,total_sales,weekday,is_weekend,holiday_flag,"
+            "holiday_name_inferred,holiday_note,density_tier"
+        )
+        .limit(2000)
+        .execute()
+    )
+    series_df = pd.DataFrame(resp.data or [])
+    if series_df.empty:
+        raise RuntimeError("rca_city_series is empty. Run 'rca build' first.")
 
-    city_count = con.execute("SELECT COUNT(DISTINCT city_id) FROM fact_sales_city_day").fetchone()[0]
-    day_count = con.execute("SELECT COUNT(DISTINCT dt) FROM fact_sales_city_day").fetchone()[0]
-    date_min, date_max = con.execute(
-        "SELECT MIN(CAST(dt AS VARCHAR)), MAX(CAST(dt AS VARCHAR)) FROM fact_sales_city_day"
-    ).fetchone()
+    series_df["dt"] = pd.to_datetime(series_df["dt"])
+    series_df["total_sales"] = series_df["total_sales"].astype(float)
 
-    per_store = con.execute("""
-        SELECT
-            city_id,
-            ROUND(AVG(total_sales), 2) AS avg_daily_sales,
-            ROUND(STDDEV(total_sales), 2) AS stddev_daily_sales,
-            ROUND(MIN(total_sales), 2) AS min_daily_sales,
-            ROUND(MAX(total_sales), 2) AS max_daily_sales
-        FROM fact_sales_city_day
-        GROUP BY city_id
-        ORDER BY city_id
-    """).fetchall()
+    city_count = int(series_df["city_id"].nunique())
+    day_count = int(series_df["dt"].nunique())
+    date_min = series_df["dt"].min().strftime("%Y-%m-%d")
+    date_max = series_df["dt"].max().strftime("%Y-%m-%d")
+    fleet_avg = round(float(series_df["total_sales"].mean()), 2)
+
+    weekday_avg = (
+        series_df.groupby("weekday")["total_sales"]
+        .mean()
+        .round(2)
+        .to_dict()
+    )
+    weekday_pattern = {str(k): float(v) for k, v in weekday_avg.items()}
+
+    weekend_avg = (
+        series_df.groupby("is_weekend")["total_sales"]
+        .mean()
+        .round(2)
+    )
+    weekend_vs_weekday = {
+        ("weekend" if k else "weekday"): float(v)
+        for k, v in weekend_avg.items()
+    }
+
+    holiday_rows = series_df[series_df["holiday_flag"] == True][
+        ["dt", "holiday_name_inferred", "holiday_note"]
+    ].drop_duplicates("dt").sort_values("dt")
+    holidays = [
+        {
+            "dt": row["dt"].strftime("%Y-%m-%d"),
+            "name_inferred": str(row["holiday_name_inferred"] or ""),
+            "note": str(row["holiday_note"] or ""),
+        }
+        for _, row in holiday_rows.iterrows()
+    ]
+
+    per_city_stats = (
+        series_df.groupby("city_id")["total_sales"]
+        .agg(["mean", "std", "min", "max"])
+        .round(2)
+        .reset_index()
+    )
     per_city_rows = [
         {
-            "city_id": row[0],
-            "avg_daily_sales": row[1],
-            "stddev_daily_sales": row[2],
-            "min_daily_sales": row[3],
-            "max_daily_sales": row[4],
+            "city_id": int(row["city_id"]),
+            "avg_daily_sales": float(row["mean"]),
+            "stddev_daily_sales": float(row["std"]),
+            "min_daily_sales": float(row["min"]),
+            "max_daily_sales": float(row["max"]),
         }
-        for row in per_store
+        for _, row in per_city_stats.iterrows()
     ]
 
-    fleet_avg = con.execute("SELECT ROUND(AVG(total_sales), 2) FROM fact_sales_city_day").fetchone()[0]
-
-    weekday_avg = con.execute("""
-        SELECT h.weekday, ROUND(AVG(s.total_sales), 2) AS avg_sales
-        FROM fact_sales_city_day AS s
-        JOIN dim_holiday_day AS h USING (dt)
-        GROUP BY h.weekday
-        ORDER BY h.weekday
-    """).fetchall()
-    weekday_pattern = {str(row[0]): row[1] for row in weekday_avg}
-
-    weekend_avg = con.execute("""
-        SELECT h.is_weekend, ROUND(AVG(s.total_sales), 2) AS avg_sales
-        FROM fact_sales_city_day AS s
-        JOIN dim_holiday_day AS h USING (dt)
-        GROUP BY h.is_weekend
-        ORDER BY h.is_weekend
-    """).fetchall()
-    weekend_vs_weekday = {("weekend" if row[0] else "weekday"): row[1] for row in weekend_avg}
-
-    holiday_days = con.execute("""
-        SELECT CAST(dt AS VARCHAR), holiday_name_inferred, holiday_note
-        FROM dim_holiday_day
-        WHERE holiday_flag = 1
-        ORDER BY dt
-    """).fetchall()
-    holidays = [
-        {"dt": row[0], "name_inferred": row[1], "note": row[2]}
-        for row in holiday_days
-    ]
-
-    # Density-tier grouping: 1 = >100 stores, 2 = 20-99, 3 = <20
-    tier_avg = con.execute("""
-        SELECT
-            CASE
-                WHEN dc.store_count >= 100 THEN '1'
-                WHEN dc.store_count >= 20  THEN '2'
-                ELSE '3'
-            END AS density_tier,
-            ROUND(AVG(s.total_sales), 2) AS avg_daily_sales
-        FROM fact_sales_city_day s
-        JOIN dim_city dc USING (city_id)
-        GROUP BY density_tier
-        ORDER BY density_tier
-    """).fetchall()
-    tier_empirical = {row[0]: row[1] for row in tier_avg}
-
-    con.close()
+    if "density_tier" in series_df.columns and series_df["density_tier"].notna().any():
+        tier_avg = (
+            series_df.groupby("density_tier")["total_sales"]
+            .mean()
+            .round(2)
+        )
+        tier_empirical = {str(k): float(v) for k, v in tier_avg.items()}
+    else:
+        tier_empirical = {}
 
     pack: dict[str, Any] = {
         "dataset": {
@@ -129,15 +125,15 @@ def build_context_pack(db_path: Path = DB_PATH, output_path: Path = CONTEXT_PACK
             ),
             "by_tier": tier_empirical,
         },
-        "per_city_normal": {row["city_id"]: row for row in per_city_rows},
+        "per_city_normal": {str(row["city_id"]): row for row in per_city_rows},
         "holidays_in_window": holidays,
         "provenance": {
-            "built_from": str(db_path),
+            "built_from": "Supabase rca_city_series",
             "limitations": [
                 "No cost, margin, or product-category data available.",
                 "No real-time or external data — this is a historical anonymized dataset.",
                 "Treat all context as a weak prior, not ground truth.",
-                "The analysis window is fixed: 2024-03-28 to 2024-06-25.",
+                f"The analysis window is fixed: {DATE_START} to {DATE_END}.",
                 SALES_FIELD_SEMANTICS,
             ],
         },
@@ -159,6 +155,34 @@ def load_context_pack(pack_path: Path = CONTEXT_PACK_PATH) -> dict[str, Any] | N
     return json.loads(pack_path.read_text(encoding="utf-8"))
 
 
+def _get_city_segment_and_correlations(city_id: int) -> tuple[str | None, dict | None]:
+    """Fetch segment label and top driver correlations for preamble enrichment."""
+    try:
+        client = make_supabase_client()
+        seg_resp = (
+            client.table("rca_city_segment")
+            .select("segment_label")
+            .eq("city_id", city_id)
+            .limit(1)
+            .execute()
+        )
+        segment_label = None
+        if seg_resp.data:
+            segment_label = str(seg_resp.data[0].get("segment_label") or "")
+
+        corr_resp = (
+            client.table("rca_city_correlations")
+            .select("corr_stockout,corr_discount,corr_activity,corr_precpt,corr_temperature")
+            .eq("city_id", city_id)
+            .limit(1)
+            .execute()
+        )
+        correlations = corr_resp.data[0] if corr_resp.data else None
+        return segment_label, correlations
+    except Exception:
+        return None, None
+
+
 def build_context_preamble(
     city_id: int,
     dt: str,
@@ -169,10 +193,12 @@ def build_context_preamble(
 
     Keeps the preamble small — every byte here costs in every LLM call.
     Falls back to a minimal preamble if the pack is not available.
-    profile_text: optional LLM-distilled episodic memory for this store.
+    profile_text: optional LLM-distilled episodic memory for this city.
     """
     if pack is None:
         pack = load_context_pack()
+
+    segment_label, correlations = _get_city_segment_and_correlations(city_id)
 
     if pack is None:
         base = (
@@ -181,20 +207,22 @@ def build_context_preamble(
             f"{SALES_FIELD_SEMANTICS} "
             f"Analysis date is {dt}; do not reference events after the data window.\n"
         )
+        if segment_label:
+            base += f"\nCity {city_id} segment: {segment_label}.\n"
         if profile_text:
             base += f"\nCITY MEMORY (city {city_id}) — treat as context, not ground truth:\n{profile_text}\n"
         return base
 
     dataset = pack["dataset"]
     fleet = pack["fleet"]
-    city_normal = pack.get("per_city_normal", {}).get(city_id)
+    city_normal = pack.get("per_city_normal", {}).get(str(city_id))
 
     lines = [
-        f"GROUNDING CONTEXT (factual, computed from data — treat as weak prior):",
+        "GROUNDING CONTEXT (factual, computed from data — treat as weak prior):",
         f"- Dataset: {dataset['source']}, {dataset['cities']} cities, {dataset['days']} days "
         f"({dataset['date_min']} to {dataset['date_max']}), city-day granularity.",
-        f"- City IDs (integers 0–17) and product IDs are opaque anonymized identifiers. "
-        f"Do not assign business meaning beyond what the numbers show.",
+        "- City IDs (integers 0–17) and product IDs are opaque anonymized identifiers. "
+        "Do not assign business meaning beyond what the numbers show.",
         f"- {SALES_FIELD_SEMANTICS}",
         f"- Fleet average daily sales: {fleet['avg_daily_sales']}.",
     ]
@@ -211,19 +239,42 @@ def build_context_preamble(
         tier_summary = ", ".join(f"tier {t}: avg {v}" for t, v in sorted(tier_data.items()))
         lines.append(
             f"- Density tier averages (1=>100 stores, 2=20-99, 3=<20): {tier_summary}. "
-            f"Use as a weak prior for relative scale only."
+            "Use as a weak prior for relative scale only."
         )
 
+    if segment_label:
+        lines.append(f"- City {city_id} KMeans segment: {segment_label}.")
+
+    if correlations:
+        corr_parts = []
+        for key, label in [
+            ("corr_stockout", "stockout"),
+            ("corr_discount", "discount"),
+            ("corr_activity", "activity"),
+            ("corr_precpt", "rainfall"),
+            ("corr_temperature", "temperature"),
+        ]:
+            v = correlations.get(key)
+            if v is not None:
+                corr_parts.append(f"{label}={v:+.2f}")
+        if corr_parts:
+            lines.append(
+                f"- City {city_id} driver correlations (sales vs): {', '.join(corr_parts)}. "
+                "Sign indicates direction; treat as weak signal."
+            )
+
     lines.append(
-        f"- No cost or margin data available. holiday_name_inferred values are uncertain priors."
+        "- No cost or margin data available. holiday_name_inferred values are uncertain priors."
     )
     lines.append(
         f"- Analysis date: {dt}. Do not reference events after the data window or invent company facts."
     )
 
     if profile_text:
-        lines.append(f"")
-        lines.append(f"CITY MEMORY (city {city_id}) — distilled from prior RCA runs, treat as context not ground truth:")
+        lines.append("")
+        lines.append(
+            f"CITY MEMORY (city {city_id}) — distilled from prior RCA runs, treat as context not ground truth:"
+        )
         lines.append(profile_text)
 
     return "\n".join(lines) + "\n"

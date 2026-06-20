@@ -18,23 +18,13 @@ def _safe_print(text: str) -> None:
 
 
 def _cmd_build(args: argparse.Namespace) -> None:
-    from rca.database import ingest_to_duckdb, run_analytics, validate_daily_tables
-    from rca.config import DB_PATH
+    from rca.database import ingest_to_supabase
 
-    print("Building database...")
-    row_counts = ingest_to_duckdb()
-    for table, count in row_counts.items():
+    print("Building and pushing all tables to Supabase...")
+    counts = ingest_to_supabase()
+    for table, count in counts.items():
         print(f"  {table}: {count} rows")
-
-    print("Validating...")
-    validate_daily_tables()
-    print(f"Database built and validated: {DB_PATH}")
-
-    print("Running analytics pipeline...")
-    analytics_counts = run_analytics()
-    for table, count in analytics_counts.items():
-        print(f"  {table}: {count} rows")
-    print("Analytics complete.")
+    print("Build complete. All data is now in Supabase.")
 
 
 def _cmd_analyze(args: argparse.Namespace) -> None:
@@ -249,7 +239,7 @@ def _cmd_profile(args: argparse.Namespace) -> None:
     from rca.context import build_context_pack
     from rca.config import CONTEXT_PACK_PATH
 
-    print("Building context pack from data/rca.duckdb...")
+    print("Building context pack from Supabase rca_city_series...")
     build_context_pack()
     md_path = CONTEXT_PACK_PATH.with_suffix(".md")
     print(f"Written: {CONTEXT_PACK_PATH}")
@@ -271,8 +261,8 @@ def _cmd_runs(args: argparse.Namespace) -> None:
     result = (
         client
         .table("rca_outcome")
-        .select("run_name,city_id,dt,signal_label,confidence,escalated,brief_headline,created_at")
-        .order("created_at", desc=True)
+        .select("run_name,city_id,dt,signal_label,confidence,escalated,brief_headline,generated_at")
+        .order("generated_at", desc=True)
         .limit(30)
         .execute()
     )
@@ -450,27 +440,8 @@ def _cmd_reset_memory(args: argparse.Namespace) -> None:
 
 
 def _cmd_sync(args: argparse.Namespace) -> None:
-    from rca.database import sync_analytics_to_supabase, sync_normals_to_supabase, sync_series_to_supabase
-    from rca.config import DB_PATH
-
-    if not DB_PATH.exists():
-        print("Local DuckDB not found. Run 'rca build' first.")
-        return
-
-    print("Syncing city_series to Supabase...")
-    series_count = sync_series_to_supabase()
-    print(f"  Upserted {series_count} city-day rows.")
-
-    print("Syncing city_normals to Supabase...")
-    normals_count = sync_normals_to_supabase()
-    print(f"  Upserted {normals_count} city baselines.")
-
-    print("Syncing analytics tables to Supabase...")
-    analytics_counts = sync_analytics_to_supabase()
-    for table, count in analytics_counts.items():
-        print(f"  {table}: {count} rows upserted.")
-
-    print("Sync complete.")
+    print("'rca sync' is retired. DuckDB has been removed.")
+    print("Use 'rca build' to ingest parquet and push directly to Supabase.")
 
 
 def main() -> None:
@@ -483,7 +454,7 @@ def main() -> None:
     # rca build
     build_parser = subparsers.add_parser(
         "build",
-        help="Ingest parquet into data/rca.duckdb and validate row counts",
+        help="Ingest parquet and push all tables directly to Supabase",
     )
     build_parser.set_defaults(func=_cmd_build)
 
@@ -554,7 +525,7 @@ def main() -> None:
     # rca profile
     profile_parser = subparsers.add_parser(
         "profile",
-        help="Build data/context_pack.json and context_pack.md from the local DuckDB",
+        help="Build data/context_pack.json and context_pack.md from Supabase",
     )
     profile_parser.set_defaults(func=_cmd_profile)
 
@@ -588,10 +559,10 @@ def main() -> None:
     )
     reset_mem_parser.set_defaults(func=_cmd_reset_memory)
 
-    # rca sync
+    # rca sync (retired — kept as a no-op alias)
     sync_parser = subparsers.add_parser(
         "sync",
-        help="Push local DuckDB aggregates (store_series, store_normals) to Supabase",
+        help="Retired: use 'rca build' to ingest parquet and push to Supabase",
     )
     sync_parser.set_defaults(func=_cmd_sync)
 

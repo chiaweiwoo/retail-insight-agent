@@ -14,14 +14,14 @@ Working notes and strict guardrails for the RCA agent system.
 
 - **Dataset**: `FreshRetailNet-50K` heavily normalizes sales figures.
 - **Sandbox**: Local dataset aggregates data to the City level. "Peer group" comparisons between cities are statistically noisy. Analysts must acknowledge this.
-- **Source of Truth**: Supabase is the sole system of record and compute. DuckDB has been fully deprecated and removed. All analytical tools read directly from Supabase tables (`rca_` prefix).
+- **Source of Truth**: Supabase is the sole runtime system of record. DuckDB is gone entirely. All agent tools read directly from Supabase (`rca_` tables). ETL (`rca build`) reads parquet locally and pushes to Supabase — no local DB written.
 
 ## The LangGraph Pipeline
 
 Orchestration is handled by LangGraph via `RcaState`.
 
 1. **Build context**: Fetch from Supabase.
-2. **Retrieve memory**: Fetch `rca_store_profile` (now mapping cities) and recent `rca_outcome` rows.
+2. **Retrieve memory**: Fetch `rca_city_profile` and recent `rca_outcome` rows.
 3. **Plan (Fast Model)**: Dispatch specialists.
 4. **Specialists (Fast Model, Parallel)**: Run `sales_analyst`, `ops_analyst`, `commercial_analyst`, `market_analyst`.
 5. **Critic (Deep Model)**: Downgrades claims, flags correlation-as-cause.
@@ -39,15 +39,15 @@ All tools read directly from Supabase `rca_` tables.
 | `sales_analyst` | `get_signal_evidence`, `get_sales_context` |
 | `ops_analyst` | `get_stockout_context`, `get_stockout_baseline`, `get_sales_context` |
 | `commercial_analyst` | `get_discount_context`, `get_activity_context`, `get_sales_context` |
-| `market_analyst` | `get_calendar_weather_context`, `get_peer_store_context`, `get_sales_context` |
+| `market_analyst` | `get_calendar_weather_context`, `get_peer_city_context`, `get_sales_context` |
 
 ## The Dashboard
 
 The UI is a Next.js App Router deployed on Vercel (`dashboard/`). It uses a premium glassmorphism design system built with pure Tailwind CSS v4, Lucide icons, and Recharts.
-- `/` -> Fleet Overview with a 14-day trailing signal heatmap grid and drop/lift badges.
-- `/cities/[storeId]` -> Detailed regional telemetry featuring a responsive Recharts AreaChart with RCA triggers overlaid.
-- `/cities/[storeId]/rca` -> Historical Decision Cards rendered in elegant glass panels.
-- `/cities/[storeId]/profile` -> Distilled semantic memory displayed in a rich icon grid.
+- `/` -> Fleet Overview with a 90-day trailing signal heatmap grid and drop/lift badges.
+- `/cities/[cityId]` -> Detailed regional telemetry featuring a responsive Recharts AreaChart with RCA triggers overlaid.
+- `/cities/[cityId]/rca` -> Historical Decision Cards rendered in elegant glass panels.
+- `/cities/[cityId]/profile` -> Distilled semantic memory displayed in a rich icon grid.
 The dashboard reads securely from Supabase using Row Level Security (RLS) and the anon key.
 
 ## Shipped Ecosystem Features

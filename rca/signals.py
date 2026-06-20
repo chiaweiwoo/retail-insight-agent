@@ -1,40 +1,30 @@
 from __future__ import annotations
 
-from pathlib import Path
-
-import duckdb
 import pandas as pd
 
-from rca.config import DB_PATH, make_supabase_client
+from rca.config import make_supabase_client
 
 
 MIN_BASELINE_OBSERVATIONS = 3
 
 
-def load_sales_history(db_path: Path = DB_PATH) -> pd.DataFrame:
-    if not db_path.exists():
-        raise FileNotFoundError(f"DuckDB file is missing: {db_path}")
-
-    connection = duckdb.connect(str(db_path), read_only=True)
-    try:
-        frame = connection.execute(
-            """
-            SELECT
-                s.city_id,
-                s.dt,
-                s.total_sales,
-                h.weekday,
-                h.is_weekend,
-                h.holiday_name_inferred
-            FROM fact_sales_city_day AS s
-            JOIN dim_holiday_day AS h USING (dt)
-            ORDER BY s.city_id, s.dt
-            """
-        ).df()
-    finally:
-        connection.close()
-
+def load_sales_history() -> pd.DataFrame:
+    """Load city-day sales history from Supabase rca_city_series."""
+    client = make_supabase_client()
+    resp = (
+        client.table("rca_city_series")
+        .select("city_id,dt,total_sales,weekday,is_weekend,holiday_name_inferred")
+        .limit(2000)
+        .execute()
+    )
+    frame = pd.DataFrame(resp.data or [])
+    if frame.empty:
+        raise RuntimeError(
+            "rca_city_series returned no rows. Run 'rca build' to populate Supabase."
+        )
     frame["dt"] = pd.to_datetime(frame["dt"])
+    frame.sort_values(["city_id", "dt"], inplace=True)
+    frame.reset_index(drop=True, inplace=True)
     return frame
 
 
