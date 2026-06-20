@@ -33,6 +33,7 @@ from rca.profiles import get_store_profile
 from rca.llm import (
     ClientFactory,
     LLMSettings,
+    build_chat_completion_kwargs,
     build_openai_compatible_client,
     load_llm_settings,
     make_routed_settings,
@@ -65,6 +66,9 @@ class RcaState(TypedDict):
     # Fetched in plan_node, threaded into all LLM preambles
     store_profile: str | None
 
+    # Whether to run the optional reflection pass after the SLT brief
+    enable_reflection: bool
+
     # Accumulated via Send fan-out (operator.add merges results from each branch)
     analyst_results: Annotated[list[dict], operator.add]
 
@@ -73,6 +77,7 @@ class RcaState(TypedDict):
     coordinator_report: str
     controller_note: str
     decision_card: str
+    reflection_note: str
 
 
 # ---------------------------------------------------------------------------
@@ -308,14 +313,77 @@ def slt_node(state: RcaState, config: RunnableConfig) -> dict:
     return {"decision_card": decision_card}
 
 
+_REFLECTION_SYSTEM_PROMPT = """\
+You are auditing a retail RCA decision for hidden assumptions and data gaps.
+
+Identify the SINGLE weakest assumption or most consequential missing evidence. Then write:
+1. What the assumption is
+2. What specific data or observation would confirm or refute it
+3. Whether this uncertainty changes the recommended action
+
+Rules:
+- Exactly 3 bullets, no more
+- Cite specific figures from the decision card if available
+- Use normalized sales amounts, not currency
+- Plain ASCII markdown, start with "## Reflection"
+- If the analysis is well-supported, say so plainly in bullet 1
+"""
+
+
+def _route_after_slt(state: RcaState) -> str:
+    return "reflect" if state.get("enable_reflection") else "sanitize"
+
+
+def reflect_node(state: RcaState, config: RunnableConfig) -> dict:
+    cfg = _cfg(config)
+    base_settings: LLMSettings = cfg["settings"]
+    client_factory: ClientFactory = cfg["client_factory"]
+    logger: RunLogger = cfg["logger"]
+    observer: RcaObserver = cfg["observer"]
+    subject = f"{state['store_alias']}:{state['dt']}"
+
+    node_settings = make_routed_settings(base_settings, "reflect")
+    client = client_factory("reflect")
+
+    messages = [
+        {"role": "system", "content": _REFLECTION_SYSTEM_PROMPT},
+        {
+            "role": "user",
+            "content": (
+                f"Decision card:\n{state['decision_card']}\n\n"
+                f"RCA report (excerpt):\n{state['coordinator_report'][:2000]}\n\n"
+                f"Critic note (excerpt):\n{state['critic_note'][:800]}"
+            ),
+        },
+    ]
+    logger.log(
+        actor_type="llm", actor_name="reflect",
+        action="completion_requested", subject=subject, source="llm", details={},
+    )
+    with observer.node_span("reflect"):
+        response = client.chat.completions.create(
+            **build_chat_completion_kwargs(node_settings, messages, tools=None)
+        )
+    content = response.choices[0].message.content or ""
+    logger.log(
+        actor_type="llm", actor_name="reflect",
+        action="completion_finished", subject=subject, source="llm",
+        details={"content_preview": content[:200]},
+    )
+    return {"reflection_note": content}
+
+
 def sanitize_node(state: RcaState) -> dict:
     """Sanitize synthesis artifacts (specialist memos already sanitized at generation)."""
-    return {
+    result: dict = {
         "coordinator_report": sanitize_generated_markdown(state["coordinator_report"]),
         "critic_note": sanitize_generated_markdown(state["critic_note"]),
         "controller_note": sanitize_generated_markdown(state["controller_note"]),
         "decision_card": sanitize_generated_markdown(state["decision_card"]),
     }
+    if state.get("reflection_note"):
+        result["reflection_note"] = sanitize_generated_markdown(state["reflection_note"])
+    return result
 
 
 def record_node(state: RcaState, config: RunnableConfig) -> dict:
@@ -396,6 +464,9 @@ def artifacts_node(state: RcaState, config: RunnableConfig) -> dict:
     _write_pair("controller_note", state["controller_note"], f"Finance controller note for {store_alias} on {dt}")
     _write_pair("decision_card", state["decision_card"], f"Decision card for {store_alias} on {dt}")
     _write_pair("report", state["coordinator_report"], f"RCA report for {store_alias} on {dt}")
+    reflection_note = state.get("reflection_note", "")
+    if reflection_note:
+        _write_pair("reflection", reflection_note, f"Reflection for {store_alias} on {dt}")
 
     trace_payload = {
         "store_alias": store_alias,
@@ -411,6 +482,7 @@ def artifacts_node(state: RcaState, config: RunnableConfig) -> dict:
         "controller_note_markdown": state["controller_note"],
         "decision_card_markdown": state["decision_card"],
         "coordinator_report_markdown": state["coordinator_report"],
+        "reflection_note_markdown": state.get("reflection_note", ""),
         "analyst_results": state["analyst_results"],
     }
     trace_json = json.dumps(trace_payload, indent=2, ensure_ascii=False)
@@ -433,6 +505,7 @@ def build_rca_graph() -> Any:
     builder.add_node("synthesize", synthesize_node)
     builder.add_node("controller", controller_node)
     builder.add_node("slt", slt_node)
+    builder.add_node("reflect", reflect_node)
     builder.add_node("sanitize", sanitize_node)
     builder.add_node("record", record_node)
     builder.add_node("artifacts", artifacts_node)
@@ -443,7 +516,8 @@ def build_rca_graph() -> Any:
     builder.add_edge("critic", "synthesize")
     builder.add_edge("synthesize", "controller")
     builder.add_edge("controller", "slt")
-    builder.add_edge("slt", "sanitize")
+    builder.add_conditional_edges("slt", _route_after_slt, ["reflect", "sanitize"])
+    builder.add_edge("reflect", "sanitize")
     builder.add_edge("sanitize", "record")
     builder.add_edge("record", "artifacts")
     builder.add_edge("artifacts", END)
@@ -464,6 +538,7 @@ def run_rca_graph(
     client_factory: ClientFactory | None = None,
     output_dir: Path | None = None,
     include_research: bool = False,
+    enable_reflection: bool = False,
 ) -> CoordinatorResult:
     settings = settings or load_llm_settings()
     is_dry_run = client_factory is not None
@@ -485,11 +560,13 @@ def run_rca_graph(
         "prior_rca_summary": {},
         "skipped_analysts": [],
         "store_profile": None,
+        "enable_reflection": enable_reflection,
         "analyst_results": [],
         "critic_note": "",
         "coordinator_report": "",
         "controller_note": "",
         "decision_card": "",
+        "reflection_note": "",
     }
 
     graph_config: dict = {

@@ -203,6 +203,7 @@ def _cmd_run(args: argparse.Namespace) -> None:
         specialists=specialists,
         client_factory=client_factory,
         output_dir=output_dir,
+        enable_reflection=getattr(args, "reflect", False),
     )
     if args.quick:
         _safe_print(result.coordinator_report_markdown)
@@ -502,6 +503,11 @@ def main() -> None:
         "--full",
         action="store_true",
         help="Print the full RCA after the decision card",
+    )
+    run_parser.add_argument(
+        "--reflect",
+        action="store_true",
+        help="Run a bounded self-audit reflection after the SLT brief",
     )
     run_parser.set_defaults(func=_cmd_run)
 

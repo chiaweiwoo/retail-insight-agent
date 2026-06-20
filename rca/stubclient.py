@@ -117,6 +117,13 @@ flag for finance review if recurrence is confirmed.
 **One-off vs structural:** Single-day trigger in stub mode. Insufficient history to classify
 as structural. Recommend watching the next 5 trading days before drawing a conclusion.
 """,
+    "reflect": """\
+## Reflection
+
+- Weakest assumption: the -20% drop is attributed to stockout pressure, but the causal direction is ambiguous — a demand-side drop can precede stockouts as easily as cause them. Confirming would require intraday replenishment logs or demand forecasts not in this dataset.
+- Missing data: no cost, margin, or intraday order data available; the ops analyst correctly flagged this but the synthesis treated the stockout correlation as more causal than warranted.
+- Action implication: the "monitor" recommendation is appropriate given the uncertainty; escalation would require at least one additional day of stockout confirmation before it is justified.
+""",
     "evaluator": """\
 {"groundedness": 4, "calibration": 4, "actionability": 3, "conciseness": 4, "causal_honesty": 4, "summary": "Stub evaluation only."}
 """,

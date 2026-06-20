@@ -30,6 +30,7 @@ NODE_MODEL_MAP: dict[str, str] = {
     "critic": "deep",
     "finance_controller": "deep",
     "slt_brief": "deep",
+    "reflect": "deep",
     "evaluator": "deep",
 }
 

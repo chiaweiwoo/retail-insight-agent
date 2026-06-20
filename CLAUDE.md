@@ -9,6 +9,7 @@ uv run python -m rca.cli build
 uv run python -m rca.cli analyze
 uv run python -m rca.cli profile
 uv run python -m rca.cli run --store h555 --dt 2024-05-16 --dry-run --full
+uv run python -m rca.cli run --store h555 --dt 2024-05-16 --dry-run --reflect  # adds reflection pass
 uv run python -m rca.cli bench
 uv run python -m rca.cli eval --dry-run
 uv run python -m rca.cli story --run-dir data/analysis/agent_benchmark_runs/<run_folder>
