@@ -1,10 +1,290 @@
 # Improvement Plan — Calibrated RCA, v2 (cloud + LangGraph)
 
-> **Planned on Opus. Execute on Sonnet.** Learning project, rollback-safe.
-> This file is both an execution plan (Sonnet runs it round by round) **and** a learning artifact
-> (the student is the only audience — it explains *why*, not just *what*).
+> **Planned on Opus. Execute on Sonnet (or Gemini Pro).** Learning project, rollback-safe.
+> This file is both an execution plan **and** a learning artifact.
 > **Executes in 3 rounds, max.** Each round ends in a working, committed, deployable state.
 > Delete scratch docs at the very end; keep README, PRD, CLAUDE.md, AGENTS.md.
+
+---
+
+## HANDOFF — Current state as of 2026-06-20 (start here)
+
+**Branch**: `redesign/calibration-first` | **Last commit**: `06140eb feat(reflect): add bounded reflection node`
+
+Phases 1.1–2.6 are complete and green. Remaining: **2.7 → 2.8 → 3.1 → 3.2 (PAUSE) → 3.3 → 3.4 → 3.5**.
+
+### Invariants that apply to every remaining phase
+
+- Run `uv run python -m rca.cli run --store h555 --dt 2024-05-16 --dry-run --full` as the smoke gate before each commit — must complete with no exceptions.
+- Commit + push after each phase. Check CI: `gh run list --limit 1` — wait for green.
+- Never run SQL directly. Author a migration file; user runs it in the Supabase SQL Editor.
+- `sale_amount` / `hours_sale` are normalized coefficients, not currency. Never emit `$` or "revenue".
+- Store prefix groups (`h/m/l`) are opaque IDs — do not call them "tiers".
+- Peer comparisons come from a 15-store local sandbox — always note the small-sample limitation.
+- Prompt changes (any `*_PROMPT` constant) → run `/prompt-audit` before committing.
+
+### Key files — what exists now
+
+| File | Status | Role |
+|------|--------|------|
+| `rca/graph.py` | NEW (Phase 2.1) | LangGraph `StateGraph`; `run_rca_graph()` is the main entry point |
+| `rca/obs.py` | NEW (Phase 2.4) | Langfuse tracing wrapper; no-ops silently when env keys are absent |
+| `rca/profiles.py` | NEW (Phase 2.5) | Episodic store memory: `get_store_profile`, `distil_store_profile`, `reset_store_profile` |
+| `rca/llm.py` | MODIFIED | Added `NODE_MODEL_MAP`, `make_routed_settings()`, `ClientFactory` type alias |
+| `rca/agents.py` | MODIFIED | All private `_run_*` functions accept `profile_text: str \| None = None` |
+| `rca/context.py` | MODIFIED | `build_context_preamble(store_alias, dt, pack, profile_text)` — injects store memory |
+| `rca/evaluator.py` | TO MODIFY (2.7) | Currently 5 judge dimensions; Phase 2.7 adds 4 more + free-text verdict |
+| `rca/mcp_server.py` | TO CREATE (2.8) | FastMCP server exposing read-only tools |
+| `rca/stubclient.py` | MODIFIED | Has stubs for all nodes incl. `"reflect"` and `"evaluator"` (5-field JSON today) |
+| `rca/tools.py` | EXISTS | All read-only query functions used by specialist agents |
+| `rca/cli.py` | MODIFIED | `rca distil`, `rca reset-memory`, `rca run --reflect` added |
+| `rca/bench.py` | MODIFIED | Imports and calls `run_rca_graph` (not `run_coordinator`) |
+
+### Architecture summary
+
+**Graph nodes** — lowercase_underscore names must match keys in `NODE_MODEL_MAP` in `rca/llm.py`:
+
+```
+START → plan → [Send fan-out] → run_specialist (×N parallel)
+     → critic → synthesize → controller → slt
+     → [conditional: enable_reflection?] → reflect? → sanitize
+     → record → artifacts → END
+```
+
+**Config injection** — every node callable receives `config: RunnableConfig`. Extract via:
+```python
+from langchain_core.runnables import RunnableConfig
+cfg = config.get("configurable", {})
+settings: LLMSettings      = cfg["settings"]
+client_factory: ClientFactory = cfg["client_factory"]
+logger: RunLogger          = cfg["logger"]
+observer: RcaObserver      = cfg["observer"]
+is_dry_run: bool           = cfg["is_dry_run"]
+```
+
+**Model routing** — call `make_routed_settings(base_settings, node_name)` before each LLM call to get the right model. Fast tier = `DEEPSEEK_MODEL_FAST` env var; deep tier = `DEEPSEEK_MODEL_DEEP`.
+
+**Dry-run contract** — pass `client_factory=stub_client_factory` from `rca/stubclient.py`. Every node that calls an LLM **must** have an entry in `_STUB_RESPONSES`. The `"evaluator"` entry must be a JSON string parseable by `json.loads()`.
+
+**Tools available** (in `rca/tools.py`):
+`get_signal_evidence`, `get_sales_context`, `get_stockout_context`, `get_stockout_baseline`,
+`get_discount_context`, `get_activity_context`, `get_calendar_weather_context`,
+`get_peer_store_context`, `get_prior_rca`, `get_tool_schemas`
+
+**Supabase** — all reads/writes via `supabase-py` client in `rca/db.py`. Tables in `public` schema with `rca_` prefix. Service role key is backend-only; never send it to the frontend or check it into git.
+
+---
+
+## Phase 2.7 — Evaluator: executive-usefulness judge
+
+**File**: `rca/evaluator.py`
+
+`EVALUATOR_SYSTEM_PROMPT` currently scores 5 dimensions. Extend it to score 9 and return a free-text verdict.
+
+**New dimensions** (1–5 each):
+- `time_to_decision`: can the SLT decide within one read without chasing footnotes?
+- `format_compliance`: does the card have all 6 required fields (headline / confidence / materiality / pattern / action / escalate)?
+- `procedure_transparency`: can a reader tell which analysts ran, what the critic changed, and why?
+- `restraint`: does the output avoid over-claiming, inventing data, or asserting causal links without evidence?
+
+**New free-text field**:
+- `executive_pov` (string): "Would I act on this? What's missing?" — one paragraph, plain language.
+
+Updated prompt must instruct: return valid JSON with exactly these 9 numeric keys + 1 string key:
+`groundedness, calibration, actionability, conciseness, causal_honesty, time_to_decision, format_compliance, procedure_transparency, restraint, executive_pov`
+
+Update `_render_eval_markdown` to add the 4 new numeric columns to the table and print `executive_pov` as an indented line beneath each scenario row.
+
+Update `_STUB_RESPONSES["evaluator"]` in `rca/stubclient.py` to include all 10 fields:
+```python
+"evaluator": '{"groundedness": 4, "calibration": 4, "actionability": 3, "conciseness": 4, "causal_honesty": 4, "time_to_decision": 3, "format_compliance": 5, "procedure_transparency": 4, "restraint": 4, "executive_pov": "Stub evaluation only."}',
+```
+
+**Checkpoint**: `uv run python -m rca.cli eval --dry-run` shows new columns in `eval_report.md`; `uv run pytest` green; dry-run smoke green.
+
+---
+
+## Phase 2.8 — MCP server
+
+**File to create**: `rca/mcp_server.py`
+**Dependency**: `fastmcp>=2.0` — already in `pyproject.toml` (confirmed installed).
+
+Pattern using FastMCP 2.x:
+```python
+from fastmcp import FastMCP
+from rca.tools import (
+    get_signal_evidence, get_sales_context, get_stockout_context,
+    get_stockout_baseline, get_discount_context, get_activity_context,
+    get_calendar_weather_context, get_peer_store_context, get_prior_rca,
+)
+
+mcp = FastMCP("retail-rca")
+
+@mcp.tool()
+def signal_evidence(store_alias: str, dt: str) -> dict:
+    """Get signal evidence for a store on a given date.
+    Caveats: sales figures are normalized coefficients (not currency).
+    Peer comparisons come from a 15-store local sandbox — treat as weak priors.
+    """
+    return get_signal_evidence(store_alias, dt)
+```
+
+Wrap all 9 tool functions listed above. Each docstring **must** include the data caveats (normalized sales, small-sample peer groups, opaque store IDs).
+
+Add `rca mcp` CLI command in `rca/cli.py`:
+```python
+def _cmd_mcp(args) -> None:
+    from rca.mcp_server import mcp
+    mcp.run()
+
+# in main(), alongside other subparsers:
+sub = subparsers.add_parser("mcp", help="Launch MCP tool server (read-only)")
+sub.set_defaults(func=_cmd_mcp)
+```
+
+**Checkpoint**: `uv run python -m rca.cli mcp --help` exits cleanly; dry-run smoke unaffected; `uv run pytest` green.
+
+---
+
+## Phase 3.1 — Next.js dashboard (local first)
+
+**Directory**: `dashboard/` (create from scratch in the repo root).
+
+**Stack**: Next.js 14+ (App Router) · TypeScript · Tailwind CSS · Tremor (charts) · `@supabase/supabase-js`
+
+**Scaffold**:
+```bash
+pnpm create next-app dashboard --typescript --tailwind --app --src-dir --import-alias "@/*" --no-eslint
+cd dashboard && pnpm add @supabase/supabase-js @tremor/react
+```
+
+**Supabase client** at `dashboard/src/lib/supabase.ts`:
+```ts
+import { createClient } from '@supabase/supabase-js'
+export const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
+```
+
+**`dashboard/.env.local`** (gitignored; user fills in after Vercel project is created):
+```
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+```
+
+**Pages** (App Router — all under `dashboard/src/app/`):
+
+| Route | File | Content |
+|-------|------|---------|
+| `/` | `page.tsx` | Store list — signal status badges (drop / lift / none); filter by city |
+| `/stores/[storeId]` | `stores/[storeId]/page.tsx` | Sales time series (Tremor AreaChart); triggered dates marked; descriptive stats (mean, stddev, weekday pattern) |
+| `/stores/[storeId]/rca` | `stores/[storeId]/rca/page.tsx` | Decision cards list (confidence + escalate badges); click to expand report / critique / story markdown |
+| `/stores/[storeId]/profile` | `stores/[storeId]/profile/page.tsx` | Distilled store profile + recurrence counts (from `rca_store_profile`) |
+
+All reads use the **anon key under RLS** — anon SELECT is allowed on dim/fact/signal/outcome/profile tables; no write paths exist in the dashboard. Surface the small-sample caveat on the peer view.
+
+**`dashboard/.env.local.example`** (commit this file with blanks; `.env.local` stays gitignored).
+
+**Checkpoint**: `pnpm dev` in `dashboard/` renders against Supabase; `pnpm build` succeeds with no TS errors.
+
+---
+
+## Phase 3.2 — Deploy to Vercel  ← PAUSE (user action required)
+
+**PAUSE** — user must do all of this before the agent continues:
+1. Go to vercel.com → New Project → import the GitHub repo → set **Root Directory** to `dashboard/`
+2. In Project → Settings → Environment Variables, add:
+   - `NEXT_PUBLIC_SUPABASE_URL` (from Supabase Project Settings → API → Project URL)
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` (from Supabase Project Settings → API → anon key)
+3. Trigger the first deploy
+4. Confirm the deployed URL loads and reads data
+5. Verify RLS: the anon key can SELECT from tables but cannot INSERT/UPDATE/DELETE
+
+After user confirms, agent adds `dashboard/vercel.json` if needed and confirms the build settings are correct.
+
+---
+
+## Phase 3.3 — Skills
+
+**File to create**: `.claude/skills/rca-story/SKILL.md`
+
+This is a Claude Code skill file (Markdown). Content should describe the procedure for regenerating a reader-facing story report for a completed run:
+
+```markdown
+# Skill: rca-story
+
+Regenerate the reader-facing story report for a completed RCA run.
+
+## When to use
+The user says "generate story for <run_folder>" or "write the story report for <store> <date>".
+
+## Steps
+1. Locate the run folder under `data/analysis/agent_benchmark_runs/<run_folder>/`
+2. Run: `uv run python -m rca.cli story --run-dir data/analysis/agent_benchmark_runs/<run_folder>`
+3. Output is written to `output/story_reports/<run_folder>/`
+4. Read and summarise the story report for the user.
+
+## Grounding rules
+- Do not invent drivers not present in the coordinator trace.
+- Do not claim certainty beyond what the decision card confidence field states.
+- Normalized sales figures are coefficients, not currency.
+```
+
+Optionally add `.claude/skills/rca-run/SKILL.md` for an end-to-end run + card summary workflow.
+
+---
+
+## Phase 3.4 — Documentation
+
+**All files require a conflict pass**: re-read the whole file, resolve contradictions, then write. Stale docs are worse than no docs.
+
+### `README.md` — rewrite as Agents 101 (§E outline below)
+
+1. What this is + ASCII funnel diagram (label each step: code vs LLM)
+2. Components at a glance — table: Agent | Tools | Model | When | What it must change
+3. How an LLM agent works — system prompt, tools, ReAct loop (worked example), parallel specialists
+4. Why critic + coordinator + decision card — the funnel logic; calibration; confidence-led
+5. Staying honest — faithfulness check, LLM-as-judge ≠ critic, small-sample caution, no currency
+6. Memory over time — episodic vs semantic, distillation, store profile, `rca replay` / `rca reset-memory`
+7. Model routing — cheap/strong table + cost rationale
+8. The ecosystem — LangGraph, MCP, Skills, Langfuse, Supabase, Vercel (one sentence each: what it is + how to run)
+9. Glossary (the concept table from §2 of this plan, expanded)
+10. Full CLI command list (all `rca *` subcommands)
+11. Data (minimal) — Supabase tables, the raw parquet source, the 15-store local sandbox vs 5-city full scope
+
+### `AGENTS.md` — conflict pass + these additions
+- Replace old orchestration description with LangGraph pipeline + `RcaState` fields
+- Tool table: add `get_stockout_baseline`; update all descriptions to reference Supabase (not DuckDB)
+- Add **Dashboard section** matching Phase 3.1 page/route spec above
+- Move MCP and Skills from "Out of Scope" to a shipped-features section
+- Update scope framing from "single city / 15 stores" to "15-store local sandbox; 5-city full dataset"
+
+### `CLAUDE.md` — conflict pass + these additions
+- New commands: `rca distil [--store ALIAS] [--dry-run]`, `rca reset-memory [--store ALIAS | --all]`, `rca run --reflect`, `rca mcp`
+- Datastores section: `data/rca.duckdb` (ETL only); `data/runs.duckdb` (legacy); Supabase is system of record
+- Routing: specialists → fast model; synthesis/oversight → deep model
+- Deterministic sanitizer: no LLM calls in sanitize; runs once at write boundary
+
+### `PRD.md` — update scope and roadmap
+- Mark all Round 1 + Round 2 items as shipped
+- Dashboard and Vercel deploy as current/in-progress
+- Remove any future-tense items that are now complete
+
+### Delete
+`docs/REDESIGN_PLAN.md` (if it exists) and any other scratch markdown files. Keep: `README.md`, `PRD.md`, `CLAUDE.md`, `AGENTS.md`.
+
+**Checkpoint**: a fresh reader can answer "what are the agents, their tools, when each runs, where the LLM helps, and how to run/deploy it" from README alone; no doc contradicts shipped behavior.
+
+---
+
+## Phase 3.5 — Land it
+
+1. Delete `docs/IMPROVEMENT_PLAN.md` (this file)
+2. Final live smoke: `uv run python -m rca.cli bench` → `uv run python -m rca.cli eval --run-dir <bench_dir>` → open Vercel URL
+3. Commit, push, `gh run list --limit 1` — confirm green
+
+---
 
 ---
 
