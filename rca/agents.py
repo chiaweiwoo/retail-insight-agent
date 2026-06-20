@@ -133,7 +133,7 @@ ANALYST_SPECS: tuple[AnalystSpec, ...] = (
     AnalystSpec(
         name="market_analyst",
         focus="market context — calendar, weather, and peer store comparison",
-        tool_names=("get_calendar_weather_context", "get_peer_store_context", "get_sales_context"),
+        tool_names=("get_calendar_weather_context", "get_peer_city_context", "get_sales_context"),
         system_prompt=_analyst_prompt(
             role="Market Analyst",
             domain_instructions=(

@@ -2,7 +2,7 @@ from fastmcp import FastMCP
 from rca.tools import (
     get_signal_evidence, get_sales_context, get_stockout_context,
     get_stockout_baseline, get_discount_context, get_activity_context,
-    get_calendar_weather_context, get_peer_store_context, get_prior_rca,
+    get_calendar_weather_context, get_peer_city_context, get_prior_rca,
 )
 
 mcp = FastMCP("retail-rca")
@@ -69,7 +69,7 @@ def peer_store_context(city_id: int, dt: str) -> dict:
     Caveats: sales figures are normalized coefficients (not currency).
     Peer comparisons come from a 15-store local sandbox — treat as weak priors.
     """
-    return get_peer_store_context(city_id, dt)
+    return get_peer_city_context(city_id, dt)
 
 @mcp.tool()
 def prior_rca(city_id: int) -> dict:
