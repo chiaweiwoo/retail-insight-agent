@@ -5,7 +5,7 @@ from pathlib import Path
 import duckdb
 import pandas as pd
 
-from rca.config import DB_PATH
+from rca.config import DB_PATH, make_supabase_client
 
 
 MIN_BASELINE_OBSERVATIONS = 3
@@ -38,6 +38,16 @@ def load_sales_history(db_path: Path = DB_PATH) -> pd.DataFrame:
     return frame
 
 
+def load_finance_forecast() -> pd.DataFrame:
+    client = make_supabase_client()
+    # Fetch all forecast data from Supabase directly
+    response = client.table("rca_finance_forecast").select("city_id,dt,forecast_sales").execute()
+    df = pd.DataFrame(response.data)
+    if not df.empty:
+        df["dt"] = pd.to_datetime(df["dt"])
+    return df
+
+
 def _safe_pct_change(current: pd.Series, baseline: pd.Series) -> pd.Series:
     result = ((current - baseline) / baseline) * 100.0
     return result.where(baseline > 0)
@@ -45,6 +55,13 @@ def _safe_pct_change(current: pd.Series, baseline: pd.Series) -> pd.Series:
 
 def build_sales_signal_frame(frame: pd.DataFrame) -> pd.DataFrame:
     signals = frame.copy().sort_values(["city_id", "dt"]).reset_index(drop=True)
+    
+    # Merge Finance Forecast from Supabase
+    forecast_df = load_finance_forecast()
+    if not forecast_df.empty:
+        signals = pd.merge(signals, forecast_df, on=["city_id", "dt"], how="left")
+    else:
+        signals["forecast_sales"] = pd.NA
 
     by_city = signals.groupby("city_id", group_keys=False)
     signals["previous_day_sales"] = by_city["total_sales"].shift(1)
@@ -75,8 +92,14 @@ def build_sales_signal_frame(frame: pd.DataFrame) -> pd.DataFrame:
     )
 
     signals["baseline_sales_floor"] = signals[
-        ["previous_day_sales", "trailing_7d_avg_sales", "same_weekday_4w_avg_sales"]
+        ["previous_day_sales", "trailing_7d_avg_sales", "same_weekday_4w_avg_sales", "forecast_sales"]
     ].max(axis=1)
+
+    # Compute the new Finance Forecast signal
+    signals["finance_forecast_abs_change"] = signals["total_sales"] - signals["forecast_sales"]
+    signals["finance_forecast_pct_change"] = _safe_pct_change(
+        signals["total_sales"], signals["forecast_sales"]
+    )
 
     return signals
 
@@ -89,6 +112,8 @@ def summarize_signal_distribution(signals: pd.DataFrame) -> dict[str, pd.DataFra
         "trailing_7d_pct_change",
         "same_weekday_4w_abs_change",
         "same_weekday_4w_pct_change",
+        "finance_forecast_abs_change",
+        "finance_forecast_pct_change",
     ]
 
     distribution_rows: list[dict[str, float | str | int]] = []
@@ -115,6 +140,7 @@ def summarize_signal_distribution(signals: pd.DataFrame) -> dict[str, pd.DataFra
         "day_over_day_pct_change",
         "trailing_7d_pct_change",
         "same_weekday_4w_pct_change",
+        "finance_forecast_pct_change",
     ]
     pct_thresholds = [10, 15, 20, 25, 30]
     abs_thresholds = [10, 20, 30, 40, 50]
@@ -258,18 +284,5 @@ def build_pct_trigger_grid(
 
 
 def recommend_primary_signal(summary_tables: dict[str, pd.DataFrame]) -> str:
-    distribution = summary_tables["distribution"].set_index("metric")
-    day_over_day = distribution.loc["day_over_day_pct_change"]
-    trailing_7d = distribution.loc["trailing_7d_pct_change"]
-    same_weekday = distribution.loc["same_weekday_4w_pct_change"]
-
-    same_weekday_coverage_ratio = same_weekday["rows_with_baseline"] / day_over_day["rows_with_baseline"]
-    same_weekday_bias = abs(same_weekday["mean"])
-
-    if same_weekday_coverage_ratio >= 0.9 and same_weekday_bias <= 4.0:
-        return "same_weekday_4w_pct_change"
-
-    if trailing_7d["std"] < day_over_day["std"]:
-        return "trailing_7d_pct_change"
-
-    return "day_over_day_pct_change"
+    # Always use the finance forecast if available, as it is the corporate S&OP target
+    return "finance_forecast_pct_change"

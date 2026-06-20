@@ -91,7 +91,7 @@ def get_signal_evidence(
         signal_label = analytics["signal_label"]
     else:
         # Fallback to legacy pct-change trigger while analytics table is not yet built
-        pct = row.get("trailing_7d_pct_change")
+        pct = row.get("finance_forecast_pct_change")
         if pct is None or pd.isna(pct):
             signal_label = "insufficient_history"
         elif float(pct) <= DEFAULT_DROP_THRESHOLD_PCT:
@@ -118,6 +118,7 @@ def get_signal_evidence(
         "day_over_day_pct_change": _round_float(row["day_over_day_pct_change"]),
         "trailing_7d_pct_change": _round_float(row["trailing_7d_pct_change"]),
         "same_weekday_4w_pct_change": _round_float(row["same_weekday_4w_pct_change"]),
+        "finance_forecast_pct_change": _round_float(row.get("finance_forecast_pct_change")),
         "weekday": str(row["weekday"]),
         "holiday_name_inferred": str(row["holiday_name_inferred"]),
     }
