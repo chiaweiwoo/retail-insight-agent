@@ -21,8 +21,13 @@ Working notes and guardrails for the v2 RCA agent system.
 ## Public CLI
 
 - `uv run python -m rca.cli build`
+- `uv run python -m rca.cli signal`
 - `uv run python -m rca.cli run --city <id> --date <YYYY-MM-DD>`
 - `uv run python -m rca.cli mcp`
+
+## Delivery Rule
+
+- After meaningful code or documentation changes, commit and push them in small, readable commits instead of leaving the repo dirty.
 
 ## The LangGraph Pipeline
 
@@ -70,11 +75,18 @@ All tools read directly from Supabase `rca.*` tables.
 
 The UI is a Next.js App Router app in `dashboard/`. It reads from the `rca` schema with the anon key and RLS.
 
-- `/` -> Fleet Overview with a city/date heatmap and drop/lift badges.
+- `/` -> City signal heatmap with clickable city/date cells.
 - `/cities/[cityId]` -> City timeline of actual sales versus synthetic business goal with clickable signal markers.
 - `/cities/[cityId]/rca` -> RCA history with decision card, RCA, prediction, and prescription.
 - `/cities/[cityId]/logs` -> Run logs and completion records.
 - `/cities/[cityId]/profile` -> Distilled memory notes.
+
+## Operational Notes
+
+- `rca build` ingests stable city/date base tables from parquet.
+- `rca signal` rebuilds the more experimental screening layer in `rca.signals`.
+- `rca run` depends on `rca.signals`; run `build` and `signal` before running the LLM workflow on fresh data.
+- For `rca.events`, `rca.completions`, and `rca.memory` inserts to work through the service role, `rca` schema sequences must be granted to `service_role`.
 
 ## Skills
 

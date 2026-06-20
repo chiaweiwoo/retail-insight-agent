@@ -24,12 +24,15 @@ The system of record is Supabase. The dashboard is read-only. Runs are manual.
 ## Public Workflows
 
 1. `rca build`
-   Rebuilds the RCA evidence model from parquet.
+   Rebuilds the base RCA evidence model from parquet.
 
-2. `rca run --city <id> --date <YYYY-MM-DD>`
+2. `rca signal`
+   Rebuilds the signal screening layer from ingested city/date tables.
+
+3. `rca run --city <id> --date <YYYY-MM-DD>`
    Runs the LLM agent system for one city/date.
 
-3. `rca mcp`
+4. `rca mcp`
    Starts the MCP tool server for learning.
 
 ## Data Semantics
@@ -85,12 +88,23 @@ Agents:
 
 Required dashboard capabilities:
 
-- fleet heatmap of signals
+- city heatmap of signals
 - city timeline of actual sales versus synthetic business goal
-- clickable signal markers
+- clickable signal markers and clickable heatmap cells
 - RCA view with RCA, prediction, and prescription
-- logs page
+- logs page with completion text and tool-call trace
 - memory page
+
+## Runtime Persistence
+
+`rca run` writes to:
+
+- `rca.outcomes` for the final RCA artifact
+- `rca.events` for workflow events
+- `rca.completions` for per-node LLM outputs and tool call JSON
+- `rca.memory` for distilled lessons
+
+These sequence-backed tables require `service_role` access to schema sequences in addition to table grants.
 
 ## Constraints
 

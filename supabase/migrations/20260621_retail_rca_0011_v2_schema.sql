@@ -267,3 +267,4 @@ create policy "anon_read_external_events" on rca.external_events for select to a
 grant usage on schema rca to anon, authenticated, service_role;
 grant select on all tables in schema rca to anon, authenticated;
 grant all on all tables in schema rca to service_role;
+grant usage, select, update on all sequences in schema rca to service_role;

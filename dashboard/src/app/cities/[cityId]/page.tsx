@@ -6,11 +6,12 @@ import { rca } from "@/lib/supabase";
 
 export default async function CityOverview({ params }: { params: Promise<{ cityId: string }> }) {
   const { cityId } = await params;
+  const cityKey = Number(cityId);
 
   const [{ data: salesRows, error }, { data: goalRows }, { data: signalRows }] = await Promise.all([
-    rca.from("sales").select("dt,total_sales").eq("city_id", cityId).order("dt", { ascending: true }),
-    rca.from("goals").select("dt,expected_sales").eq("city_id", cityId).order("dt", { ascending: true }),
-    rca.from("signals").select("dt,signal_label").eq("city_id", cityId).order("dt", { ascending: true }),
+    rca.from("sales").select("dt,total_sales").eq("city_id", cityKey).order("dt", { ascending: true }),
+    rca.from("goals").select("dt,expected_sales").eq("city_id", cityKey).order("dt", { ascending: true }),
+    rca.from("signals").select("dt,signal_label").eq("city_id", cityKey).order("dt", { ascending: true }),
   ]);
 
   if (error || !salesRows) {
@@ -29,6 +30,7 @@ export default async function CityOverview({ params }: { params: Promise<{ cityI
     Signal: signalMap.get(row.dt) || null,
   }));
   const triggeredCount = chartData.filter((row) => row.Signal === "drop" || row.Signal === "lift").length;
+  const triggeredDates = chartData.filter((row) => row.Signal === "drop" || row.Signal === "lift");
 
   return (
     <div className="space-y-8">
@@ -71,6 +73,28 @@ export default async function CityOverview({ params }: { params: Promise<{ cityI
         <h2 className="text-lg font-semibold text-white">Actual Sales vs Business Goal (synthetic)</h2>
         <p className="mt-2 text-sm text-slate-400">Markers show city/date signals. Click a red or green marker to jump to the RCA result for that day.</p>
         <SalesChart cityId={cityId} data={chartData} />
+        <div className="mt-5">
+          <div className="mb-2 text-xs font-medium uppercase tracking-wider text-slate-500">Triggered Dates</div>
+          {triggeredDates.length === 0 ? (
+            <p className="text-sm text-slate-500">No drop or lift dates found in the current signal table for this city.</p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {triggeredDates.map((row) => (
+                <a
+                  key={row.date}
+                  href={`/cities/${cityId}/rca?date=${row.date}`}
+                  className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                    row.Signal === "drop"
+                      ? "border-rose-500/25 bg-rose-500/10 text-rose-300 hover:bg-rose-500/15"
+                      : "border-emerald-500/25 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/15"
+                  }`}
+                >
+                  {row.date}
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

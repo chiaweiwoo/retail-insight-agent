@@ -146,6 +146,12 @@ Signals are then:
 
 The LLM can challenge the signal later, but the dashboard needs a fast screening layer.
 
+The operational split is deliberate:
+
+- `rca build` creates stable base facts
+- `rca signal` creates the more tunable screening layer
+- `rca run` consumes the signal plus the raw city/date evidence
+
 ## Retail concepts that shape decisions
 
 - realized sales are not always demand
@@ -179,6 +185,12 @@ Then:
 4. read the RCA result
 5. inspect logs and completions
 6. check the distilled memory
+
+The Logs page also exposes:
+
+- workflow events
+- raw node completions
+- tool call traces from `tool_calls_json`
 
 ## Common failure modes
 

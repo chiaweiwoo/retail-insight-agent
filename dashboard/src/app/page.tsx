@@ -38,7 +38,7 @@ export default async function CitiesPage() {
     <div className="space-y-8">
       <div className="flex items-start justify-between gap-6">
         <div className="space-y-2">
-          <h1 className="text-3xl font-semibold tracking-tight text-slate-50">Signals Heatmap</h1>
+          <h1 className="text-3xl font-semibold tracking-tight text-slate-50">City Signal Heatmap</h1>
           <p className="flex items-center gap-2 text-sm leading-relaxed text-slate-400">
             <span>City versus date screening against the synthetic business goal.</span>
             <span className="group relative inline-flex cursor-help items-center justify-center">
@@ -87,11 +87,12 @@ export default async function CitiesPage() {
                       : signal === "lift"
                         ? "bg-emerald-500/15 text-emerald-300"
                         : "bg-white/[0.03] text-slate-500";
+                  const href = signal === "drop" || signal === "lift" ? `/cities/${cityId}/rca?date=${date}` : `/cities/${cityId}`;
                   return (
                     <td key={date} className="border-b border-white/5 p-[1px] text-center" title={`${date} | ${signal}${deviation !== null ? ` | ${deviation.toFixed(1)}%` : ""}`}>
-                      <div className={`flex h-full w-full items-center justify-center rounded-sm py-1.5 text-[9px] font-semibold ${tone}`}>
+                      <Link href={href} className={`flex h-full w-full items-center justify-center rounded-sm py-1.5 text-[9px] font-semibold transition-opacity hover:opacity-80 ${tone}`}>
                         {deviation === null ? "?" : `${deviation > 0 ? "+" : ""}${Math.round(deviation)}`}
-                      </div>
+                      </Link>
                     </td>
                   );
                 })}

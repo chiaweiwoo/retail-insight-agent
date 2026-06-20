@@ -21,12 +21,13 @@ function toolCallCount(toolCalls: JsonLike | null | undefined): number {
 
 export default async function LogsPage({ params }: { params: Promise<{ cityId: string }> }) {
   const { cityId } = await params;
+  const cityKey = Number(cityId);
   const [{ data: events }, { data: completions }] = await Promise.all([
-    rca.from("events").select("run_id,dt,seq,actor_type,actor_name,action,source,details").eq("city_id", cityId).order("id", { ascending: false }).limit(120),
+    rca.from("events").select("run_id,dt,seq,actor_type,actor_name,action,source,details").eq("city_id", cityKey).order("id", { ascending: false }).limit(120),
     rca
       .from("completions")
       .select("run_id,dt,node_name,model,prompt_tokens,completion_tokens,content,tool_calls_json")
-      .eq("city_id", cityId)
+      .eq("city_id", cityKey)
       .order("id", { ascending: false })
       .limit(40),
   ]);

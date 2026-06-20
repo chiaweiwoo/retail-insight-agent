@@ -4,10 +4,11 @@ import { rca } from "@/lib/supabase";
 
 export default async function MemoryPage({ params }: { params: Promise<{ cityId: string }> }) {
   const { cityId } = await params;
+  const cityKey = Number(cityId);
   const { data: memories } = await rca
     .from("memory")
     .select("dt,memory_type,topic,content,created_at,signal_label")
-    .eq("city_id", cityId)
+    .eq("city_id", cityKey)
     .order("created_at", { ascending: false })
     .limit(30);
 

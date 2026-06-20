@@ -14,7 +14,8 @@ The v2 direction is:
 
 ```bash
 uv run python -m rca.cli build
-uv run python -m rca.cli run --city 0 --date 2024-05-16
+uv run python -m rca.cli signal
+uv run python -m rca.cli run --city 0 --date 2024-06-09
 uv run python -m rca.cli mcp
 ```
 
@@ -22,10 +23,14 @@ uv run python -m rca.cli mcp
 
 - `rca build`
   - reads the FreshRetailNet parquet
-  - resets RCA tables
+  - resets and repopulates the base RCA tables
   - aggregates facts to city/date grain
   - builds synthetic expected-sales goals
-  - labels `signals` for the dashboard
+
+- `rca signal`
+  - reads the ingested `sales`, `goals`, and `calendar` tables
+  - materializes `rca.signals`
+  - keeps signal tuning separate from stable ingestion
 
 - `rca run`
   - retrieves memory and cached evidence
@@ -51,15 +56,21 @@ Use schema `rca`.
 
 Before running the app, apply the migration in [20260621_retail_rca_0011_v2_schema.sql](/C:/Users/chiaw/OneDrive/Desktop/playground/retail_insight_agent/supabase/migrations/20260621_retail_rca_0011_v2_schema.sql) and make sure the `rca` schema is exposed through the Supabase Data API for dashboard reads.
 
+For write-heavy runtime tables that use `bigserial` ids, also grant sequence access to `service_role`:
+
+```sql
+grant usage, select, update on all sequences in schema rca to service_role;
+```
+
 ## Dashboard
 
 The dashboard keeps the surface intentionally small:
 
-- fleet heatmap from `rca.signals`
+- city signal heatmap from `rca.signals`
 - city timeline of actual sales vs synthetic business goal
 - clickable drop/lift markers
 - RCA page with root cause, prediction, and prescription
-- logs page for events and completions
+- logs page for events, completions, and tool-call traces
 - memory page for distilled lessons
 
 ## Learning Notes

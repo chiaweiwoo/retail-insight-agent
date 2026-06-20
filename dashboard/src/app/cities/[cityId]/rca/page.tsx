@@ -11,11 +11,12 @@ export default async function RCAPage({
   searchParams: Promise<{ date?: string }>;
 }) {
   const { cityId } = await params;
+  const cityKey = Number(cityId);
   const { date } = await searchParams;
   const { data: outcomes, error } = await rca
     .from("outcomes")
     .select("city_id,dt,signal_label,confidence,headline,decision_card_markdown,report_markdown,prediction_markdown,prescription_markdown,generated_at")
-    .eq("city_id", cityId)
+    .eq("city_id", cityKey)
     .order("dt", { ascending: false });
 
   if (error) {
