@@ -74,7 +74,7 @@ The funnel logic is designed for **calibration**.
 - **Skills**: Claude Markdown guidelines (`.claude/skills/`) that teach Claude how to run workflows automatically.
 - **Langfuse**: Observability layer tracing every prompt, response, and token cost (`rca/obs.py`).
 - **Supabase**: Postgres system of record containing our `rca_` prefixed tables and memory.
-- **Vercel**: Hosts the Next.js App Router dashboard (`dashboard/`).
+- **Vercel**: Hosts the Next.js App Router dashboard (`dashboard/`), featuring a premium glassmorphism UI built with pure Tailwind CSS v4, Recharts, and dynamic signal heatmaps.
 
 ## 9. Glossary
 

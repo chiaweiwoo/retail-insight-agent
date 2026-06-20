@@ -43,11 +43,11 @@ All tools read directly from Supabase `rca_` tables.
 
 ## The Dashboard
 
-The UI is a Next.js App Router deployed on Vercel (`dashboard/`).
-- `/` -> Store list with drop/lift badges.
-- `/stores/[storeId]` -> Time series AreaChart and signals.
-- `/stores/[storeId]/rca` -> Historical Decision Cards.
-- `/stores/[storeId]/profile` -> Distilled semantic memory.
+The UI is a Next.js App Router deployed on Vercel (`dashboard/`). It uses a premium glassmorphism design system built with pure Tailwind CSS v4, Lucide icons, and Recharts.
+- `/` -> Fleet Overview with a 14-day trailing signal heatmap grid and drop/lift badges.
+- `/stores/[storeId]` -> Detailed telemetry featuring a responsive Recharts AreaChart with RCA triggers overlaid.
+- `/stores/[storeId]/rca` -> Historical Decision Cards rendered in elegant glass panels.
+- `/stores/[storeId]/profile` -> Distilled semantic memory displayed in a rich icon grid.
 The dashboard reads securely from Supabase using Row Level Security (RLS) and the anon key.
 
 ## Shipped Ecosystem Features

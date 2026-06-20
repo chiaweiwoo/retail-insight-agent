@@ -37,4 +37,4 @@ It utilizes LangGraph, Supabase, Next.js, and FastMCP to provide an end-to-end f
 - **Supabase (Postgres)**: System of record. `rca_store_series`, `rca_store_normals`, `rca_outcome`, `rca_store_profile`.
 - **DuckDB**: Local ETL compute engine only.
 - **LangGraph**: Python-based DAG orchestration defining the analyst pipeline.
-- **Next.js Dashboard**: Vercel-hosted readonly viewer securely consuming the Supabase data via RLS.
+- **Next.js Dashboard**: Vercel-hosted readonly viewer securely consuming the Supabase data via RLS. Features a premium glassmorphism UI built with Tailwind CSS v4, Recharts, and a dynamic 14-day signal heatmap.
