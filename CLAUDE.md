@@ -29,6 +29,8 @@ uv run python -m rca.cli reset-memory --all           # delete all profiles
 - `rca story` is a post-run report rendering step. It reads a saved trace and writes root-level story report files.
 - `sale_amount` and `hours_sale` are normalized sales amounts from the source dataset, not literal units and not currency revenue. Prefer phrases like `sales amount`, `normalized sales amount`, or `relative sales level`.
 - Do not call store prefixes (`h/m/l`) tiers unless the text explicitly says they are only opaque prefix groupings.
+- The only active frontend is `dashboard/` (Next.js). The old `ui/` Vite app is retired.
+- For Vercel, deploy from the repo root; the root `vercel.json` and `package.json` delegate build/runtime work to `dashboard/`.
 - **Sandbox vs Production Scale (Crucial Context)**: The underlying raw dataset is `FreshRetailNet-50K` (898 stores, 18 cities, 50,000 series, heavily normalized metrics, sales could be in millions in reality). However, our local DuckDB database is a tiny sandbox subset of only **15 stores** spanning 90 days. 
   - **WARNING**: Because the local dataset only has 15 stores, "peer group" comparisons (e.g. comparing a store to others sharing the same prefix) are statistically noisy and often meaningless. A peer group might only have 2-4 stores. Do not let the AI agents over-index on peer comparisons without acknowledging this limitation.
 

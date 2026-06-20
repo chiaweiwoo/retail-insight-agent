@@ -2,6 +2,7 @@
 .env
 __pycache__/
 .pytest_cache/
+node_modules/
 *.pyc
 *.pyo
 *.pyd
@@ -10,6 +11,10 @@ __pycache__/
 *.wal
 ui/node_modules/
 ui/dist/
+ui/
+dashboard/node_modules/
+dashboard/.next/
+dashboard/.env.local
 
 # Local raw source data stays out of Git.
 data/raw/*.parquet

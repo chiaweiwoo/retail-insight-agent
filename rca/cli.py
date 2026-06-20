@@ -226,21 +226,17 @@ def _cmd_bench(args: argparse.Namespace) -> None:
 
 
 def _cmd_dashboard(args: argparse.Namespace) -> None:
-    from rca.report import build_dashboard_html
-    from rca.config import PROJECT_ROOT
-
-    output_path = PROJECT_ROOT / "ui" / "public" / "dashboard.html"
-    build_dashboard_html(output_path)
-    print(f"Dashboard written to {output_path}")
+    print(
+        "The old static Vite dashboard has been retired. "
+        "Use the Next.js app in dashboard/ instead."
+    )
 
 
 def _cmd_export(args: argparse.Namespace) -> None:
-    from rca.evidence import export_evidence_dataset
-    from rca.config import PROJECT_ROOT
-
-    output_path = PROJECT_ROOT / "ui" / "public" / "evidence_data.json"
-    export_evidence_dataset(output_path)
-    print(f"UI data exported to {output_path}")
+    print(
+        "The old evidence-viewer export flow has been retired with the Vite UI. "
+        "Use the dashboard/ app backed by Supabase instead."
+    )
 
 
 def _cmd_profile(args: argparse.Namespace) -> None:
@@ -532,14 +528,14 @@ def main() -> None:
     # rca dashboard
     dashboard_parser = subparsers.add_parser(
         "dashboard",
-        help="Regenerate ui/public/dashboard.html from analysis CSVs and run logs",
+        help="Legacy alias - static dashboard retired; use dashboard/ Next.js app",
     )
     dashboard_parser.set_defaults(func=_cmd_dashboard)
 
     # rca export
     export_parser = subparsers.add_parser(
         "export",
-        help="Refresh ui/public/evidence_data.json for the Vite evidence viewer",
+        help="Legacy alias - Vite evidence viewer retired; use dashboard/ Next.js app",
     )
     export_parser.set_defaults(func=_cmd_export)
 

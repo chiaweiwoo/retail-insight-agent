@@ -2,6 +2,8 @@
 
 Retail RCA playground built on a local DuckDB evidence store, with a calibration-first multi-agent workflow on top.
 
+The canonical frontend is the Next.js app in `dashboard/`. The older `ui/` Vite app has been retired so the repo only has one active UI target.
+
 The current shape is:
 
 1. Build clean daily store facts in DuckDB.
@@ -56,8 +58,17 @@ uv run python -m rca.cli run --store h555 --dt 2024-05-16 --dry-run --full
 | `uv run python -m rca.cli eval [--run-dir PATH] [--dry-run]` | Evaluate a benchmark run directory |
 | `uv run python -m rca.cli story --run-dir PATH [--no-llm] [--dry-run]` | Generate root-level story report markdown and HTML for one run |
 | `uv run python -m rca.cli runs` | Show recent run history from `data/runs.duckdb` |
-| `uv run python -m rca.cli dashboard` | Rebuild the static dashboard HTML |
-| `uv run python -m rca.cli export` | Refresh the UI evidence JSON |
+| `uv run python -m rca.cli dashboard` | Legacy alias; static dashboard retired |
+| `uv run python -m rca.cli export` | Legacy alias; Vite evidence viewer retired |
+
+## Frontend
+
+Use `dashboard/` as the only active frontend.
+
+- local dev: `cd dashboard && npm run dev`
+- production build: `cd dashboard && npm run build`
+- Vercel deploy from repo root; root `vercel.json` delegates build to `dashboard/`
+- required env vars: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 
 ## Runtime Design
 
