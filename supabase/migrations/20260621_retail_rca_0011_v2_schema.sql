@@ -264,5 +264,6 @@ create policy "anon_read_evidence_cache" on rca.evidence_cache for select to ano
 drop policy if exists "anon_read_external_events" on rca.external_events;
 create policy "anon_read_external_events" on rca.external_events for select to anon, authenticated using (true);
 
-grant usage on schema rca to anon, authenticated;
+grant usage on schema rca to anon, authenticated, service_role;
 grant select on all tables in schema rca to anon, authenticated;
+grant all on all tables in schema rca to service_role;
