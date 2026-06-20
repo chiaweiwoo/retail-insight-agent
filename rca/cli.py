@@ -249,57 +249,49 @@ def _cmd_profile(args: argparse.Namespace) -> None:
 
 
 def _cmd_runs(args: argparse.Namespace) -> None:
-    import json
+    import os
     import sys
 
-    import duckdb
+    from rca.config import make_supabase_client
 
-    from rca.config import LOG_DB_PATH
-
-    if not LOG_DB_PATH.exists():
-        print("No run log database found. Run a pipeline first.")
+    if not os.getenv("SUPABASE_URL"):
+        print("SUPABASE_URL not set — no run history available.")
         sys.exit(0)
 
-    con = duckdb.connect(str(LOG_DB_PATH), read_only=True)
-    rows = con.execute("""
-        SELECT
-            run_name,
-            MIN(timestamp_sgt)  AS started_at,
-            MAX(timestamp_sgt)  AS finished_at,
-            COUNT(*)            AS events,
-            MAX(CASE WHEN action = 'completed' AND actor_name = 'coordinator_pipeline'
-                     THEN details_json END) AS completed_json
-        FROM run_log_event
-        GROUP BY run_name
-        ORDER BY MIN(timestamp_sgt) DESC
-        LIMIT 30
-    """).fetchall()
-    con.close()
+    client = make_supabase_client()
+    result = (
+        client
+        .table("rca_outcome")
+        .select("run_name,store_id,dt,signal_label,confidence,escalated,brief_headline,created_at")
+        .order("created_at", desc=True)
+        .limit(30)
+        .execute()
+    )
+    rows = result.data or []
 
     if not rows:
-        print("Log table exists but is empty.")
+        print("No runs recorded yet.")
         sys.exit(0)
 
-    col_widths = {"run_name": 36, "started_at": 25, "events": 6}
+    col = {"run_name": 40, "store_id": 8, "dt": 12, "conf": 8}
     header = (
-        f"{'run':<{col_widths['run_name']}}  "
-        f"{'started (SGT)':<{col_widths['started_at']}}  "
-        f"{'evts':>{col_widths['events']}}  "
-        f"output_dir"
+        f"{'run':<{col['run_name']}}  "
+        f"{'store':<{col['store_id']}}  "
+        f"{'dt':<{col['dt']}}  "
+        f"{'conf':<{col['conf']}}  "
+        f"headline"
     )
     print(header)
-    print("-" * (len(header) + 30))
+    print("-" * (len(header) + 20))
 
-    for run_name, started_at, _, events, completed_json in rows:
-        output_dir = ""
-        if completed_json:
-            details = json.loads(completed_json)
-            output_dir = details.get("output_dir") or ""
+    for row in rows:
+        escalated = " [ESC]" if row.get("escalated") else ""
         print(
-            f"{run_name:<{col_widths['run_name']}}  "
-            f"{started_at:<{col_widths['started_at']}}  "
-            f"{events:>{col_widths['events']}}  "
-            f"{output_dir}"
+            f"{str(row.get('run_name','')):<{col['run_name']}}  "
+            f"{str(row.get('store_id','')):<{col['store_id']}}  "
+            f"{str(row.get('dt','')):<{col['dt']}}  "
+            f"{str(row.get('confidence','')):<{col['conf']}}  "
+            f"{row.get('brief_headline','')}{escalated}"
         )
 
 
@@ -369,6 +361,25 @@ def _cmd_story(args: argparse.Namespace) -> None:
     )
     print(f"Story markdown written to {markdown_path}")
     print(f"Story HTML written to {html_path}")
+
+
+def _cmd_sync(args: argparse.Namespace) -> None:
+    from rca.database import sync_normals_to_supabase, sync_series_to_supabase
+    from rca.config import DB_PATH
+
+    if not DB_PATH.exists():
+        print("Local DuckDB not found. Run 'rca build' first.")
+        return
+
+    print("Syncing store_series to Supabase...")
+    series_count = sync_series_to_supabase()
+    print(f"  Upserted {series_count} store-day rows.")
+
+    print("Syncing store_normals to Supabase...")
+    normals_count = sync_normals_to_supabase()
+    print(f"  Upserted {normals_count} store baselines.")
+
+    print("Sync complete.")
 
 
 def main() -> None:
@@ -445,10 +456,17 @@ def main() -> None:
     )
     profile_parser.set_defaults(func=_cmd_profile)
 
+    # rca sync
+    sync_parser = subparsers.add_parser(
+        "sync",
+        help="Push local DuckDB aggregates (store_series, store_normals) to Supabase",
+    )
+    sync_parser.set_defaults(func=_cmd_sync)
+
     # rca runs
     runs_parser = subparsers.add_parser(
         "runs",
-        help="Print recent run history from data/runs.duckdb",
+        help="Print recent run history from Supabase rca_outcome",
     )
     runs_parser.set_defaults(func=_cmd_runs)
 

@@ -7,20 +7,19 @@ import duckdb
 import pandas as pd
 
 from rca.config import (
-    CITY_ID,
+    CITY_IDS,
     DATE_END,
     DATE_START,
     DB_PATH,
     EXPECTED_DAY_COUNT,
-    EXPECTED_STORE_COUNT,
-    EXPECTED_STORE_DAY_COUNT,
     EXPECTED_TABLE_ROWS,
     FACT_TABLES,
     HOURLY_LENGTH,
     RAW_DATA_PATH,
     REQUIRED_RAW_COLUMNS,
     SCHEMA_PATH,
-    STORE_MAP,
+    STORE_ID_TO_ALIAS,
+    make_supabase_client,
 )
 
 
@@ -77,18 +76,9 @@ def _validate_hourly_lists(series: pd.Series, column_name: str) -> None:
 
 
 def _validate_scope_counts(scoped: pd.DataFrame) -> None:
-    store_count = int(scoped["store_alias"].nunique())
     day_count = int(scoped["dt"].nunique())
-    store_day_count = int(scoped[["store_alias", "dt"]].drop_duplicates().shape[0])
-
-    if store_count != EXPECTED_STORE_COUNT:
-        raise ValueError(f"Expected {EXPECTED_STORE_COUNT} stores, found {store_count}.")
     if day_count != EXPECTED_DAY_COUNT:
         raise ValueError(f"Expected {EXPECTED_DAY_COUNT} dates, found {day_count}.")
-    if store_day_count != EXPECTED_STORE_DAY_COUNT:
-        raise ValueError(
-            f"Expected {EXPECTED_STORE_DAY_COUNT} store-day combinations, found {store_day_count}."
-        )
 
     min_date = scoped["dt"].min().strftime("%Y-%m-%d")
     max_date = scoped["dt"].max().strftime("%Y-%m-%d")
@@ -96,6 +86,10 @@ def _validate_scope_counts(scoped: pd.DataFrame) -> None:
         raise ValueError(
             f"Expected date range {DATE_START} to {DATE_END}, found {min_date} to {max_date}."
         )
+
+    store_count = int(scoped["store_alias"].nunique())
+    city_count = int(scoped["city_id"].nunique())
+    print(f"  Scope: {store_count} stores across {city_count} cities, {day_count} days.")
 
 
 def _expand_hourly_column(
@@ -124,6 +118,11 @@ def _infer_holiday_name(dt: pd.Timestamp) -> str:
     return "normal_weekday"
 
 
+def _make_store_alias(store_id: int) -> str:
+    """Map numeric store_id → alias. Known city-0 stores get h/m/l prefix; others get 's{id}'."""
+    return STORE_ID_TO_ALIAS.get(store_id, f"s{store_id}")
+
+
 def load_scoped_raw_data(raw_data_path: Path = RAW_DATA_PATH) -> pd.DataFrame:
     if not raw_data_path.exists():
         raise FileNotFoundError(f"Raw parquet is missing: {raw_data_path}")
@@ -131,30 +130,23 @@ def load_scoped_raw_data(raw_data_path: Path = RAW_DATA_PATH) -> pd.DataFrame:
     frame = pd.read_parquet(raw_data_path)
     _validate_required_columns(frame)
 
-    scoped = frame.loc[
-        (frame["city_id"] == CITY_ID) & (frame["store_id"].isin(STORE_MAP.values()))
-    ].copy()
+    scoped = frame.loc[frame["city_id"].isin(CITY_IDS)].copy()
 
     if scoped.empty:
-        raise ValueError("Scoped raw data is empty after applying city/store filters.")
+        raise ValueError(f"Scoped raw data is empty after filtering to city_ids={CITY_IDS}.")
 
     scoped["dt"] = pd.to_datetime(scoped["dt"], format="%Y-%m-%d", errors="raise")
     _validate_hourly_lists(scoped["hours_sale"], "hours_sale")
     _validate_hourly_lists(scoped["hours_stock_status"], "hours_stock_status")
 
-    store_lookup = {store_id: alias for alias, store_id in STORE_MAP.items()}
-    scoped["store_alias"] = scoped["store_id"].map(store_lookup)
-
-    if scoped["store_alias"].isna().any():
-        raise ValueError("Store alias mapping failed for at least one scoped store_id.")
-
+    scoped["store_alias"] = scoped["store_id"].map(_make_store_alias)
     _validate_scope_counts(scoped)
     return scoped
 
 
 def build_dim_store(scoped: pd.DataFrame) -> pd.DataFrame:
     return (
-        scoped[["store_alias"]]
+        scoped[["store_alias", "city_id"]]
         .drop_duplicates()
         .sort_values("store_alias")
         .reset_index(drop=True)
@@ -396,13 +388,11 @@ def validate_fact_shape(
     _assert(null_store_alias == 0, f"{table_name} contains null store_alias values.")
     _assert(null_dt == 0, f"{table_name} contains null dt values.")
     _assert(
-        distinct_stores == EXPECTED_STORE_COUNT,
-        f"{table_name} should contain {EXPECTED_STORE_COUNT} stores, found {distinct_stores}.",
-    )
-    _assert(
         distinct_dates == EXPECTED_DAY_COUNT,
         f"{table_name} should contain {EXPECTED_DAY_COUNT} dates, found {distinct_dates}.",
     )
+    # Store count is dynamic with multi-city scope — just sanity-check it's non-zero.
+    _assert(distinct_stores > 0, f"{table_name} contains zero stores.")
 
 
 def validate_rate_columns(connection: duckdb.DuckDBPyConnection) -> None:
@@ -483,3 +473,159 @@ def validate_daily_tables(db_path: Path = DB_PATH) -> dict[str, int]:
 
 # Keep old name as alias for backward compat during transition
 validate_database = validate_daily_tables
+
+
+# ---------------------------------------------------------------------------
+# Supabase sync
+# ---------------------------------------------------------------------------
+
+
+def _store_prefix(store_alias: str) -> str:
+    """Return single-char prefix from alias: 'h555' → 'h', 's41' → 's'."""
+    return store_alias[0] if store_alias else "s"
+
+
+def sync_series_to_supabase(db_path: Path = DB_PATH, batch_size: int = 500) -> int:
+    """Push daily store aggregates from local DuckDB → Supabase store_series.
+
+    Returns total rows upserted.
+    """
+    connection = duckdb.connect(str(db_path), read_only=True)
+    try:
+        rows = connection.execute(
+            """
+            SELECT
+                s.store_alias,
+                ds.city_id,
+                CAST(s.dt AS VARCHAR) AS dt,
+                s.total_sales,
+                s.product_count,
+                s.active_product_count,
+                s.avg_sales_per_product,
+                st.stockout_product_rate,
+                st.severe_stockout_product_rate,
+                d.avg_discount,
+                d.discounted_product_rate,
+                a.activity_product_rate,
+                a.activity_sales_share,
+                h.holiday_flag,
+                h.is_weekend,
+                h.weekday
+            FROM fact_sales_store_day s
+            JOIN dim_store ds USING (store_alias)
+            JOIN fact_stockout_store_day st USING (store_alias, dt)
+            JOIN fact_discount_store_day d USING (store_alias, dt)
+            JOIN fact_activity_store_day a USING (store_alias, dt)
+            JOIN dim_holiday_day h USING (dt)
+            ORDER BY s.store_alias, s.dt
+            """
+        ).fetchall()
+    finally:
+        connection.close()
+
+    if not rows:
+        return 0
+
+    client = make_supabase_client()
+    total = 0
+    batch = []
+    for row in rows:
+        store_alias = str(row[0])
+        batch.append({
+            "store_id": store_alias,
+            "city_id": int(row[1]),
+            "prefix": _store_prefix(store_alias),
+            "dt": str(row[2]),
+            "total_sales": float(row[3]) if row[3] is not None else None,
+            "product_count": int(row[4]) if row[4] is not None else None,
+            "active_product_count": int(row[5]) if row[5] is not None else None,
+            "avg_sales_per_product": float(row[6]) if row[6] is not None else None,
+            "stockout_product_rate": float(row[7]) if row[7] is not None else None,
+            "severe_stockout_rate": float(row[8]) if row[8] is not None else None,
+            "avg_discount": float(row[9]) if row[9] is not None else None,
+            "discounted_product_rate": float(row[10]) if row[10] is not None else None,
+            "activity_product_rate": float(row[11]) if row[11] is not None else None,
+            "activity_sales_share": float(row[12]) if row[12] is not None else None,
+            "holiday_flag": bool(row[13]) if row[13] is not None else None,
+            "is_weekend": bool(row[14]) if row[14] is not None else None,
+            "weekday": str(row[15]) if row[15] is not None else None,
+        })
+        if len(batch) >= batch_size:
+            client.table("rca_store_series").upsert(
+                batch, on_conflict="store_id,dt"
+            ).execute()
+            total += len(batch)
+            batch = []
+
+    if batch:
+        client.table("rca_store_series").upsert(
+            batch, on_conflict="store_id,dt"
+        ).execute()
+        total += len(batch)
+
+    return total
+
+
+def sync_normals_to_supabase(db_path: Path = DB_PATH) -> int:
+    """Compute per-store baselines and upsert to Supabase store_normals."""
+    connection = duckdb.connect(str(db_path), read_only=True)
+    try:
+        rows = connection.execute(
+            """
+            SELECT
+                s.store_alias,
+                ds.city_id,
+                PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY s.total_sales) AS p25,
+                PERCENTILE_CONT(0.50) WITHIN GROUP (ORDER BY s.total_sales) AS p50,
+                PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY s.total_sales) AS p75,
+                AVG(s.total_sales) AS avg_sale,
+                STDDEV(s.total_sales) AS stddev_sale
+            FROM fact_sales_store_day s
+            JOIN dim_store ds USING (store_alias)
+            GROUP BY s.store_alias, ds.city_id
+            """
+        ).fetchall()
+
+        # Weekday pattern per store: avg sales by day-of-week, normalised to fleet mean=1
+        dow_rows = connection.execute(
+            """
+            SELECT
+                s.store_alias,
+                DAYOFWEEK(s.dt) - 1 AS dow,
+                AVG(s.total_sales) AS dow_avg
+            FROM fact_sales_store_day s
+            GROUP BY s.store_alias, DAYOFWEEK(s.dt)
+            ORDER BY s.store_alias, dow
+            """
+        ).fetchall()
+    finally:
+        connection.close()
+
+    import json
+
+    dow_map: dict[str, dict[str, float]] = {}
+    for store_alias, dow, avg in dow_rows:
+        dow_map.setdefault(str(store_alias), {})[str(int(dow))] = float(avg) if avg else 0.0
+
+    client = make_supabase_client()
+    records = []
+    for row in rows:
+        store_alias = str(row[0])
+        records.append({
+            "store_id": store_alias,
+            "city_id": int(row[1]),
+            "prefix": _store_prefix(store_alias),
+            "p25_sale": float(row[2]) if row[2] is not None else None,
+            "p50_sale": float(row[3]) if row[3] is not None else None,
+            "p75_sale": float(row[4]) if row[4] is not None else None,
+            "avg_sale": float(row[5]) if row[5] is not None else None,
+            "stddev_sale": float(row[6]) if row[6] is not None else None,
+            "dow_pattern": dow_map.get(store_alias),
+        })
+
+    if records:
+        client.table("rca_store_normals").upsert(
+            records, on_conflict="store_id"
+        ).execute()
+
+    return len(records)

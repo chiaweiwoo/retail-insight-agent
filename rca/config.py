@@ -20,11 +20,18 @@ MIGRATION_PATH = SCHEMA_PATH
 DATE_START = "2024-03-28"
 DATE_END = "2024-06-25"
 EXPECTED_DAY_COUNT = 90
-EXPECTED_STORE_COUNT = 15
-EXPECTED_STORE_DAY_COUNT = 1350
-CITY_ID = 0
 HOURLY_LENGTH = 24
 
+# Top-5 cities by store count from FreshRetailNet-50K:
+# city 0=290, city 12=107, city 3=101, city 13=90, city 16=89 stores
+CITY_IDS = [0, 3, 12, 13, 16]
+
+# Backward-compatible alias — tools/signals still reference single city builds.
+# Use CITY_IDS for multi-city ingestion.
+CITY_ID = CITY_IDS[0]
+
+# Known city-0 store aliases (used for backward compat with bench scenarios and CLI).
+# Stores from other cities get auto-generated aliases ("s{store_id}").
 STORE_MAP = {
     "h235": 235,
     "h263": 263,
@@ -42,16 +49,13 @@ STORE_MAP = {
     "l164": 164,
     "l175": 175,
 }
+# Reverse lookup: numeric store_id → alias string
+STORE_ID_TO_ALIAS: dict[int, str] = {v: k for k, v in STORE_MAP.items()}
 
-EXPECTED_TABLE_ROWS = {
-    "dim_store": EXPECTED_STORE_COUNT,
+EXPECTED_TABLE_ROWS: dict[str, int] = {
     "dim_holiday_day": EXPECTED_DAY_COUNT,
     "dim_weather_day": EXPECTED_DAY_COUNT,
-    "fact_sales_store_day": EXPECTED_STORE_DAY_COUNT,
-    "fact_stockout_store_day": EXPECTED_STORE_DAY_COUNT,
-    "fact_discount_store_day": EXPECTED_STORE_DAY_COUNT,
-    "fact_activity_store_day": EXPECTED_STORE_DAY_COUNT,
-}
+}  # Row counts are dynamic now that scope is multi-city; only calendar tables are fixed.
 
 REQUIRED_RAW_COLUMNS = {
     "city_id",
@@ -159,3 +163,37 @@ def get_llm_model() -> str:
 def get_llm_thinking_enabled() -> bool:
     value = os.getenv("DEEPSEEK_THINKING", "false").strip().lower()
     return value in {"1", "true", "yes", "on"}
+
+
+def get_model_fast() -> str:
+    """High-volume / mechanical nodes: specialists, story writer."""
+    return os.getenv("DEEPSEEK_MODEL_FAST", "deepseek-v4-flash")
+
+
+def get_model_deep() -> str:
+    """Synthesis / judgment nodes: critic, coordinator, slt_brief, judge."""
+    return os.getenv("DEEPSEEK_MODEL_DEEP", "deepseek-v4-pro")
+
+
+def get_supabase_url() -> str:
+    url = os.getenv("SUPABASE_URL", "")
+    if not url:
+        raise RuntimeError("SUPABASE_URL is not set. Fill it in from your Supabase project settings.")
+    return url
+
+
+def get_supabase_service_key() -> str:
+    key = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+    if not key:
+        raise RuntimeError("SUPABASE_SERVICE_ROLE_KEY is not set.")
+    return key
+
+
+def get_supabase_anon_key() -> str:
+    return os.getenv("SUPABASE_ANON_KEY", "")
+
+
+def make_supabase_client():
+    """Service-role client — bypasses RLS. Backend use only."""
+    from supabase import create_client  # lazy import; not all commands need it
+    return create_client(get_supabase_url(), get_supabase_service_key())

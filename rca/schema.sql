@@ -1,5 +1,6 @@
 CREATE TABLE dim_store (
-    store_alias TEXT PRIMARY KEY
+    store_alias TEXT PRIMARY KEY,
+    city_id INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE dim_holiday_day (

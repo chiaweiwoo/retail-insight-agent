@@ -10,7 +10,6 @@ from rca.config import (
     ASSESSMENT_FORMAT,
     CONFIDENCE_VOCAB,
     DEFAULT_LLM_MAX_TOOL_ROUNDS,
-    LOG_DB_PATH,
 )
 from rca.context import build_context_preamble
 from rca.llm import (
@@ -682,7 +681,7 @@ def run_coordinator(
 
     planning_inputs: dict[str, Any] | None = None
     skipped_analysts: list[dict[str, Any]] = []
-    prior_rca_summary = get_prior_rca(store_alias, db_path=LOG_DB_PATH)
+    prior_rca_summary = get_prior_rca(store_alias)
     if specialists is None:
         specialists, skipped_analysts, planning_inputs = _plan_specialists_with_reasons(
             store_alias=store_alias,
@@ -815,7 +814,8 @@ def run_coordinator(
         coordinator_report_markdown=coordinator_report,
         decision_card_markdown=decision_card,
     )
-    record_outcome(outcome_record, db_path=LOG_DB_PATH)
+    is_dry_run = client_factory is not None
+    record_outcome(outcome_record, dry_run=is_dry_run)
     logger.log(
         actor_type="workflow",
         actor_name="coordinator_pipeline",
@@ -830,7 +830,6 @@ def run_coordinator(
             "escalated": outcome_record.escalated,
         },
     )
-    logger.write_to_db(LOG_DB_PATH)
 
     if output_dir is not None:
         output_dir.mkdir(parents=True, exist_ok=True)
