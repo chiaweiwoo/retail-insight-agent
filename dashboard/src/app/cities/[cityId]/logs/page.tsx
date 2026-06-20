@@ -2,11 +2,33 @@ export const dynamic = "force-dynamic";
 
 import { rca } from "@/lib/supabase";
 
+type JsonLike =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: JsonLike }
+  | JsonLike[];
+
+function formatToolCalls(toolCalls: JsonLike | null | undefined): string {
+  if (!toolCalls) return "[]";
+  return JSON.stringify(toolCalls, null, 2);
+}
+
+function toolCallCount(toolCalls: JsonLike | null | undefined): number {
+  return Array.isArray(toolCalls) ? toolCalls.length : 0;
+}
+
 export default async function LogsPage({ params }: { params: Promise<{ cityId: string }> }) {
   const { cityId } = await params;
   const [{ data: events }, { data: completions }] = await Promise.all([
     rca.from("events").select("run_id,dt,seq,actor_type,actor_name,action,source,details").eq("city_id", cityId).order("id", { ascending: false }).limit(120),
-    rca.from("completions").select("run_id,dt,node_name,model,prompt_tokens,completion_tokens,content").eq("city_id", cityId).order("id", { ascending: false }).limit(40),
+    rca
+      .from("completions")
+      .select("run_id,dt,node_name,model,prompt_tokens,completion_tokens,content,tool_calls_json")
+      .eq("city_id", cityId)
+      .order("id", { ascending: false })
+      .limit(40),
   ]);
 
   return (
@@ -44,8 +66,15 @@ export default async function LogsPage({ params }: { params: Promise<{ cityId: s
               </summary>
               <div className="mt-3 text-xs text-slate-500">
                 prompt tokens: {completion.prompt_tokens ?? "?"} | completion tokens: {completion.completion_tokens ?? "?"}
+                {" | "}tool calls: {toolCallCount(completion.tool_calls_json as JsonLike | null | undefined)}
               </div>
               <pre className="mt-3 whitespace-pre-wrap text-sm text-slate-300">{completion.content}</pre>
+              <details className="mt-4 rounded-lg border border-white/5 bg-black/20 p-3">
+                <summary className="cursor-pointer list-none text-xs font-medium uppercase tracking-wider text-slate-400">Tool Call Trace</summary>
+                <pre className="mt-3 whitespace-pre-wrap text-xs leading-relaxed text-slate-400">
+                  {formatToolCalls(completion.tool_calls_json as JsonLike | null | undefined)}
+                </pre>
+              </details>
             </details>
           ))}
         </div>
