@@ -45,6 +45,41 @@ export default async function CitiesPage() {
     return acc;
   }, {});
 
+  // Compute Fleet Macro Series
+  const fleetSeries: Record<string, number> = {};
+  allDates.forEach((date) => {
+    let sum = 0;
+    normals?.forEach((city: any) => {
+      const vol = citySeries?.[city.city_id]?.[date] || 0;
+      sum += vol;
+    });
+    fleetSeries[date] = sum;
+  });
+
+  // Precompute Fleet Ratios
+  const fleetRatios: Record<string, number> = {};
+  allDates.forEach((date, dateIdx) => {
+    if (dateIdx >= 0 && dateIdx + 7 < allDates.length) {
+      let sum = 0;
+      let count = 0;
+      for (let i = 1; i <= 7; i++) {
+        const priorDate = allDates[dateIdx + i];
+        if (fleetSeries[priorDate]) {
+          sum += fleetSeries[priorDate];
+          count++;
+        }
+      }
+      if (count > 0) {
+        const trailingAvg = sum / count;
+        fleetRatios[date] = fleetSeries[date] / trailingAvg;
+      } else {
+        fleetRatios[date] = 1.0;
+      }
+    } else {
+      fleetRatios[date] = 1.0;
+    }
+  });
+
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
       <div className="flex items-start justify-between">
@@ -56,8 +91,8 @@ export default async function CitiesPage() {
               <Info size={16} className="text-indigo-400" />
               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-3 bg-slate-800 text-xs text-slate-200 rounded shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 border border-slate-700">
                 <strong className="text-white block mb-1">RCA Triggers:</strong>
-                <span className="text-rose-400 font-semibold">Drop:</span> Sales ≤ -20% vs 7-day trailing avg<br/>
-                <span className="text-emerald-400 font-semibold">Lift:</span> Sales ≥ +35% vs 7-day trailing avg
+                <span className="text-rose-400 font-semibold">Drop:</span> Sales ≤ -15% vs Fleet-Adjusted Baseline<br/>
+                <span className="text-emerald-400 font-semibold">Lift:</span> Sales ≥ +15% vs Fleet-Adjusted Baseline
               </div>
             </span>
           </p>
@@ -104,12 +139,14 @@ export default async function CitiesPage() {
                     }
                   }
                   if (count > 0) {
-                    trailingAvg = sum / count;
+                    const baseTrailingAvg = sum / count;
+                    // Apply the Model C: Fleet Macro Adjustment
+                    trailingAvg = baseTrailingAvg * (fleetRatios[date] || 1.0);
                     pctChange = (currentSales - trailingAvg) / trailingAvg;
                   }
                 }
-                const isDrop = pctChange <= -0.20;
-                const isLift = pctChange >= 0.35;
+                const isDrop = pctChange <= -0.15;
+                const isLift = pctChange >= 0.15;
                 return { date, currentSales, trailingAvg, pctChange, isDrop, isLift };
               });
 
