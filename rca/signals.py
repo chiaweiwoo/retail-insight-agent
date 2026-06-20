@@ -176,7 +176,7 @@ def summarize_pct_trigger_distribution(
     eligible = signals[signals[metric].notna()].copy()
 
     overall_rows: list[dict[str, float | str | int]] = []
-    per_store_rows: list[dict[str, float | str | int]] = []
+    per_city_rows: list[dict[str, float | str | int]] = []
     per_date_rows: list[dict[str, float | str | int]] = []
 
     for pct_threshold in thresholds:
@@ -190,7 +190,7 @@ def summarize_pct_trigger_distribution(
                 "metric": metric,
                 "pct_threshold": pct_threshold,
                 "eligible_store_days": int(eligible.shape[0]),
-                "triggered_store_days": int(trigger_mask.sum()),
+                "triggered_city_days": int(trigger_mask.sum()),
                 "drop_store_days": int(drop_mask.sum()),
                 "lift_store_days": int(lift_mask.sum()),
                 "triggered_dates": int(triggered["dt"].nunique()),
@@ -202,7 +202,7 @@ def summarize_pct_trigger_distribution(
             city_drop_mask = city_frame[metric] <= -pct_threshold
             city_lift_mask = city_frame[metric] >= pct_threshold
             city_trigger_count = int((city_drop_mask | city_lift_mask).sum())
-            per_store_rows.append(
+            per_city_rows.append(
                 {
                     "metric": metric,
                     "pct_threshold": pct_threshold,
@@ -218,8 +218,8 @@ def summarize_pct_trigger_distribution(
         if not triggered.empty:
             per_date = (
                 triggered.groupby("dt", as_index=False)
-                .agg(triggered_store_days=("city_id", "count"))
-                .sort_values(["triggered_store_days", "dt"], ascending=[False, True])
+                .agg(triggered_city_days=("city_id", "count"))
+                .sort_values(["triggered_city_days", "dt"], ascending=[False, True])
             )
             for row in per_date.itertuples(index=False):
                 per_date_rows.append(
@@ -227,13 +227,13 @@ def summarize_pct_trigger_distribution(
                         "metric": metric,
                         "pct_threshold": pct_threshold,
                         "dt": row.dt.strftime("%Y-%m-%d"),
-                        "triggered_store_days": int(row.triggered_store_days),
+                        "triggered_city_days": int(row.triggered_city_days),
                     }
                 )
 
     return {
         "overall": pd.DataFrame(overall_rows),
-        "per_store": pd.DataFrame(per_store_rows),
+        "per_store": pd.DataFrame(per_city_rows),
         "per_date": pd.DataFrame(per_date_rows),
     }
 

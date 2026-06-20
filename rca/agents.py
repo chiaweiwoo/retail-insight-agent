@@ -132,7 +132,7 @@ ANALYST_SPECS: tuple[AnalystSpec, ...] = (
     ),
     AnalystSpec(
         name="market_analyst",
-        focus="market context — calendar, weather, and peer store comparison",
+        focus="market context — calendar, weather, and peer city comparison",
         tool_names=("get_calendar_weather_context", "get_peer_city_context", "get_sales_context"),
         system_prompt=_analyst_prompt(
             role="Market Analyst",
@@ -140,11 +140,10 @@ ANALYST_SPECS: tuple[AnalystSpec, ...] = (
                 "Assess external factors and whether the move is city-specific or broadly macro-regional. "
                 "Look at calendar context (weekday, holiday), weather conditions, and how this city performed "
                 "relative to peers. "
-                "PEER COMPARISON CAUTION: The peer group tool groups stores by their alias prefix (h/m/l) "
-                "or store type. For the well-known city-0 stores, each prefix group contains only ~5 stores — "
-                "statistically noisy. For stores aliased as 's{id}', the peer pool is large but spans multiple "
-                "cities with different demand patterns, making fleet-average comparisons unreliable as root-cause evidence. "
-                "In either case: peer comparison can support a hypothesis but CANNOT be the primary root cause. "
+                "PEER COMPARISON CAUTION: The peer group tool groups cities by their density tier "
+                "(based on their store count). While this provides a baseline, macro-economic factors can affect "
+                "all cities simultaneously. "
+                "Peer comparison can support a hypothesis but CANNOT be the primary root cause. "
                 "If the move appears fleet-wide across the same calendar date, that supports external factors. "
                 "If isolated, flag it as city-specific but LOW confidence without corroborating evidence."
             ),

@@ -25,7 +25,7 @@ def build_context_pack(db_path: Path = DB_PATH, output_path: Path = CONTEXT_PACK
 
     con = duckdb.connect(str(db_path), read_only=True)
 
-    store_count = con.execute("SELECT COUNT(DISTINCT city_id) FROM fact_sales_city_day").fetchone()[0]
+    city_count = con.execute("SELECT COUNT(DISTINCT city_id) FROM fact_sales_city_day").fetchone()[0]
     day_count = con.execute("SELECT COUNT(DISTINCT dt) FROM fact_sales_city_day").fetchone()[0]
     date_min, date_max = con.execute(
         "SELECT MIN(CAST(dt AS VARCHAR)), MAX(CAST(dt AS VARCHAR)) FROM fact_sales_city_day"
@@ -42,7 +42,7 @@ def build_context_pack(db_path: Path = DB_PATH, output_path: Path = CONTEXT_PACK
         GROUP BY city_id
         ORDER BY city_id
     """).fetchall()
-    per_store_rows = [
+    per_city_rows = [
         {
             "city_id": row[0],
             "avg_daily_sales": row[1],
@@ -105,7 +105,7 @@ def build_context_pack(db_path: Path = DB_PATH, output_path: Path = CONTEXT_PACK
     pack: dict[str, Any] = {
         "dataset": {
             "source": "FreshRetailNet-50K (anonymized 2024 dataset)",
-            "cities": store_count,
+            "cities": city_count,
             "days": day_count,
             "date_min": date_min,
             "date_max": date_max,
@@ -129,7 +129,7 @@ def build_context_pack(db_path: Path = DB_PATH, output_path: Path = CONTEXT_PACK
             ),
             "by_tier": tier_empirical,
         },
-        "per_city_normal": {row["city_id"]: row for row in per_store_rows},
+        "per_city_normal": {row["city_id"]: row for row in per_city_rows},
         "holidays_in_window": holidays,
         "provenance": {
             "built_from": str(db_path),

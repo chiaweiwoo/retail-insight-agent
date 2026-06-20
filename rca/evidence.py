@@ -84,16 +84,16 @@ def list_dates(db_path: Path = DB_PATH) -> list[str]:
         connection.close()
 
 
-def _assert_store_and_date_exist(
+def _assert_city_and_date_exist(
     connection: duckdb.DuckDBPyConnection,
     city_id: int,
     dt: str,
 ) -> None:
-    store_exists = connection.execute(
+    city_exists = connection.execute(
         "SELECT COUNT(*) FROM dim_city WHERE city_id = ?",
         [city_id],
     ).fetchone()[0]
-    if int(store_exists) != 1:
+    if int(city_exists) != 1:
         raise ValueError(f"Unknown city_id: {city_id}")
 
     date_exists = connection.execute(
@@ -104,14 +104,14 @@ def _assert_store_and_date_exist(
         raise ValueError(f"Unknown date: {dt}")
 
 
-def get_store_day_evidence(
+def get_city_day_evidence(
     city_id: int,
     dt: str,
     db_path: Path = DB_PATH,
 ) -> dict[str, Any]:
     connection = _connect(db_path)
     try:
-        _assert_store_and_date_exist(connection, city_id, dt)
+        _assert_city_and_date_exist(connection, city_id, dt)
         result = connection.execute(
             EVIDENCE_SELECT
             + """

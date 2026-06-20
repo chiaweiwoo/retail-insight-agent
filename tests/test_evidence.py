@@ -5,7 +5,7 @@ import pytest
 from rca.evidence import (
     export_evidence_dataset,
     fetch_all_evidence_records,
-    get_store_day_evidence,
+    get_city_day_evidence,
     list_dates,
     list_city_ides,
 )

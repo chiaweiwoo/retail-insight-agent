@@ -85,7 +85,7 @@ def _cmd_analyze(args: argparse.Namespace) -> None:
         trigger_overall = pct_trigger_tables["overall"]
         anomaly_candidate = trigger_overall.loc[trigger_overall["pct_threshold"] == 25].iloc[0]
         discussion_candidate = trigger_overall.loc[trigger_overall["pct_threshold"] == 20].iloc[0]
-        store_spread = (
+        city_spread = (
             pct_trigger_tables["per_store"]
             .loc[
                 pct_trigger_tables["per_store"]["pct_threshold"] == 20,
@@ -114,7 +114,7 @@ def _cmd_analyze(args: argparse.Namespace) -> None:
             "",
             "## Per-Store Spread At 20%",
             "",
-            _as_markdown_value_table(store_spread),
+            _as_markdown_value_table(city_spread),
             "",
             "## Grid Legend",
             "",
@@ -128,8 +128,8 @@ def _cmd_analyze(args: argparse.Namespace) -> None:
             "- `trailing_7d` is smoother and currently the best default operational trigger when we want broad coverage.",
             f"- `same_weekday_4w` is the most retail-shaped benchmark, but it only covers {same_weekday_coverage_ratio:.1%} of the rows that `day_over_day` covers in this 90-day slice.",
             f"- `same_weekday_4w` also has an upward mean drift of {same_weekday_bias:.2f}% in this sample, so it is better as a reasoning baseline than as the first trigger baseline.",
-            f"- Pure `trailing_7d_pct_change` at 20% gives {int(discussion_candidate['triggered_store_days'])} triggered store-days across {int(discussion_candidate['triggered_dates'])} calendar dates.",
-            f"- Pure `trailing_7d_pct_change` at 25% gives {int(anomaly_candidate['triggered_store_days'])} triggered store-days across {int(anomaly_candidate['triggered_dates'])} calendar dates, which is a better anomaly-style discussion set.",
+            f"- Pure `trailing_7d_pct_change` at 20% gives {int(discussion_candidate['triggered_city_days'])} triggered city-days across {int(discussion_candidate['triggered_dates'])} calendar dates.",
+            f"- Pure `trailing_7d_pct_change` at 25% gives {int(anomaly_candidate['triggered_city_days'])} triggered city-days across {int(anomaly_candidate['triggered_dates'])} calendar dates, which is a better anomaly-style discussion set.",
             "- The current trigger exploration is per store-day, not a single global daily alarm.",
             "",
         ]
@@ -149,10 +149,10 @@ def _cmd_analyze(args: argparse.Namespace) -> None:
     docs_dir = PROJECT_ROOT / "docs" / "analysis"
     docs_dir.mkdir(parents=True, exist_ok=True)
 
-    signals.to_csv(analysis_dir / "store_day_sales_signals.csv", index=False)
+    signals.to_csv(analysis_dir / "city_day_sales_signals.csv", index=False)
     summary_tables["distribution"].to_csv(analysis_dir / "signal_distribution_summary.csv", index=False)
     summary_tables["thresholds"].to_csv(analysis_dir / "signal_threshold_grid.csv", index=False)
-    summary_tables["city_stability"].to_csv(analysis_dir / "store_signal_stability.csv", index=False)
+    summary_tables["city_stability"].to_csv(analysis_dir / "city_signal_stability.csv", index=False)
     pct_trigger_tables["overall"].to_csv(analysis_dir / "pct_trigger_overall_summary.csv", index=False)
     pct_trigger_tables["per_store"].to_csv(analysis_dir / "pct_trigger_by_store.csv", index=False)
     pct_trigger_tables["per_date"].to_csv(analysis_dir / "pct_trigger_by_date.csv", index=False)

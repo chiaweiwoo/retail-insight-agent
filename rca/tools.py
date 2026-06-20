@@ -12,7 +12,7 @@ from rca.config import (
     DEFAULT_LIFT_THRESHOLD_PCT,
     DEFAULT_LIFT_THRESHOLD_Z,
 )
-from rca.evidence import get_store_day_evidence
+from rca.evidence import get_city_day_evidence
 from rca.outcomes import get_prior_rca as load_prior_rca
 from rca.signals import build_sales_signal_frame, load_sales_history
 
@@ -196,7 +196,7 @@ def get_sales_context(city_id: int, dt: str, history_days: int = 7) -> dict[str,
 
 
 def get_stockout_context(city_id: int, dt: str) -> dict[str, Any]:
-    record = get_store_day_evidence(city_id, dt)
+    record = get_city_day_evidence(city_id, dt)
     history = _get_history_slice(city_id, dt, days=7)
     matched = history[history["dt_label"] == dt].iloc[0]
     trailing_avg = _round_float(history["total_sales"].iloc[:-1].mean()) if len(history) > 1 else None
@@ -257,7 +257,7 @@ def get_stockout_baseline(
             "note": "No prior stockout data in window.",
         }
 
-    current = get_store_day_evidence(city_id, dt)
+    current = get_city_day_evidence(city_id, dt)
     cur_rate = current["stockout"]["stockout_product_rate"]
     baseline_rate = float(row[0]) if row[0] is not None else None
 
@@ -293,7 +293,7 @@ def get_stockout_baseline(
 
 
 def get_discount_context(city_id: int, dt: str) -> dict[str, Any]:
-    record = get_store_day_evidence(city_id, dt)
+    record = get_city_day_evidence(city_id, dt)
     return {
         "city_id": city_id,
         "dt": dt,
@@ -306,7 +306,7 @@ def get_discount_context(city_id: int, dt: str) -> dict[str, Any]:
 
 
 def get_activity_context(city_id: int, dt: str) -> dict[str, Any]:
-    record = get_store_day_evidence(city_id, dt)
+    record = get_city_day_evidence(city_id, dt)
     return {
         "city_id": city_id,
         "dt": dt,
@@ -316,7 +316,7 @@ def get_activity_context(city_id: int, dt: str) -> dict[str, Any]:
 
 
 def get_calendar_weather_context(city_id: int, dt: str) -> dict[str, Any]:
-    record = get_store_day_evidence(city_id, dt)
+    record = get_city_day_evidence(city_id, dt)
     return {
         "city_id": city_id,
         "dt": dt,

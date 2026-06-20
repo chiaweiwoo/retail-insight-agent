@@ -294,7 +294,7 @@ const DATA = {data_json};
     {{ label: "Eligible store-days", value: summary.eligible_store_days, cls: "" }},
     {{ label: "Drop events", value: summary.drop_store_days, cls: "drop" }},
     {{ label: "Lift events", value: summary.lift_store_days, cls: "lift" }},
-    {{ label: "Trigger rate", value: (summary.triggered_store_days / summary.eligible_store_days * 100).toFixed(1) + "%", cls: "" }},
+    {{ label: "Trigger rate", value: (summary.triggered_city_days / summary.eligible_store_days * 100).toFixed(1) + "%", cls: "" }},
   ];
   stats.forEach(s => {{
     const div = document.createElement("div");
