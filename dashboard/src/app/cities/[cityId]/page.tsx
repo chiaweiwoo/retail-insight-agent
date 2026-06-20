@@ -1,120 +1,76 @@
 export const dynamic = "force-dynamic";
-import { supabase } from "@/lib/supabase";
-import Link from "next/link";
+
+import { Activity, Clock3, Target, Zap } from "lucide-react";
 import SalesChart from "./SalesChart";
-import { ArrowLeft, ChevronRight, Activity, TrendingDown, Target, Zap, Clock } from "lucide-react";
+import { rca } from "@/lib/supabase";
 
 export default async function CityOverview({ params }: { params: Promise<{ cityId: string }> }) {
   const { cityId } = await params;
-  
-  const { data: salesData, error } = await supabase
-    .from("rca_city_series")
-    .select("dt, total_sales")
-    .eq("city_id", cityId)
-    .order("dt", { ascending: true });
 
-  const { data: signals } = await supabase
-    .from("rca_outcome")
-    .select("dt, signal_label")
-    .eq("city_id", cityId)
-    .neq("signal_label", "none");
+  const [{ data: salesRows, error }, { data: goalRows }, { data: signalRows }] = await Promise.all([
+    rca.from("sales").select("dt,total_sales").eq("city_id", cityId).order("dt", { ascending: true }),
+    rca.from("goals").select("dt,expected_sales").eq("city_id", cityId).order("dt", { ascending: true }),
+    rca.from("signals").select("dt,signal_label").eq("city_id", cityId).order("dt", { ascending: true }),
+  ]);
 
-  const { data: forecastData } = await supabase
-    .from("rca_finance_forecast")
-    .select("dt, forecast_sales")
-    .eq("city_id", cityId)
-    .order("dt", { ascending: true });
-
-  if (error || !salesData) {
-    return (
-      <div className="p-4 bg-red-500/10 text-red-400 rounded-xl border border-red-500/20 glass-panel">
-        <h2 className="text-lg font-semibold">Error loading data</h2>
-      </div>
-    );
+  if (error || !salesRows) {
+    return <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 p-4 text-rose-300">Error loading city data.</div>;
   }
 
-  // Calculate descriptive stats
-  const sales = salesData.map(d => d.total_sales);
-  const mean = sales.length ? sales.reduce((a, b) => a + b, 0) / sales.length : 0;
-  const stddev = sales.length ? Math.sqrt(sales.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / sales.length) : 0;
-
-  // Mark triggered dates and map forecast in chart data
-  const signalMap = new Map(signals?.map(s => [s.dt, s.signal_label]) || []);
-  const forecastMap = new Map(forecastData?.map(f => [f.dt, f.forecast_sales]) || []);
-  
-  const chartData = salesData.map(d => ({
-    date: d.dt,
-    Sales: d.total_sales,
-    Forecast: forecastMap.get(d.dt) || d.total_sales, // fallback to actual if no forecast
-    Trigger: signalMap.get(d.dt) || null,
+  const sales = salesRows.map((row) => Number(row.total_sales || 0));
+  const mean = sales.length ? sales.reduce((sum, value) => sum + value, 0) / sales.length : 0;
+  const stddev = sales.length ? Math.sqrt(sales.reduce((sum, value) => sum + Math.pow(value - mean, 2), 0) / sales.length) : 0;
+  const goalMap = new Map((goalRows || []).map((row) => [row.dt, Number(row.expected_sales || 0)]));
+  const signalMap = new Map((signalRows || []).map((row) => [row.dt, row.signal_label]));
+  const chartData = salesRows.map((row) => ({
+    date: row.dt,
+    Sales: Number(row.total_sales || 0),
+    Goal: goalMap.get(row.dt) || Number(row.total_sales || 0),
+    Signal: signalMap.get(row.dt) || null,
   }));
+  const triggeredCount = chartData.filter((row) => row.Signal === "drop" || row.Signal === "lift").length;
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-700">
-      {/* KPI Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="glass-card p-5 rounded-2xl">
-          <div className="flex items-center space-x-3 mb-3 text-slate-400">
-            <Target size={18} className="text-indigo-400" />
-            <span className="text-sm font-medium">Avg Daily Sales</span>
+    <div className="space-y-8">
+      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+        <div className="glass-card rounded-2xl p-5">
+          <div className="mb-3 flex items-center gap-3 text-slate-400">
+            <Target size={18} className="text-teal-400" />
+            <span className="text-sm font-medium">Average Sales</span>
           </div>
           <div className="text-3xl font-bold text-white">{Math.round(mean).toLocaleString()}</div>
-          <div className="mt-2 text-xs text-slate-500">Normalized Coefficient</div>
+          <div className="mt-2 text-xs text-slate-500">Normalized sales amount</div>
         </div>
-        
-        <div className="glass-card p-5 rounded-2xl">
-          <div className="flex items-center space-x-3 mb-3 text-slate-400">
-            <Activity size={18} className="text-purple-400" />
-            <span className="text-sm font-medium">Sales Volatility (σ)</span>
+        <div className="glass-card rounded-2xl p-5">
+          <div className="mb-3 flex items-center gap-3 text-slate-400">
+            <Activity size={18} className="text-amber-400" />
+            <span className="text-sm font-medium">Volatility</span>
           </div>
           <div className="text-3xl font-bold text-white">{Math.round(stddev).toLocaleString()}</div>
-          <div className="mt-2 text-xs text-slate-500">Standard Deviation</div>
+          <div className="mt-2 text-xs text-slate-500">Simple day-to-day spread</div>
         </div>
-        
-        <div className="glass-card p-5 rounded-2xl">
-          <div className="flex items-center space-x-3 mb-3 text-slate-400">
+        <div className="glass-card rounded-2xl p-5">
+          <div className="mb-3 flex items-center gap-3 text-slate-400">
             <Zap size={18} className="text-rose-400" />
-            <span className="text-sm font-medium">Triggered Days</span>
+            <span className="text-sm font-medium">Signals</span>
           </div>
-          <div className="text-3xl font-bold text-white">{signals?.length || 0}</div>
-          <div className="mt-2 text-xs text-slate-500">Requiring Agent RCA</div>
+          <div className="text-3xl font-bold text-white">{triggeredCount}</div>
+          <div className="mt-2 text-xs text-slate-500">Drop or lift markers in this window</div>
         </div>
-
-        <div className="glass-card p-5 rounded-2xl bg-gradient-to-br from-indigo-500/10 to-purple-600/10 border-indigo-500/20">
-          <div className="flex items-center space-x-3 mb-3 text-indigo-300">
-            <Clock size={18} />
-            <span className="text-sm font-medium">Next Evaluation</span>
+        <div className="glass-card rounded-2xl p-5">
+          <div className="mb-3 flex items-center gap-3 text-slate-400">
+            <Clock3 size={18} className="text-indigo-400" />
+            <span className="text-sm font-medium">Workflow</span>
           </div>
-          <div className="text-xl font-bold text-indigo-100 mt-2">Active Monitoring</div>
-          <div className="mt-2 text-xs text-indigo-300/70">Real-time signal ingestion</div>
+          <div className="text-xl font-bold text-white">Manual RCA</div>
+          <div className="mt-2 text-xs text-slate-500">Use `rca run` to create or refresh the LLM result</div>
         </div>
       </div>
 
-      {/* Main Chart */}
-      <div className="glass-card p-6 rounded-2xl relative overflow-hidden">
-        {/* Subtle background glow */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-32 bg-indigo-500/20 blur-[100px] rounded-full pointer-events-none"></div>
-        
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-lg font-semibold text-white">Sales Performance Timeline</h2>
-          <div className="flex items-center space-x-4 text-xs font-medium">
-            <div className="flex items-center space-x-1.5 text-slate-400">
-              <div className="w-2 h-2 rounded-full bg-slate-500"></div>
-              <span>Finance Forecast</span>
-            </div>
-            <div className="flex items-center space-x-1.5 text-slate-400 ml-4">
-              <div className="w-2 h-2 rounded-full bg-rose-500"></div>
-              <span>RCA Drop Trigger</span>
-            </div>
-            <div className="flex items-center space-x-1.5 text-slate-400">
-              <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-              <span>RCA Lift Trigger</span>
-            </div>
-          </div>
-        </div>
-        <p className="text-sm text-slate-400 mb-6">Red and green markers indicate dates where LangGraph analysts were dispatched.</p>
-        
-        <SalesChart data={chartData} />
+      <div className="glass-card rounded-2xl p-6">
+        <h2 className="text-lg font-semibold text-white">Actual Sales vs Business Goal (synthetic)</h2>
+        <p className="mt-2 text-sm text-slate-400">Markers show city/date signals. Click a red or green marker to jump to the RCA result for that day.</p>
+        <SalesChart cityId={cityId} data={chartData} />
       </div>
     </div>
   );

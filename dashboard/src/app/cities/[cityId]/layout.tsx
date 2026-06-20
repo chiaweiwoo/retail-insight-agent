@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { use, useEffect, useState } from "react";
-import { LayoutDashboard, FileText, BrainCircuit } from "lucide-react";
+import { use } from "react";
+import { BrainCircuit, FileText, LayoutDashboard, ScrollText } from "lucide-react";
 
 export default function CityLayout({
   children,
@@ -15,50 +15,31 @@ export default function CityLayout({
   const resolvedParams = use(params);
   const cityId = resolvedParams.cityId;
   const pathname = usePathname();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const tabs = [
-    {
-      name: "Overview",
-      href: `/cities/${cityId}`,
-      icon: LayoutDashboard,
-      active: pathname === `/cities/${cityId}`,
-    },
-    {
-      name: "Decision Cards",
-      href: `/cities/${cityId}/rca`,
-      icon: FileText,
-      active: pathname === `/cities/${cityId}/rca`,
-    },
-    {
-      name: "Profile & Memory",
-      href: `/cities/${cityId}/profile`,
-      icon: BrainCircuit,
-      active: pathname === `/cities/${cityId}/profile`,
-    },
+    { name: "Overview", href: `/cities/${cityId}`, icon: LayoutDashboard, active: pathname === `/cities/${cityId}` },
+    { name: "RCA", href: `/cities/${cityId}/rca`, icon: FileText, active: pathname === `/cities/${cityId}/rca` },
+    { name: "Logs", href: `/cities/${cityId}/logs`, icon: ScrollText, active: pathname === `/cities/${cityId}/logs` },
+    { name: "Memory", href: `/cities/${cityId}/profile`, icon: BrainCircuit, active: pathname === `/cities/${cityId}/profile` },
   ];
-
-  if (!mounted) return null;
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between pb-4 border-b border-white/5 space-y-4 md:space-y-0">
-        <h1 className="text-3xl text-white font-semibold tracking-tight">Regional Zone <span className="text-indigo-400">{cityId.replace('city_', '')}</span></h1>
-        <nav className="flex space-x-1 bg-[#111114] p-1 rounded-xl border border-white/5">
+      <div className="flex flex-col justify-between gap-4 border-b border-white/5 pb-4 md:flex-row md:items-center">
+        <h1 className="text-3xl font-semibold tracking-tight text-white">
+          City <span className="text-teal-400">{cityId}</span>
+        </h1>
+        <nav className="flex flex-wrap gap-1 rounded-xl border border-white/5 bg-[#111114] p-1">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             return (
-              <Link 
-                key={tab.name} 
-                href={tab.href} 
-                className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                  tab.active 
-                    ? "bg-indigo-500 text-white shadow-[0_0_15px_rgba(99,102,241,0.3)]" 
-                    : "text-slate-400 hover:text-slate-200 hover:bg-white/5"
+              <Link
+                key={tab.name}
+                href={tab.href}
+                className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all ${
+                  tab.active
+                    ? "bg-teal-700 text-white shadow-[0_0_18px_rgba(13,148,136,0.28)]"
+                    : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
                 }`}
               >
                 <Icon size={16} />

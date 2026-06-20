@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import Link from "next/link";
-import { Activity, BarChart2, Settings, Store } from "lucide-react";
+import { Activity, BarChart2, Store } from "lucide-react";
 
 const inter = Inter({ subsets: ["latin"] });
 
