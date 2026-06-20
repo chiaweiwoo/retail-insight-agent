@@ -6,7 +6,7 @@ import { AlertTriangle, TrendingUp, TrendingDown, Store, ArrowRight, Activity } 
 export default async function StoresPage() {
   const { data: stores, error: storesError } = await supabase
     .from("rca_city_normals")
-    .select("city_id, city_id")
+    .select("city_id, density_tier")
     .limit(100);
 
   if (storesError) {
@@ -47,7 +47,7 @@ export default async function StoresPage() {
 
     return {
       city_id: store.city_id,
-      city_id: store.city_id,
+      density_tier: store.density_tier,
       latest_dt: latestSignal?.dt || "N/A",
       signal_label: latestSignal?.signal_label || "none",
       heatmapCells,
@@ -82,8 +82,8 @@ export default async function StoresPage() {
                     <Store size={18} />
                   </div>
                   <div>
-                    <h3 className="text-lg font-medium text-slate-200 group-hover:text-white transition-colors">{store.city_id.replace('city_', 'Regional Zone ')}</h3>
-                    <p className="text-xs text-slate-500 font-medium">City Aggregate</p>
+                    <h3 className="text-lg font-medium text-slate-200 group-hover:text-white transition-colors">City {store.city_id}</h3>
+                    <p className="text-xs text-slate-500 font-medium capitalize">{store.density_tier?.trim() || "City Aggregate"}</p>
                   </div>
                 </div>
                 
