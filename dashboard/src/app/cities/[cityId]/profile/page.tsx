@@ -14,7 +14,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ cityId
     return (
       <div className="space-y-6 animate-in fade-in duration-700">
         <div>
-          <h2 className="text-2xl font-semibold text-slate-50">Store Profile & Semantic Memory</h2>
+          <h2 className="text-2xl font-semibold text-slate-50">City Profile & Semantic Memory</h2>
           <p className="text-slate-400 text-sm mt-1">Distilled longitudinal patterns for City {cityId}</p>
         </div>
         <div className="glass-card rounded-2xl p-8 text-center flex flex-col items-center justify-center">
@@ -33,7 +33,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ cityId
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
       <div>
-        <h2 className="text-2xl font-semibold text-slate-50">Store Profile & Semantic Memory</h2>
+        <h2 className="text-2xl font-semibold text-slate-50">City Profile & Semantic Memory</h2>
         <p className="text-slate-400 text-sm mt-1">Distilled longitudinal patterns for City {cityId}</p>
       </div>
       

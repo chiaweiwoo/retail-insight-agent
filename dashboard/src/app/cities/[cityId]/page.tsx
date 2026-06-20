@@ -4,7 +4,7 @@ import Link from "next/link";
 import SalesChart from "./SalesChart";
 import { ArrowLeft, ChevronRight, Activity, TrendingDown, Target, Zap, Clock } from "lucide-react";
 
-export default async function StoreOverview({ params }: { params: Promise<{ cityId: string }> }) {
+export default async function CityOverview({ params }: { params: Promise<{ cityId: string }> }) {
   const { cityId } = await params;
   
   const { data: salesData, error } = await supabase

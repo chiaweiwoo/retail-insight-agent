@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { use, useEffect, useState } from "react";
 import { LayoutDashboard, FileText, BrainCircuit } from "lucide-react";
 
-export default function StoreLayout({
+export default function CityLayout({
   children,
   params,
 }: {

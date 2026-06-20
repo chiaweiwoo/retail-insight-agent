@@ -4,7 +4,7 @@ import { Info, ArrowRight } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
-export default async function StoresPage() {
+export default async function CitiesPage() {
   // Fetch city normals for sorting and axis labels
   const { data: normals, error: normalsError } = await supabase
     .from("rca_city_normals")
