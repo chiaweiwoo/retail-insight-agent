@@ -20,12 +20,24 @@ export default async function CitiesPage() {
     );
   }
 
-  // Fetch the latest 100 days of data to compute 7-day trailing averages for the last 90 days
+  // 2. Fetch Sales Series
   const { data: seriesData, error: seriesError } = await supabase
     .from("rca_city_series")
     .select("city_id, dt, total_sales")
-    .order("dt", { ascending: false })
-    .limit(18 * 100);
+    .order("dt", { ascending: true });
+
+  // 3. Fetch Finance Forecast
+  const { data: forecastData } = await supabase
+    .from("rca_finance_forecast")
+    .select("city_id, dt, forecast_sales")
+    .order("dt", { ascending: true });
+
+  // Group forecast by city_id
+  const cityForecast = forecastData?.reduce((acc: any, row: any) => {
+    if (!acc[row.city_id]) acc[row.city_id] = {};
+    acc[row.city_id][row.dt] = row.forecast_sales;
+    return acc;
+  }, {});
 
   if (seriesError) {
     return <div>Error loading series data: {seriesError.message}</div>;
@@ -35,8 +47,9 @@ export default async function CitiesPage() {
   const allDates = Array.from(new Set(seriesData?.map((d) => d.dt) || []))
     .sort((a, b) => b.localeCompare(a));
   
-  // We want to show the full 90-day span (dropping the oldest 7 used for the first trailing avg)
+  // We want to show the full 90-day span
   const displayDates = allDates.slice(0, 90).reverse();
+  const totalDays = displayDates.length;
 
   // Group by city_id
   const citySeries = seriesData?.reduce((acc: any, row: any) => {
@@ -44,41 +57,6 @@ export default async function CitiesPage() {
     acc[row.city_id][row.dt] = row.total_sales;
     return acc;
   }, {});
-
-  // Compute Fleet Macro Series
-  const fleetSeries: Record<string, number> = {};
-  allDates.forEach((date) => {
-    let sum = 0;
-    normals?.forEach((city: any) => {
-      const vol = citySeries?.[city.city_id]?.[date] || 0;
-      sum += vol;
-    });
-    fleetSeries[date] = sum;
-  });
-
-  // Precompute Fleet Ratios
-  const fleetRatios: Record<string, number> = {};
-  allDates.forEach((date, dateIdx) => {
-    if (dateIdx >= 0 && dateIdx + 7 < allDates.length) {
-      let sum = 0;
-      let count = 0;
-      for (let i = 1; i <= 7; i++) {
-        const priorDate = allDates[dateIdx + i];
-        if (fleetSeries[priorDate]) {
-          sum += fleetSeries[priorDate];
-          count++;
-        }
-      }
-      if (count > 0) {
-        const trailingAvg = sum / count;
-        fleetRatios[date] = fleetSeries[date] / trailingAvg;
-      } else {
-        fleetRatios[date] = 1.0;
-      }
-    } else {
-      fleetRatios[date] = 1.0;
-    }
-  });
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
@@ -90,10 +68,10 @@ export default async function CitiesPage() {
             <span className="group relative cursor-help inline-flex items-center justify-center">
               <Info size={16} className="text-indigo-400" />
               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-3 bg-slate-800 text-xs text-slate-200 rounded shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 border border-slate-700">
-                <p className="text-slate-300 block mb-2">We predict what a city should sell today by combining its recent track record with how the rest of the company is doing right now.</p>
+                <p className="text-slate-300 block mb-2">We compare actual sales against the Corporate Finance S&OP Forecast.</p>
                 <strong className="text-white block mb-1">RCA Triggers:</strong>
-                <span className="text-rose-400 font-semibold">Drop:</span> Sales ≤ -14% vs Expected Baseline<br/>
-                <span className="text-emerald-400 font-semibold">Lift:</span> Sales ≥ +15% vs Expected Baseline
+                <span className="text-rose-400 font-semibold">Drop:</span> Sales ≤ -10% vs Finance Forecast<br/>
+                <span className="text-emerald-400 font-semibold">Lift:</span> Sales ≥ +25% vs Finance Forecast
               </div>
             </span>
           </p>
@@ -123,45 +101,26 @@ export default async function CitiesPage() {
             {normals?.map((city: any) => {
               const rowData = citySeries[city.city_id] || {};
               
-              // Precompute the 14-day data for this city
               const sparklineData = displayDates.map((date) => {
                 const currentSales = rowData[date] || 0;
-                const dateIdx = allDates.indexOf(date);
-                let trailingAvg = 0;
+                const forecastSales = cityForecast?.[city.city_id]?.[date] || currentSales;
+                
                 let pctChange = 0;
-                if (dateIdx >= 0 && dateIdx + 7 < allDates.length) {
-                  let sum = 0;
-                  let count = 0;
-                  for (let i = 1; i <= 7; i++) {
-                    const priorDate = allDates[dateIdx + i];
-                    if (rowData[priorDate]) {
-                      sum += rowData[priorDate];
-                      count++;
-                    }
-                  }
-                  if (count > 0) {
-                    const baseTrailingAvg = sum / count;
-                    // Apply the Model C: Fleet Macro Adjustment
-                    trailingAvg = baseTrailingAvg * (fleetRatios[date] || 1.0);
-                    pctChange = (currentSales - trailingAvg) / trailingAvg;
-                  }
+                if (forecastSales > 0) {
+                  pctChange = (currentSales - forecastSales) / forecastSales;
                 }
-                const isDrop = pctChange <= -0.14;
-                const isLift = pctChange >= 0.15;
-                return { date, currentSales, trailingAvg, pctChange, isDrop, isLift };
+                
+                const isDrop = pctChange <= -0.10;
+                const isLift = pctChange >= 0.25;
+                return { date, currentSales, forecastSales, pctChange, isDrop, isLift };
               });
 
-              // Compute SVG coordinates for the sparkline
-              const minSales = Math.min(...sparklineData.map(d => d.currentSales));
-              const maxSales = Math.max(...sparklineData.map(d => d.currentSales));
+              const minSales = Math.min(...sparklineData.map(d => Math.min(d.currentSales, d.forecastSales)));
+              const maxSales = Math.max(...sparklineData.map(d => Math.max(d.currentSales, d.forecastSales)));
               const salesRange = (maxSales - minSales) || 1;
 
-              const svgPoints = sparklineData.map((d, i) => {
-                const x = (i / (sparklineData.length - 1)) * 100;
-                const y = 14 - ((d.currentSales - minSales) / salesRange) * 14;
-                return { x, y, ...d };
-              });
-              const polylineStr = svgPoints.map(p => `${p.x},${p.y}`).join(" ");
+              const pointsActual = sparklineData.map((d, i) => `${i * 4},${14 - ((d.currentSales - minSales) / salesRange) * 14}`).join(' ');
+              const pointsForecast = sparklineData.map((d, i) => `${i * 4},${14 - ((d.forecastSales - minSales) / salesRange) * 14}`).join(' ');
 
               return (
                 <tr key={city.city_id} className="group hover:bg-white/[0.02] transition-colors">
@@ -176,13 +135,15 @@ export default async function CitiesPage() {
                           {Math.round(city.avg_sale / 1000)}k
                         </div>
                       </div>
-                      <div className="w-full px-1" title="90-day trend">
-                        <svg viewBox="0 -3 100 20" className="w-full h-4 overflow-visible opacity-80">
-                          <polyline points={polylineStr} fill="none" stroke="#6366f1" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                          {svgPoints.map(p => {
-                            if (p.isDrop) return <circle key={p.date} cx={p.x} cy={p.y} r="2.5" className="fill-rose-500" />;
-                            if (p.isLift) return <circle key={p.date} cx={p.x} cy={p.y} r="2.5" className="fill-emerald-500" />;
-                            return null;
+                      <div className="w-full shrink-0 flex items-center pr-2">
+                        <svg width="100%" height="16" viewBox={`0 0 ${totalDays * 4} 16`} preserveAspectRatio="none" className="overflow-visible">
+                          <polyline fill="none" stroke="#64748b" strokeWidth="1" strokeDasharray="2 2" points={pointsForecast} opacity="0.6" />
+                          <polyline fill="none" stroke="#6366f1" strokeWidth="1.5" points={pointsActual} />
+                          {sparklineData.map((d, i) => {
+                            if (!d.isDrop && !d.isLift) return null;
+                            const x = i * 4;
+                            const y = 14 - ((d.currentSales - minSales) / salesRange) * 14;
+                            return <circle key={i} cx={x} cy={y} r="2.5" fill={d.isDrop ? "#f43f5e" : "#10b981"} />;
                           })}
                         </svg>
                       </div>
@@ -206,9 +167,9 @@ export default async function CitiesPage() {
                     }
 
                     return (
-                      <td key={cell.date} className={`border-b border-white/5 p-[1px] text-center ${borderLeft}`} title={`${cell.date} | Raw: ${Math.round(cell.currentSales).toLocaleString()} | Change: ${pctStr}`}>
+                      <td key={cell.date} className={`border-b border-white/5 p-[1px] text-center ${borderLeft}`} title={`${cell.date} | Actual: ${Math.round(cell.currentSales).toLocaleString()} | Forecast: ${Math.round(cell.forecastSales).toLocaleString()} | Error: ${pctStr}`}>
                         <div className={`mx-auto w-full h-full py-1.5 rounded-sm flex items-center justify-center transition-colors ${cellBg}`}>
-                          {cell.currentSales > 0 && cell.trailingAvg > 0 ? (
+                          {cell.currentSales > 0 && cell.forecastSales > 0 ? (
                             <span className={`text-[9px] font-bold tracking-tighter ${textClass}`}>
                               {cell.pctChange > 0 ? '+' : ''}{(cell.pctChange * 100).toFixed(0)}
                             </span>
