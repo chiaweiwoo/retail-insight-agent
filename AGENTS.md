@@ -14,7 +14,7 @@ Working notes and strict guardrails for the RCA agent system.
 
 - **Dataset**: `FreshRetailNet-50K` heavily normalizes sales figures.
 - **Sandbox**: Local dataset aggregates data to the City level. "Peer group" comparisons between cities are statistically noisy. Analysts must acknowledge this.
-- **Source of Truth**: Supabase is the system of record. DuckDB is just an ETL/Compute engine.
+- **Source of Truth**: Supabase is the sole system of record and compute. DuckDB has been fully deprecated and removed. All analytical tools read directly from Supabase tables (`rca_` prefix).
 
 ## The LangGraph Pipeline
 
