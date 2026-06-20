@@ -1,6 +1,15 @@
 from __future__ import annotations
 
 import argparse
+import sys
+
+
+def _safe_print(text: str) -> None:
+    try:
+        print(text)
+    except UnicodeEncodeError:
+        sys.stdout.buffer.write((text + "\n").encode("utf-8", errors="replace"))
+        sys.stdout.flush()
 
 
 def _cmd_build(_: argparse.Namespace) -> None:
@@ -29,7 +38,7 @@ def _cmd_run(args: argparse.Namespace) -> None:
 
     client_factory = stub_client_factory if args.dry_run else None
     result = run_rca_graph(city_id=args.city, dt=args.date, client_factory=client_factory)
-    print(result["final_report"])
+    _safe_print(result["final_report"])
 
 
 def _cmd_mcp(_: argparse.Namespace) -> None:
