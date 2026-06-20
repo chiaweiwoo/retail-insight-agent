@@ -1,41 +1,101 @@
-# Retail Insight Agent - PRD
+# Retail Insight Agent v2 PRD
 
-## 1. Project Overview
+## Overview
 
-Retail Insight Agent is a learning project for building an evidence-backed retail root cause analysis system.
-It utilizes LangGraph, Supabase, Next.js, and FastMCP to provide an end-to-end framework.
+Retail Insight Agent v2 is a learning-focused city/date retail RCA system.
 
-## 2. Delivery Milestones
+It is designed to teach:
 
-**Shipped:**
-- Read the raw FreshRetailNet-50K parquet file and filter scope.
-- Aggregate into daily city-level tables (local DuckDB ETL).
-- Surface signals (anomaly triggers) based on trailing standard deviations.
-- Use LangGraph to orchestrate analyst agents that query context and write a synthesized RCA.
-- Record traceable episodic memory and distil semantic city profiles.
-- Stand up an LLM-as-judge Evaluator (9 dimensions).
-- Stand up a FastMCP server exposing RCA tools.
-- Build and deploy the Next.js App Router Dashboard to Vercel.
-- Configure Langfuse observability for token cost and trace tracking.
-- Create Claude Markdown Skills for workflow automations.
+- LangGraph orchestration
+- autonomous planning
+- runtime tool use
+- MCP
+- memory
+- critique
+- internal versus external factor investigation
+- retail decision framing
 
-## 3. Data Semantics Guardrail
+## Product Goal
 
-`sale_amount` is a **daily sales amount after global normalization**.
-- It is **not** a literal unit count or real currency revenue.
-- Use phrasing like `sales amount` or `normalized sales amount`.
+The project should help a learner understand how to build an autonomous coding-agent-like workflow for retail analysis without hiding too much intelligence in ETL.
 
-## 4. Scope
+The system of record is Supabase. The dashboard is read-only. Runs are manual.
 
-**Date Range**: `2024-03-28` to `2024-06-25` (90 days).
-**City Scope**: 5 cities (0, 12, 3, 13, 16)
-**City Scope**: 5 sampled cities (city_0, city_3, etc).
-**Analysis Grain**: One analytical row represents one city on one date.
+## Public Workflows
 
-## Target Stack
+1. `rca build`
+   Rebuilds the RCA evidence model from parquet.
 
-- **DuckDB**: Local OLAP for fast ETL grouping and standard deviation baseline generation.
-- **Supabase (Postgres)**: System of record. `rca_store_series`, `rca_store_normals`, `rca_outcome`, `rca_store_profile` (Stores legacy data, but now represents city aggregates).
-- **DuckDB**: Local ETL compute engine only.
-- **LangGraph**: Python-based DAG orchestration defining the analyst pipeline.
-- **Next.js Dashboard**: Vercel-hosted readonly viewer securely consuming the Supabase data via RLS. Features a premium glassmorphism UI built with Tailwind CSS v4, Recharts, and a dynamic 14-day signal heatmap.
+2. `rca run --city <id> --date <YYYY-MM-DD>`
+   Runs the LLM agent system for one city/date.
+
+3. `rca mcp`
+   Starts the MCP tool server for learning.
+
+## Data Semantics
+
+- `sale_amount` is normalized sales amount, not revenue.
+- `activity_flag` is unlabeled.
+- `holiday_flag` has no official holiday name in source data.
+- product and store identifiers are aggregated away to city/date evidence.
+
+## Evidence Model
+
+All runtime evidence is city/date only.
+
+Tables:
+
+- `rca.sales`
+- `rca.inventory`
+- `rca.pricing`
+- `rca.promotions`
+- `rca.calendar`
+- `rca.weather`
+- `rca.goals`
+- `rca.signals`
+- `rca.outcomes`
+- `rca.events`
+- `rca.completions`
+- `rca.memory`
+- `rca.evidence_cache`
+- `rca.external_events`
+
+## Agent Model
+
+The RCA harness separates:
+
+- internal factors: database evidence
+- external factors: web/news evidence
+
+Agents:
+
+- planner
+- statistician/data scientist
+- sales
+- inventory
+- pricing
+- promotions
+- calendar/weather
+- news
+- critic
+- coordinator
+- memory distiller
+
+## Dashboard
+
+Required dashboard capabilities:
+
+- fleet heatmap of signals
+- city timeline of actual sales versus synthetic business goal
+- clickable signal markers
+- RCA view with RCA, prediction, and prescription
+- logs page
+- memory page
+
+## Constraints
+
+- no scheduled jobs
+- no product/store drilldown
+- no heavy ETL statistics
+- moderate tests only
+- docs should be strong and beginner-friendly
