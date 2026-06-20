@@ -221,20 +221,6 @@ def _cmd_bench(args: argparse.Namespace) -> None:
     run_benchmark(client_factory=client_factory)
 
 
-def _cmd_dashboard(args: argparse.Namespace) -> None:
-    print(
-        "The old static Vite dashboard has been retired. "
-        "Use the Next.js app in dashboard/ instead."
-    )
-
-
-def _cmd_export(args: argparse.Namespace) -> None:
-    print(
-        "The old evidence-viewer export flow has been retired with the Vite UI. "
-        "Use the dashboard/ app backed by Supabase instead."
-    )
-
-
 def _cmd_profile(args: argparse.Namespace) -> None:
     from rca.context import build_context_pack
     from rca.config import CONTEXT_PACK_PATH
@@ -439,11 +425,6 @@ def _cmd_reset_memory(args: argparse.Namespace) -> None:
         print("Specify --city ID or --all.")
 
 
-def _cmd_sync(args: argparse.Namespace) -> None:
-    print("'rca sync' is retired. DuckDB has been removed.")
-    print("Use 'rca build' to ingest parquet and push directly to Supabase.")
-
-
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="rca",
@@ -508,20 +489,6 @@ def main() -> None:
     )
     bench_parser.set_defaults(func=_cmd_bench)
 
-    # rca dashboard
-    dashboard_parser = subparsers.add_parser(
-        "dashboard",
-        help="Legacy alias - static dashboard retired; use dashboard/ Next.js app",
-    )
-    dashboard_parser.set_defaults(func=_cmd_dashboard)
-
-    # rca export
-    export_parser = subparsers.add_parser(
-        "export",
-        help="Legacy alias - Vite evidence viewer retired; use dashboard/ Next.js app",
-    )
-    export_parser.set_defaults(func=_cmd_export)
-
     # rca profile
     profile_parser = subparsers.add_parser(
         "profile",
@@ -558,13 +525,6 @@ def main() -> None:
         "--all", action="store_true", help="Reset profiles for all cities"
     )
     reset_mem_parser.set_defaults(func=_cmd_reset_memory)
-
-    # rca sync (retired — kept as a no-op alias)
-    sync_parser = subparsers.add_parser(
-        "sync",
-        help="Retired: use 'rca build' to ingest parquet and push to Supabase",
-    )
-    sync_parser.set_defaults(func=_cmd_sync)
 
     # rca runs
     runs_parser = subparsers.add_parser(
