@@ -414,7 +414,6 @@ def build_dashboard_html(output_path: Path) -> None:
 
 
 def render_markdown_document(markdown_text: str, title: str) -> str:
-    markdown_text = sanitize_generated_markdown(markdown_text)
     body_html = markdown.markdown(
         markdown_text,
         extensions=["extra", "tables", "fenced_code", "sane_lists"],
@@ -1007,37 +1006,66 @@ def _normalize_story_markdown(markdown_text: str) -> str:
 
 
 def sanitize_generated_markdown(markdown_text: str) -> str:
-    sanitized = _repair_mojibake(markdown_text)
+    """Deterministic terminology enforcement — no LLM calls.
 
-    try:
-        from rca.llm import load_llm_settings, build_openai_compatible_client, build_chat_completion_kwargs
-        settings = load_llm_settings()
-        client = build_openai_compatible_client(settings)
-        messages = [
-            {
-                "role": "system",
-                "content": (
-                    "You are a strict text sanitization assistant. Rewrite the user's text to enforce these rules:\n"
-                    "1. Replace 'unit sales', 'sales units', 'units', and 'revenue' with 'sales amount'.\n"
-                    "2. Replace amounts like '$200' with '200 sales amount'. Remove any standalone '$' signs.\n"
-                    "3. Find any references to tier L, M, or H (e.g. 'tier l', 'prefix group m', \"'l' prefix group\", \"tier 'm'\") and replace them ENTIRELY (including any surrounding quotes) with exactly 'store group L', 'store group M', or 'store group H'. Do NOT leave quotes around the letter.\n"
-                    "4. Replace any remaining standalone word 'tier' or 'tiers' with 'store group' or 'store groups'.\n"
-                    "5. Remove or fix any broken characters/mojibake.\n"
-                    "Return ONLY the sanitized text with the exact original markdown formatting. Do not add any conversational text or formatting outside the provided text."
-                )
-            },
-            {"role": "user", "content": sanitized}
-        ]
-        
-        response = client.chat.completions.create(
-            **build_chat_completion_kwargs(settings, messages, tools=None)
-        )
-        if response.choices and response.choices[0].message.content:
-            return response.choices[0].message.content.strip()
-    except Exception as e:
-        print(f"Warning: LLM sanitization failed, returning original text. Error: {e}")
-        
-    return sanitized
+    Rules (all mechanical regex, applied in order):
+    1. Mojibake repair (e.g. â€™ → ')
+    2. Currency amounts → sales amount phrasing  ($200 → 200 sales amount)
+    3. Standalone $ sign removal
+    4. Unit/revenue vocabulary → sales amount
+    5. Tier prefix references → store group (with letter preserved)
+    6. Remaining standalone 'tier' → 'store group'
+    """
+    text = _repair_mojibake(markdown_text)
+
+    # Currency amounts: $1,234 or $1234 → "1234 sales amount"
+    text = re.sub(r'\$\s*([\d,]+(?:\.\d+)?)\s*[KkMm]?', _replace_currency, text)
+    # Any remaining bare $ sign
+    text = re.sub(r'\$', '', text)
+
+    # Unit / revenue vocabulary (case-insensitive, word-boundary aware)
+    text = re.sub(r'\bunit\s+sales\b', 'sales amount', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bsales\s+units?\b', 'sales amount', text, flags=re.IGNORECASE)
+    text = re.sub(r'\brevenue\b', 'sales amount', text, flags=re.IGNORECASE)
+    # "units" alone — only when clearly standalone metric, not in words like "unique"
+    text = re.sub(r'(?<!\w)units(?!\w)', 'sales amount', text, flags=re.IGNORECASE)
+
+    # Tier + prefix letter references: "tier L", "'l' prefix group", "prefix group m", etc.
+    # Capture the letter so we can preserve it as uppercase in "store group X"
+    text = re.sub(
+        r"""(?:tier|prefix\s+group|store\s+tier)\s*['"]?\s*([lmhLMH])\b['"]?""",
+        lambda m: f"store group {m.group(1).upper()}",
+        text,
+        flags=re.IGNORECASE,
+    )
+    text = re.sub(
+        r"""['"]([lmhLMH])['"]\s+(?:prefix\s+group|tier)""",
+        lambda m: f"store group {m.group(1).upper()}",
+        text,
+        flags=re.IGNORECASE,
+    )
+    # Remaining standalone tier / tiers
+    text = re.sub(r'\btiers\b', 'store groups', text, flags=re.IGNORECASE)
+    text = re.sub(r'\btier\b', 'store group', text, flags=re.IGNORECASE)
+
+    return text
+
+
+def _replace_currency(match: re.Match) -> str:
+    """Convert a $NNN currency match to 'NNN sales amount'."""
+    amount = match.group(1).replace(',', '')
+    # Preserve K/M suffix from the full match if present
+    suffix_map = {'k': '000', 'm': '000000'}
+    original = match.group(0)
+    for s, expansion in suffix_map.items():
+        if original.endswith(s) or original.endswith(s.upper()):
+            try:
+                numeric = float(amount) * (1000 if s == 'k' else 1_000_000)
+                amount = str(int(numeric))
+            except ValueError:
+                pass
+            break
+    return f"{amount} sales amount "
 
 
 def find_report_language_issues(text: str) -> list[str]:

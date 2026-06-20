@@ -381,7 +381,7 @@ def _run_specialist(
         message = response.choices[0].message
         tool_calls = getattr(message, "tool_calls", None)
         if not tool_calls:
-            memo = sanitize_generated_markdown(getattr(message, "content", None) or "")
+            memo = getattr(message, "content", None) or ""
             logger.log(
                 actor_type="llm",
                 actor_name=spec.name,
@@ -511,7 +511,7 @@ def _synthesize(
         source="llm",
         details={"content_preview": content[:200]},
     )
-    return sanitize_generated_markdown(content)
+    return content
 
 
 def _run_critic(
@@ -561,7 +561,7 @@ def _run_critic(
         source="llm",
         details={"content_preview": content[:200]},
     )
-    return sanitize_generated_markdown(content)
+    return content
 
 
 def _run_finance_controller(
@@ -609,7 +609,7 @@ def _run_finance_controller(
         source="llm",
         details={"content_preview": content[:200]},
     )
-    return sanitize_generated_markdown(content)
+    return content
 
 
 def _run_slt_brief(
@@ -661,7 +661,7 @@ def _run_slt_brief(
         source="llm",
         details={"content_preview": content[:200]},
     )
-    return sanitize_generated_markdown(content)
+    return content
 
 
 def run_coordinator(
