@@ -85,61 +85,87 @@ export default async function CitiesPage() {
             {normals?.map((city: any) => {
               const rowData = citySeries[city.city_id] || {};
               
+              // Precompute the 14-day data for this city
+              const sparklineData = displayDates.map((date) => {
+                const currentSales = rowData[date] || 0;
+                const dateIdx = allDates.indexOf(date);
+                let trailingAvg = 0;
+                let pctChange = 0;
+                if (dateIdx >= 0 && dateIdx + 7 < allDates.length) {
+                  let sum = 0;
+                  let count = 0;
+                  for (let i = 1; i <= 7; i++) {
+                    const priorDate = allDates[dateIdx + i];
+                    if (rowData[priorDate]) {
+                      sum += rowData[priorDate];
+                      count++;
+                    }
+                  }
+                  if (count > 0) {
+                    trailingAvg = sum / count;
+                    pctChange = (currentSales - trailingAvg) / trailingAvg;
+                  }
+                }
+                const isDrop = pctChange <= -0.20;
+                const isLift = pctChange >= 0.35;
+                return { date, currentSales, trailingAvg, pctChange, isDrop, isLift };
+              });
+
+              // Compute SVG coordinates for the sparkline
+              const minSales = Math.min(...sparklineData.map(d => d.currentSales));
+              const maxSales = Math.max(...sparklineData.map(d => d.currentSales));
+              const salesRange = (maxSales - minSales) || 1;
+
+              const svgPoints = sparklineData.map((d, i) => {
+                const x = (i / (sparklineData.length - 1)) * 100;
+                const y = 14 - ((d.currentSales - minSales) / salesRange) * 14;
+                return { x, y, ...d };
+              });
+              const polylineStr = svgPoints.map(p => `${p.x},${p.y}`).join(" ");
+
               return (
                 <tr key={city.city_id} className="group hover:bg-white/[0.02] transition-colors">
                   <td className="sticky left-0 z-10 bg-slate-900/90 group-hover:bg-slate-800/90 backdrop-blur border-b border-r border-white/10 p-3">
-                    <div className="flex items-center justify-between">
-                      <Link href={`/cities/${city.city_id}`} className="text-sm font-medium text-indigo-300 hover:text-indigo-200 hover:underline flex items-center space-x-1">
-                        <span>City {city.city_id}</span>
-                        <ArrowRight size={12} />
-                      </Link>
-                      <div className="text-[10px] text-slate-500 font-medium">
-                        {Math.round(city.avg_sale / 1000)}k
+                    <div className="flex flex-col space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Link href={`/cities/${city.city_id}`} className="text-sm font-medium text-indigo-300 hover:text-indigo-200 hover:underline flex items-center space-x-1">
+                          <span>City {city.city_id}</span>
+                          <ArrowRight size={12} />
+                        </Link>
+                        <div className="text-[10px] text-slate-500 font-medium">
+                          {Math.round(city.avg_sale / 1000)}k
+                        </div>
+                      </div>
+                      <div className="w-full px-1" title="14-day trend">
+                        <svg viewBox="0 -3 100 20" className="w-full h-4 overflow-visible opacity-80">
+                          <polyline points={polylineStr} fill="none" stroke="#6366f1" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                          {svgPoints.map(p => {
+                            if (p.isDrop) return <circle key={p.date} cx={p.x} cy={p.y} r="2.5" className="fill-rose-500" />;
+                            if (p.isLift) return <circle key={p.date} cx={p.x} cy={p.y} r="2.5" className="fill-emerald-500" />;
+                            return null;
+                          })}
+                        </svg>
                       </div>
                     </div>
                   </td>
                   
-                  {displayDates.map((date, idx) => {
-                    const currentSales = rowData[date] || 0;
+                  {sparklineData.map((cell) => {
+                    const pctStr = (cell.pctChange > 0 ? '+' : '') + (cell.pctChange * 100).toFixed(1) + '%';
                     
-                    // compute 7 day trailing avg manually for the heatmap logic
-                    const dateIdx = allDates.indexOf(date);
-                    let trailingAvg = 0;
-                    let pctChange = 0;
-                    if (dateIdx >= 0 && dateIdx + 7 < allDates.length) {
-                      let sum = 0;
-                      let count = 0;
-                      for (let i = 1; i <= 7; i++) {
-                        const priorDate = allDates[dateIdx + i];
-                        if (rowData[priorDate]) {
-                          sum += rowData[priorDate];
-                          count++;
-                        }
-                      }
-                      if (count > 0) {
-                        trailingAvg = sum / count;
-                        pctChange = (currentSales - trailingAvg) / trailingAvg;
-                      }
-                    }
-
-                    const pctStr = (pctChange > 0 ? '+' : '') + (pctChange * 100).toFixed(1) + '%';
-                    const isDrop = pctChange <= -0.20;
-                    const isLift = pctChange >= 0.35;
-
                     let cellBg = '';
                     let textClass = 'text-slate-400';
-                    if (isDrop) {
+                    if (cell.isDrop) {
                       cellBg = 'bg-rose-500/10 border-rose-500/30';
                       textClass = 'text-rose-400';
-                    } else if (isLift) {
+                    } else if (cell.isLift) {
                       cellBg = 'bg-emerald-500/10 border-emerald-500/30';
                       textClass = 'text-emerald-400';
                     }
 
                     return (
-                      <td key={date} className="border-b border-white/5 p-1 text-center" title={`Raw volume: ${Math.round(currentSales).toLocaleString()}`}>
+                      <td key={cell.date} className="border-b border-white/5 p-1 text-center" title={`Raw volume: ${Math.round(cell.currentSales).toLocaleString()}`}>
                         <div className={`mx-auto w-full h-full py-1.5 px-2 rounded flex items-center justify-center transition-colors ${cellBg}`}>
-                          {currentSales > 0 && trailingAvg > 0 ? (
+                          {cell.currentSales > 0 && cell.trailingAvg > 0 ? (
                             <span className={`text-[11px] font-semibold ${textClass}`}>
                               {pctStr}
                             </span>
