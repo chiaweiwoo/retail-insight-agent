@@ -90,9 +90,10 @@ export default async function CitiesPage() {
             <span className="group relative cursor-help inline-flex items-center justify-center">
               <Info size={16} className="text-indigo-400" />
               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-3 bg-slate-800 text-xs text-slate-200 rounded shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 border border-slate-700">
+                <p className="text-slate-300 block mb-2">We predict what a city should sell today by combining its recent track record with how the rest of the company is doing right now.</p>
                 <strong className="text-white block mb-1">RCA Triggers:</strong>
-                <span className="text-rose-400 font-semibold">Drop:</span> Sales ≤ -15% vs Fleet-Adjusted Baseline<br/>
-                <span className="text-emerald-400 font-semibold">Lift:</span> Sales ≥ +15% vs Fleet-Adjusted Baseline
+                <span className="text-rose-400 font-semibold">Drop:</span> Sales ≤ -14% vs Expected Baseline<br/>
+                <span className="text-emerald-400 font-semibold">Lift:</span> Sales ≥ +15% vs Expected Baseline
               </div>
             </span>
           </p>
@@ -145,7 +146,7 @@ export default async function CitiesPage() {
                     pctChange = (currentSales - trailingAvg) / trailingAvg;
                   }
                 }
-                const isDrop = pctChange <= -0.15;
+                const isDrop = pctChange <= -0.14;
                 const isLift = pctChange >= 0.15;
                 return { date, currentSales, trailingAvg, pctChange, isDrop, isLift };
               });
