@@ -20,12 +20,12 @@ export default async function CitiesPage() {
     );
   }
 
-  // Fetch the latest 21 days of data to compute 7-day trailing averages for the last 14 days
+  // Fetch the latest 100 days of data to compute 7-day trailing averages for the last 90 days
   const { data: seriesData, error: seriesError } = await supabase
     .from("rca_city_series")
     .select("city_id, dt, total_sales")
     .order("dt", { ascending: false })
-    .limit(18 * 21); // 18 cities * 21 days
+    .limit(18 * 100);
 
   if (seriesError) {
     return <div>Error loading series data: {seriesError.message}</div>;
@@ -35,8 +35,8 @@ export default async function CitiesPage() {
   const allDates = Array.from(new Set(seriesData?.map((d) => d.dt) || []))
     .sort((a, b) => b.localeCompare(a));
   
-  // We want to show the last 14 days
-  const displayDates = allDates.slice(0, 14).reverse();
+  // We want to show the full 90-day span (dropping the oldest 7 used for the first trailing avg)
+  const displayDates = allDates.slice(0, 90).reverse();
 
   // Group by city_id
   const citySeries = seriesData?.reduce((acc: any, row: any) => {
@@ -51,7 +51,7 @@ export default async function CitiesPage() {
         <div>
           <h1 className="text-3xl font-semibold tracking-tight text-slate-50">Fleet Overview (City Level)</h1>
           <p className="text-slate-400 mt-2 max-w-2xl text-sm leading-relaxed flex items-center space-x-2">
-            <span>Heatmap of regional performance across the last 14 days.</span>
+            <span>Heatmap of regional performance across the last 90 days. Scroll horizontally.</span>
             <span className="group relative cursor-help inline-flex items-center justify-center">
               <Info size={16} className="text-indigo-400" />
               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-3 bg-slate-800 text-xs text-slate-200 rounded shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 border border-slate-700">
@@ -76,8 +76,8 @@ export default async function CitiesPage() {
                 const isMonday = d.getDay() === 1;
                 const borderLeft = isMonday ? "border-l-2 border-l-white/20" : "border-l border-l-transparent";
                 return (
-                  <th key={date} className={`border-b border-white/10 p-2 text-center whitespace-nowrap ${borderLeft}`}>
-                    <div className="text-[11px] font-medium text-slate-400">{d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
+                  <th key={date} className={`border-b border-white/10 p-1 min-w-[32px] text-center ${borderLeft}`} title={date}>
+                    <div className="text-[9px] font-medium text-slate-500">{d.getDate()}</div>
                   </th>
                 );
               })}
@@ -138,7 +138,7 @@ export default async function CitiesPage() {
                           {Math.round(city.avg_sale / 1000)}k
                         </div>
                       </div>
-                      <div className="w-full px-1" title="14-day trend">
+                      <div className="w-full px-1" title="90-day trend">
                         <svg viewBox="0 -3 100 20" className="w-full h-4 overflow-visible opacity-80">
                           <polyline points={polylineStr} fill="none" stroke="#6366f1" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                           {svgPoints.map(p => {
@@ -168,14 +168,14 @@ export default async function CitiesPage() {
                     }
 
                     return (
-                      <td key={cell.date} className={`border-b border-white/5 p-1 text-center ${borderLeft}`} title={`Raw volume: ${Math.round(cell.currentSales).toLocaleString()}`}>
-                        <div className={`mx-auto w-full h-full py-1.5 px-2 rounded flex items-center justify-center transition-colors ${cellBg}`}>
+                      <td key={cell.date} className={`border-b border-white/5 p-[1px] text-center ${borderLeft}`} title={`${cell.date} | Raw: ${Math.round(cell.currentSales).toLocaleString()} | Change: ${pctStr}`}>
+                        <div className={`mx-auto w-full h-full py-1.5 rounded-sm flex items-center justify-center transition-colors ${cellBg}`}>
                           {cell.currentSales > 0 && cell.trailingAvg > 0 ? (
-                            <span className={`text-[11px] font-semibold ${textClass}`}>
-                              {pctStr}
+                            <span className={`text-[9px] font-bold tracking-tighter ${textClass}`}>
+                              {cell.pctChange > 0 ? '+' : ''}{(cell.pctChange * 100).toFixed(0)}
                             </span>
                           ) : (
-                            <span className="text-[11px] text-slate-600">-</span>
+                            <span className="text-[9px] text-slate-600">-</span>
                           )}
                         </div>
                       </td>
