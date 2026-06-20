@@ -1,9 +1,12 @@
 export const dynamic = "force-dynamic";
 import { supabase } from "@/lib/supabase";
-import { Card, Title, AreaChart, Grid, Metric, Text, Flex } from "@tremor/react";
+import Link from "next/link";
+import SalesChart from "./SalesChart";
+import { ArrowLeft, ChevronRight, Activity, TrendingDown, Target, Zap, Clock } from "lucide-react";
 
 export default async function StoreOverview({ params }: { params: Promise<{ storeId: string }> }) {
   const { storeId } = await params;
+  
   const { data: salesData, error } = await supabase
     .from("rca_store_series")
     .select("dt, total_sales")
@@ -17,7 +20,11 @@ export default async function StoreOverview({ params }: { params: Promise<{ stor
     .neq("signal_label", "none");
 
   if (error || !salesData) {
-    return <div>Error loading data</div>;
+    return (
+      <div className="p-4 bg-red-500/10 text-red-400 rounded-xl border border-red-500/20 glass-panel">
+        <h2 className="text-lg font-semibold">Error loading data</h2>
+      </div>
+    );
   }
 
   // Calculate descriptive stats
@@ -35,34 +42,68 @@ export default async function StoreOverview({ params }: { params: Promise<{ stor
   }));
 
   return (
-    <div className="space-y-6">
-      <Grid numItemsSm={1} numItemsLg={3} className="gap-6">
-        <Card className="bg-slate-900/50 border-slate-800">
-          <Text className="text-slate-400">Average Daily Sales</Text>
-          <Metric className="text-slate-50">{mean.toFixed(2)}</Metric>
-        </Card>
-        <Card className="bg-slate-900/50 border-slate-800">
-          <Text className="text-slate-400">Sales StdDev</Text>
-          <Metric className="text-slate-50">{stddev.toFixed(2)}</Metric>
-        </Card>
-        <Card className="bg-slate-900/50 border-slate-800">
-          <Text className="text-slate-400">Triggered Days</Text>
-          <Metric className="text-slate-50">{signals?.length || 0}</Metric>
-        </Card>
-      </Grid>
+    <div className="space-y-8 animate-in fade-in duration-700">
+      {/* KPI Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="glass-card p-5 rounded-2xl">
+          <div className="flex items-center space-x-3 mb-3 text-slate-400">
+            <Target size={18} className="text-indigo-400" />
+            <span className="text-sm font-medium">Avg Daily Sales</span>
+          </div>
+          <div className="text-3xl font-bold text-white">{mean.toFixed(1)}</div>
+          <div className="mt-2 text-xs text-slate-500">Normalized Coefficient</div>
+        </div>
+        
+        <div className="glass-card p-5 rounded-2xl">
+          <div className="flex items-center space-x-3 mb-3 text-slate-400">
+            <Activity size={18} className="text-purple-400" />
+            <span className="text-sm font-medium">Sales Volatility (σ)</span>
+          </div>
+          <div className="text-3xl font-bold text-white">{stddev.toFixed(1)}</div>
+          <div className="mt-2 text-xs text-slate-500">Standard Deviation</div>
+        </div>
+        
+        <div className="glass-card p-5 rounded-2xl">
+          <div className="flex items-center space-x-3 mb-3 text-slate-400">
+            <Zap size={18} className="text-rose-400" />
+            <span className="text-sm font-medium">Triggered Days</span>
+          </div>
+          <div className="text-3xl font-bold text-white">{signals?.length || 0}</div>
+          <div className="mt-2 text-xs text-slate-500">Requiring Agent RCA</div>
+        </div>
 
-      <Card className="bg-slate-900/50 border-slate-800 p-6">
-        <Title className="text-slate-50 mb-4">Sales Performance</Title>
-        <AreaChart
-          className="h-80 mt-4"
-          data={chartData}
-          index="date"
-          categories={["Sales"]}
-          colors={["indigo"]}
-          yAxisWidth={60}
-          showAnimation={true}
-        />
-      </Card>
+        <div className="glass-card p-5 rounded-2xl bg-gradient-to-br from-indigo-500/10 to-purple-600/10 border-indigo-500/20">
+          <div className="flex items-center space-x-3 mb-3 text-indigo-300">
+            <Clock size={18} />
+            <span className="text-sm font-medium">Next Evaluation</span>
+          </div>
+          <div className="text-xl font-bold text-indigo-100 mt-2">Active Monitoring</div>
+          <div className="mt-2 text-xs text-indigo-300/70">Real-time signal ingestion</div>
+        </div>
+      </div>
+
+      {/* Main Chart */}
+      <div className="glass-card p-6 rounded-2xl relative overflow-hidden">
+        {/* Subtle background glow */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-32 bg-indigo-500/20 blur-[100px] rounded-full pointer-events-none"></div>
+        
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-lg font-semibold text-white">Sales Performance Timeline</h2>
+          <div className="flex items-center space-x-4 text-xs font-medium">
+            <div className="flex items-center space-x-1.5 text-slate-400">
+              <div className="w-2 h-2 rounded-full bg-rose-500"></div>
+              <span>RCA Drop Trigger</span>
+            </div>
+            <div className="flex items-center space-x-1.5 text-slate-400">
+              <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+              <span>RCA Lift Trigger</span>
+            </div>
+          </div>
+        </div>
+        <p className="text-sm text-slate-400 mb-6">Red and green markers indicate dates where LangGraph analysts were dispatched.</p>
+        
+        <SalesChart data={chartData} />
+      </div>
     </div>
   );
 }

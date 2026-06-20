@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Story Report for h555 on 2024-05-16</title>
+  <style>
+body {
+  margin: 0;
+  background: #f8fafc;
+  color: #0f172a;
+  font-family: Arial, Helvetica, sans-serif;
+}
+main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 32px 24px 48px;
+}
+article {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 32px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+h1, h2, h3 {
+  color: #0f172a;
+}
+h1 {
+  margin-top: 0;
+}
+code {
+  background: #e2e8f0;
+  border-radius: 4px;
+  padding: 0.15em 0.35em;
+}
+pre {
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 10px;
+  padding: 16px;
+  overflow-x: auto;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 16px 0;
+}
+th, td {
+  border: 1px solid #cbd5e1;
+  padding: 10px 12px;
+  text-align: left;
+  vertical-align: top;
+}
+th {
+  background: #e2e8f0;
+}
+blockquote {
+  border-left: 4px solid #94a3b8;
+  margin-left: 0;
+  padding-left: 16px;
+  color: #334155;
+}
+
+.story-article {
+  border-top: 6px solid #d97706;
+}
+.story-article h1 {
+  font-size: 2rem;
+  line-height: 1.15;
+}
+.story-article h2 {
+  margin-top: 2rem;
+  padding-top: 0.25rem;
+  border-top: 1px solid #e2e8f0;
+}
+.story-article p,
+.story-article li {
+  font-size: 1rem;
+  line-height: 1.7;
+}
+</style>
+</head>
+<body>
+  <main>
+    <article class="story-article">
+      <h1>RCA Report: Store h555 — 2024-05-16 Sales Drop</h1>
+<h2>Executive Takeaway</h2>
+<p><strong>Sales dropped 24.9% below trailing-7-day average — likely a one-day operational disruption (broad stockout event) layered on moderate structural underperformance. No escalation warranted, but two critical follow-ups needed: (1) compare stockout metrics to the prior 7 days to confirm "elevation," and (2) cross-reference whether the 38.8% promotional rate overlapped with the 36.7% stockout rate (promotions on unavailable items are meaningless).</strong></p>
+<p>The ~$44 one-day gap is low-to-moderate materiality at store level; h555 remains 28% above fleet average. The finance lens classifies this as likely one-off, with a structural concern only if stockout rates persist over the next 3 days.</p>
+<hr />
+<h2>Why This Day Triggered Review</h2>
+<p><strong>Signal: −24.9% vs trailing-7-day average, exceeding the −20% threshold by ~5 percentage points.</strong></p>
+<p>The <strong>sales_analyst</strong> (first to examine) confirmed this is a statistically meaningful outlier: 2.0 standard deviations below the store's normal mean of 174.37 (stddev 21.29). Current sales of 131.91 on Thursday May 16 represent the continuation of a 4-day decline from a peak of 217.71 on Sunday May 12.</p>
+<p>The <strong>analyst correctly rated this "inconclusive, low confidence"</strong> — the drop is real and large, but coincides with a weekend-to-weekday transition following a holiday period. Natural mean reversion is plausible but insufficient alone.</p>
+<hr />
+<h2>How The Analysis Unfolded</h2>
+<h3>Layer 1: Sales magnitude — confirmed</h3>
+<p>The signal was real. No further work needed on the "what." The question became the "why."</p>
+<h3>Layer 2: Market context — store-specific problem emerges</h3>
+<p>The <strong>market_analyst</strong> pulled peer comparisons, calendar data, and weather.</p>
+<p><strong>Evidence:</strong>
+- h555 ranked <strong>5th out of 5</strong> within its "h-tier" peer group (tier average: 161.29)
+- The <strong>weather was mild</strong>: 23.2°C, 1.89mm rain, 70.4% humidity — plausible as a minor dampener, but not a primary driver
+- Calendar: Normal Thursday, no holiday</p>
+<p><strong>Interpretation:</strong> The drop is store-specific, not market-wide. Weather is "ruled out" as primary driver — though the analyst overstated confidence here (see below).</p>
+<h3>Layer 3: Operations — stockouts are the strongest candidate</h3>
+<p>The <strong>ops_analyst</strong> examined availability data.</p>
+<p><strong>Evidence:</strong>
+- <strong>36.7% of products</strong> experienced some stockout
+- <strong>17.7% had severe stockouts</strong> (&gt;4 hours)
+- <strong>Peak hourly stockout rate</strong>: 34.0%
+- <strong>Average duration</strong>: 2.96 hours</p>
+<p><strong>Interpretation:</strong> "Stockout metrics are elevated across the board." The breadth (36.7% of products) is unusually high — enough that a pure demand-side explanation is less parsimonious. But the analyst correctly caveated: lower traffic could inflate stockout rates, and stockouts reduce sales. The direction could run either way.</p>
+<p><strong>Key gap flagged by the critic:</strong> "Elevated" is asserted without a baseline. No prior-day or store-average stockout rate was provided. The raw numbers look high, but the system cannot prove they're abnormal without comparison.</p>
+<h3>Layer 4: Commercial — promotions are happening but can't be assessed</h3>
+<p>The <strong>commercial_analyst</strong> reviewed discount and activity data.</p>
+<p><strong>Evidence:</strong>
+- <strong>38.8% of products</strong> were on promotion
+- <strong>Average discount</strong>: ∼7.6%
+- <strong>Deep discount rate</strong>: 0.0%
+- <strong>Activity sales share</strong>: 38.2%</p>
+<p><strong>Interpretation:</strong> "Promotional activity is present but sales are weak — suggesting the promotion is failing to drive traffic."</p>
+<p><strong>Critical flaw caught by the critic:</strong> This is a correlation/causation error. Weak sales concurrent with promotion does not prove the promotion <em>failed</em>. The promotion may have prevented an even larger drop, or it may have been a response to an already-declining trend. The data cannot distinguish.</p>
+<h3>The unresolved tension (not caught by any analyst)</h3>
+<p>The <strong>coordinator</strong> spotted the critical interaction: <strong>If 36.7% of products were stocked out and 38.8% were on promotion, there may be significant overlap.</strong> Promotions on unavailable items are meaningless. Neither the ops_analyst nor the commercial_analyst addressed this.</p>
+<p>This is the single most important gap to close before any causal story is endorsed.</p>
+<hr />
+<h2>Where The System Challenged Itself</h2>
+<h3>Critic audit findings</h3>
+<p>The <strong>critic</strong> reviewed each analyst's claims against the evidence and found multiple overstatements:</p>
+<ol>
+<li>
+<p><strong>Market_analyst:</strong> Claimed weather was "ruled out" — downgraded. 1.89mm rain and 70% humidity on a mild day <em>could</em> have a mild dampening effect, but without foot-traffic data, the magnitude is inconclusive.</p>
+</li>
+<li>
+<p><strong>Ops_analyst:</strong> "Elevated" stockouts are asserted without temporal baseline — flagged as unsupported. The raw numbers (36.7%, 17.7% severe) are high in absolute terms, but "elevated" implies a comparison that wasn't provided.</p>
+</li>
+<li>
+<p><strong>Commercial_analyst:</strong> The "promotion is failing" claim — downgraded. Correlation/causation: weak sales with promotion doesn't prove promotion failed. Could have prevented worse, or been a response to decline.</p>
+</li>
+<li>
+<p><strong>Deep discount definition:</strong> 0.0% deep discount rate is reported but the threshold for "deep" is undefined.</p>
+</li>
+</ol>
+<h3>Calibration note</h3>
+<p>The critic recommended a downward calibration:
+- <strong>sales_analyst</strong> correctly rated "inconclusive, low confidence" — should anchor the synthesis
+- The other three should calibrate from "medium" to at most "low-medium" given missing traffic data, replenishment timing, and promotion-type granularity</p>
+<h3>Finance lens</h3>
+<p>The <strong>controller</strong> classified this as:
+- <strong>One-off indicators</strong>: Post-holiday mean reversion (recurring pattern); stockout at 36.7% is unusually broad for a single day (suggests missed delivery or system error, not chronic flaw)
+- <strong>Structural indicators</strong>: h555 ranks 5/5 in its tier (ongoing competitive disadvantage); no baseline for normal stockout rate
+- <strong>Verdict</strong>: Likely one-off operational disruption layered on underlying moderate structural underperformance</p>
+<hr />
+<h2>Final Decision</h2>
+<p><strong>No escalation. Action items, not causal endorsement.</strong></p>
+<ol>
+<li><strong>Resolve stockout baseline</strong>: Compare May 16 stockout metrics to (a) prior 7-day average for h555, and (b) same-day h-tier average</li>
+<li><strong>Cross-reference stockout × promotion</strong>: What share of the 38.8% promoted products were among the 36.7% stocked out? If &gt;50% overlap, availability failure is the primary driver by definition</li>
+<li><strong>Obtain foot-traffic data</strong>: If traffic is normal → stockouts likely causal. If traffic is also down → demand-side factors</li>
+<li><strong>Check delivery/replenishment schedule</strong>: Was there a missed delivery on May 15 or early May 16? This would explain the 3-day accelerating decline pattern</li>
+</ol>
+<p><strong>Confidence: medium</strong> — the evidence supports a stockout-driven hypothesis, but the missing baseline and unresolved promotion-overlap introduce material uncertainty. The critic's calibration note is accepted: three of four analysts overstated their causal claims, and the lowest-confidence verdict (sales_analyst's "inconclusive") should anchor the overall assessment.</p>
+    </article>
+  </main>
+</body>
+</html>

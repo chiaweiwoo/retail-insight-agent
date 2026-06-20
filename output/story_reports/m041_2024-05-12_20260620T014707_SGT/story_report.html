@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Story Report for m041 on 2024-05-12</title>
+  <style>
+body {
+  margin: 0;
+  background: #f8fafc;
+  color: #0f172a;
+  font-family: Arial, Helvetica, sans-serif;
+}
+main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 32px 24px 48px;
+}
+article {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 32px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+h1, h2, h3 {
+  color: #0f172a;
+}
+h1 {
+  margin-top: 0;
+}
+code {
+  background: #e2e8f0;
+  border-radius: 4px;
+  padding: 0.15em 0.35em;
+}
+pre {
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 10px;
+  padding: 16px;
+  overflow-x: auto;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 16px 0;
+}
+th, td {
+  border: 1px solid #cbd5e1;
+  padding: 10px 12px;
+  text-align: left;
+  vertical-align: top;
+}
+th {
+  background: #e2e8f0;
+}
+blockquote {
+  border-left: 4px solid #94a3b8;
+  margin-left: 0;
+  padding-left: 16px;
+  color: #334155;
+}
+
+main {
+  max-width: 1180px;
+  padding: 40px 24px 56px;
+}
+.story-article {
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+}
+.story-shell {
+  display: grid;
+  gap: 24px;
+}
+.story-hero {
+  background:
+    radial-gradient(circle at top right, rgba(249, 115, 22, 0.18), transparent 26%),
+    linear-gradient(145deg, #0f172a 0%, #111827 58%, #1e293b 100%);
+  border-radius: 24px;
+  padding: 32px;
+  color: #f8fafc;
+  box-shadow: 0 22px 56px rgba(15, 23, 42, 0.18);
+}
+.story-hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(260px, 0.9fr);
+  gap: 24px;
+  align-items: start;
+}
+.story-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #cbd5e1;
+}
+.story-hero h1 {
+  margin: 0 0 14px;
+  font-size: clamp(2rem, 3vw, 2.8rem);
+  line-height: 1.05;
+  color: #ffffff;
+}
+.story-dek {
+  margin: 0;
+  max-width: 760px;
+  color: #dbe4f0;
+  font-size: 1.02rem;
+  line-height: 1.75;
+}
+.story-action-card {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.07);
+  padding: 18px 18px 16px;
+  backdrop-filter: blur(12px);
+}
+.story-action-label {
+  margin: 0 0 8px;
+  color: #cbd5e1;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.72rem;
+}
+.story-action-text {
+  margin: 0;
+  color: #ffffff;
+  font-size: 0.98rem;
+  line-height: 1.65;
+}
+.story-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+.story-meta-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 16px 18px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.06);
+}
+.story-meta-label {
+  margin: 0 0 8px;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.72rem;
+}
+.story-meta-value {
+  margin: 0;
+  color: #0f172a;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+.story-section-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
+}
+.story-section {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  padding: 24px 26px;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
+}
+.story-section h2 {
+  margin: 0 0 18px;
+  font-size: 1.35rem;
+  line-height: 1.2;
+  color: #0f172a;
+}
+.story-section h3 {
+  margin-top: 1.4rem;
+  margin-bottom: 0.75rem;
+  font-size: 1rem;
+  color: #1e293b;
+}
+.story-section p,
+.story-section li,
+.story-dek li {
+  font-size: 1rem;
+  line-height: 1.75;
+}
+.story-section p {
+  margin: 0 0 1rem;
+}
+.story-section ul,
+.story-section ol {
+  margin: 0.45rem 0 1.15rem 1.25rem;
+  padding: 0;
+}
+.story-section li + li {
+  margin-top: 0.4rem;
+}
+.story-section strong {
+  color: #0f172a;
+}
+.story-section hr {
+  display: none;
+}
+.story-section blockquote {
+  margin: 1rem 0;
+  padding: 14px 18px;
+  border-left: 4px solid #f59e0b;
+  background: #fff7ed;
+  color: #7c2d12;
+  border-radius: 0 14px 14px 0;
+}
+.story-section table {
+  margin-top: 1rem;
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+}
+.story-section th,
+.story-section td {
+  border: none;
+  border-bottom: 1px solid #e2e8f0;
+}
+.story-section tr:last-child td {
+  border-bottom: none;
+}
+.story-section th {
+  background: #f8fafc;
+  color: #334155;
+  font-size: 0.85rem;
+}
+.story-section code {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+.story-section .story-kicker {
+  margin-bottom: 10px;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.72rem;
+}
+@media (max-width: 880px) {
+  .story-hero-grid,
+  .story-meta-grid {
+    grid-template-columns: 1fr;
+  }
+  .story-hero,
+  .story-section,
+  .story-meta-card {
+    border-radius: 18px;
+  }
+}
+@media (max-width: 640px) {
+  main {
+    padding: 20px 14px 40px;
+  }
+  .story-hero,
+  .story-section {
+    padding: 20px 18px;
+  }
+}
+</style>
+</head>
+<body>
+  <main>
+    
+    <article class="story-article">
+      <div class="story-shell">
+        <section class="story-hero">
+          <div class="story-hero-grid">
+            <div>
+              <div class="story-eyebrow">Retail Insight Agent RCA</div>
+              <h1>m041 on 2024-05-12</h1>
+              <p class="story-action-label">Executive Takeaway</p>
+              <div class="story-dek"><p><strong>Store m041 sold 146.4 units on May 12 — its highest single-day total in the 90-day dataset.</strong> This represents a +77% lift vs its trailing 7-day average. <strong>No causal attribution is possible.</strong> The spike is real, but why it happened is unknown. The immediate recommended action is a <strong>data quality audit</strong> to confirm the figure isn't a POS error, followed by a check of the following week for persistence before any process changes.</p></div>
+            </div>
+            
+        <aside class="story-action-card">
+          <p class="story-action-label">Recommended Action</p>
+          <div class="story-action-text"><p><strong>Do not escalate. Do not change the forecast.</strong></p></div>
+        </aside>
+        
+          </div>
+        </section>
+        <section class="story-meta-grid">
+          
+        <div class="story-meta-card">
+          <p class="story-meta-label">Store</p>
+          <p class="story-meta-value">m041</p>
+        </div>
+        
+        <div class="story-meta-card">
+          <p class="story-meta-label">Date</p>
+          <p class="story-meta-value">2024-05-12</p>
+        </div>
+        
+        <div class="story-meta-card">
+          <p class="story-meta-label">Sections</p>
+          <p class="story-meta-value">5</p>
+        </div>
+        
+        </section>
+        <div class="story-section-grid">
+          
+            <section class="story-section">
+              <div class="story-kicker">Analysis Layer</div>
+              <h2>Why This Day Triggered Review</h2>
+              <p>The system flagged store m041 on Sunday, May 12, because its trailing 7-day sales change crossed the 30% lift threshold. The numbers:</p>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Day's sales</td>
+<td>146.4 units</td>
+</tr>
+<tr>
+<td>Previous day</td>
+<td>89.0</td>
+</tr>
+<tr>
+<td>Trailing 7-day avg</td>
+<td>82.56</td>
+</tr>
+<tr>
+<td>Same-weekday 4-week avg</td>
+<td>102.37</td>
+</tr>
+<tr>
+<td>Day-over-day change</td>
+<td>+64.5%</td>
+</tr>
+<tr>
+<td>Trailing 7-day change</td>
+<td>+77.3%</td>
+</tr>
+<tr>
+<td>vs 4-week Sunday avg</td>
+<td>+43.0%</td>
+</tr>
+</tbody>
+</table>
+<p>The ramp accelerated sharply over the final four days: 56.67 → 77.01 → 89.0 → <strong>146.4</strong>.</p>
+            </section>
+            
+            <section class="story-section">
+              <div class="story-kicker">Analysis Layer</div>
+              <h2>How The Analysis Unfolded</h2>
+              <h3>Layer 1: Sales Analyst — Confirming the Signal</h3>
+<p>The <strong>sales_analyst</strong> pulled the signal evidence, then fetched sales context for the 14-day lookback and 90-day bounds. Key findings:</p>
+<ul>
+<li>146.4 is the <strong>dataset maximum</strong> in the 90-day window (previous max: 116.48)</li>
+<li>Sales rank: #1 in the dataset</li>
+<li>The store's normal max is 146.4 — but the critic later catches this: <em>"Claiming it as the store's historical maximum without longer data is speculative. Downgrade to 'observed dataset max.'"</em></li>
+</ul>
+<p><strong>Tool used:</strong> <code>get_signal_evidence</code>, <code>get_sales_context</code> (twice)</p>
+<h3>Layer 2: Market Analyst — Fleet Context and Calendar</h3>
+<p>The <strong>market_analyst</strong> examined whether this was an isolated event or part of a wider pattern. Using calendar/weather data and peer comparisons:</p>
+<ul>
+<li>Fleet average on May 12: <strong>140.23 units</strong> (fleet daily mean is 103.06)</li>
+<li>Tier 'm' stores averaged 122.52</li>
+<li>m041 ranked <strong>#1 among tier 'm'</strong> stores and <strong>#6 overall</strong> in the fleet</li>
+<li>m041 was <strong>3.0 standard deviations</strong> above its own mean (146.4 vs 84.41 ± 20.51)</li>
+<li>Weather: neutral — light precipitation, moderate temperature</li>
+</ul>
+<p>The analyst hypothesized a "post-holiday-weekend Sunday boost." <strong>The critic flagged this as unsupported</strong> — the holiday label (labor_day_period) applied to the <em>prior</em> Sunday (May 5), not May 12. The fleet-wide lift is real but unexplained.</p>
+<p><strong>Verdict:</strong> Contributing (medium confidence)
+<strong>Tool used:</strong> <code>get_calendar_weather_context</code>, <code>get_peer_store_context</code>, <code>get_sales_context</code></p>
+<h3>Layer 3: Ops Analyst — Stockout Assessment</h3>
+<p>The <strong>ops_analyst</strong> dug into stockout data, making 8 calls to get full context. Key findings:</p>
+<ul>
+<li>Average stockout hours: 4.33</li>
+<li>Stockout product rate: 55.07%</li>
+<li><strong>Severe stockout rate: 27.54%</strong> — highest in the 6-day window (prior range 17-26%)</li>
+<li>Full stockout product rate: 2.9%</li>
+</ul>
+<p><strong>The analyst's interpretation:</strong> Stockouts are a <em>consequence</em> of high demand, not a cause. The sales spike is sharply upward despite stockouts, suggesting demand-pull depleting inventory.</p>
+<p><strong>The critic pushed back:</strong> <em>"Without opening inventory levels, we cannot distinguish between demand-driven depletion, promotional drawdown of already-low stock, or a pre-existing stockout condition. Verdict 'ruled_out' is too strong — 'not supported as explanatory' would be more accurate."</em></p>
+<p><strong>Verdict:</strong> Ruled_out (medium confidence → critic says low)
+<strong>Tool used:</strong> <code>get_sales_context</code>, <code>get_stockout_context</code> (8 times)</p>
+<h3>Layer 4: Commercial Analyst — Promotion Analysis</h3>
+<p>The <strong>commercial_analyst</strong> examined discount and activity data:</p>
+<ul>
+<li>Average discount: ~10% off (0.8997 price ratio)</li>
+<li><strong>60.87% of products discounted</strong> — broad coverage</li>
+<li><strong>0% deep discount</strong> rate (none below 10%)</li>
+<li>Activity product rate: 46.38%</li>
+<li>Activity sales share: 39.41%</li>
+</ul>
+<p><strong>The analyst's interpretation:</strong> The broad, shallow promotional event drove the spike.</p>
+<p><strong>The critic demolished this causal claim:</strong> <em>"This is equally consistent with normal Sunday traffic buying promoted items incidentally, the promotion being a reaction to high traffic, or the promotion having existed for weeks and only 'working' because of unrelated demand surge. No pre/post comparison, no control group. High confidence is unwarranted."</em></p>
+<p><strong>Verdict:</strong> Contributing (high confidence → critic says low)
+<strong>Tool used:</strong> <code>get_sales_context</code>, <code>get_discount_context</code>, <code>get_activity_context</code></p>
+            </section>
+            
+            <section class="story-section">
+              <div class="story-kicker">Analysis Layer</div>
+              <h2>Where The System Challenged Itself</h2>
+              <p>The critic and controller provided the most valuable corrections:</p>
+<h3>Critic's Key Challenges</h3>
+<ol>
+<li>
+<p><strong>Overstated "historical max"</strong> — corrected to "observed dataset maximum"</p>
+</li>
+<li>
+<p><strong>Unsupported causal chain</strong> — the "post-holiday" explanation for the fleet-wide lift is correlation presented as causation</p>
+</li>
+<li>
+<p><strong>Overconfident stockout verdict</strong> — "ruled_out" should be "not supported as explanatory"</p>
+</li>
+<li>
+<p><strong>Causal leap on promotions</strong> — correlation ≠ causation; no temporal alignment demonstrated</p>
+</li>
+<li>
+<p><strong>Missing interaction</strong> — ops says stockouts capped demand, commercial says promotions drove it. These viewpoints are compatible (promotions drove demand that depleted stock), but no memo cross-references this</p>
+</li>
+<li>
+<p><strong>Missing: product-mix data</strong> — if stockout items were the promoted items, that's a different story than separate categories</p>
+</li>
+<li>
+<p><strong>Missing: data anomaly check</strong> — "A single-day spike to the dataset maximum with no clear cause should trigger a data quality check. Has this been ruled out?"</p>
+</li>
+</ol>
+<h3>Calibration Downgrades</h3>
+<table>
+<thead>
+<tr>
+<th>Analyst</th>
+<th>Stated Confidence</th>
+<th>Appropriate Confidence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>sales_analyst</td>
+<td>high</td>
+<td>medium-high (right about the number, wrong about "historical max")</td>
+</tr>
+<tr>
+<td>market_analyst</td>
+<td>medium</td>
+<td>low-medium (post-holiday inference unsupported)</td>
+</tr>
+<tr>
+<td>ops_analyst</td>
+<td>medium</td>
+<td>low (overconfident "ruled_out" verdict)</td>
+</tr>
+<tr>
+<td>commercial_analyst</td>
+<td>high</td>
+<td>low (causal leap from correlation)</td>
+</tr>
+</tbody>
+</table>
+<h3>Controller's Financial Lens</h3>
+<p>The controller added a margin perspective:</p>
+<ul>
+<li><strong>If Hypothesis A (promotion-driven):</strong> The 60.9% discount rate directly compresses unit margins on 39.4% of sales dollars. Net profitability of incremental volume is uncertain.</li>
+<li><strong>If Hypothesis B (external demand surge):</strong> Margins on full-price items are protected, making the spike highly profitable.</li>
+<li><strong>Critical missing link: product-mix.</strong> Were stockout items high-margin or low-margin?</li>
+<li><strong>Verdict: almost certainly one-off, not structural.</strong> The synchronized fleet-wide spike rules out a permanent shift. Recommended action: data quality audit.</li>
+</ul>
+            </section>
+            
+            <section class="story-section">
+              <div class="story-kicker">Analysis Layer</div>
+              <h2>Final Decision</h2>
+              <p><strong>Headline:</strong> Store m041 hit 146.4 units (dataset max, +73.5% vs mean) — fleet also spiked to 140.23; <strong>no causal attribution possible.</strong></p>
+<p><strong>Pattern:</strong> One-off spike (dataset maximum, sharp 4-day ramp, fleet-wide synchronized lift)</p>
+<p><strong>Materiality:</strong> High — +62 units vs store average on a single day</p>
+<p><strong>Confidence:</strong> Medium</p>
+<p><strong>Action:</strong>
+1. ✅ Initiate data quality audit to confirm 146.4 is not a POS error
+2. ✅ Check following week (May 13 onward) for persistence before any process change
+3. ❌ Do not escalate — this does not warrant a process change or revised forecast</p>
+<p><strong>Escalate:</strong> No</p>
+            </section>
+            
+        </div>
+      </div>
+    </article>
+    
+  </main>
+</body>
+</html>
