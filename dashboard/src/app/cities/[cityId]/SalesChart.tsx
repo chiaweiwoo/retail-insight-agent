@@ -6,6 +6,7 @@ import { format } from "date-fns";
 interface ChartData {
   date: string;
   Sales: number;
+  Forecast: number;
   Trigger: string | null;
 }
 
@@ -55,7 +56,11 @@ export default function SalesChart({ data }: { data: ChartData[] }) {
                     <p className="text-slate-400 text-xs mb-1 font-medium">{label}</p>
                     <p className="text-white font-semibold flex items-center space-x-2">
                       <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
-                      <span>{Math.round(Number(payload[0].value)).toLocaleString()} Sales</span>
+                      <span>{Math.round(Number(payload.find(p => p.dataKey === 'Sales')?.value)).toLocaleString()} Sales</span>
+                    </p>
+                    <p className="text-slate-300 font-semibold flex items-center space-x-2 mt-1">
+                      <span className="w-2 h-2 rounded-full bg-slate-500"></span>
+                      <span>{Math.round(Number(payload.find(p => p.dataKey === 'Forecast')?.value)).toLocaleString()} Forecast</span>
                     </p>
                     {isTrigger && (
                       <div className={`mt-2 text-xs font-medium px-2 py-1 rounded border inline-block ${
@@ -69,6 +74,15 @@ export default function SalesChart({ data }: { data: ChartData[] }) {
               }
               return null;
             }}
+          />
+          <Area 
+            type="monotone" 
+            dataKey="Forecast" 
+            stroke="#64748b" 
+            strokeWidth={1.5}
+            strokeDasharray="3 3"
+            fill="none" 
+            activeDot={false}
           />
           <Area 
             type="monotone" 

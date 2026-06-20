@@ -1,7 +1,6 @@
 import duckdb
 import pandas as pd
-from rca.database import get_supabase_client
-from rca.config import DB_PATH
+from rca.config import make_supabase_client, DB_PATH
 
 def generate_and_sync_forecast():
     print("Generating Finance Forecast...")
@@ -50,7 +49,7 @@ def generate_and_sync_forecast():
                     'forecast_sales': float(city_forecast)
                 })
                 
-    client = get_supabase_client()
+    client = make_supabase_client()
     
     print(f"Upserting {len(forecasts)} forecast rows to Supabase...")
     batch_size = 1000

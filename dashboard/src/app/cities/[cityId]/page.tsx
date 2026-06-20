@@ -19,6 +19,12 @@ export default async function CityOverview({ params }: { params: Promise<{ cityI
     .eq("city_id", cityId)
     .neq("signal_label", "none");
 
+  const { data: forecastData } = await supabase
+    .from("rca_finance_forecast")
+    .select("dt, forecast_sales")
+    .eq("city_id", cityId)
+    .order("dt", { ascending: true });
+
   if (error || !salesData) {
     return (
       <div className="p-4 bg-red-500/10 text-red-400 rounded-xl border border-red-500/20 glass-panel">
@@ -32,12 +38,14 @@ export default async function CityOverview({ params }: { params: Promise<{ cityI
   const mean = sales.length ? sales.reduce((a, b) => a + b, 0) / sales.length : 0;
   const stddev = sales.length ? Math.sqrt(sales.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / sales.length) : 0;
 
-  // Mark triggered dates in chart data
+  // Mark triggered dates and map forecast in chart data
   const signalMap = new Map(signals?.map(s => [s.dt, s.signal_label]) || []);
+  const forecastMap = new Map(forecastData?.map(f => [f.dt, f.forecast_sales]) || []);
   
   const chartData = salesData.map(d => ({
     date: d.dt,
     Sales: d.total_sales,
+    Forecast: forecastMap.get(d.dt) || d.total_sales, // fallback to actual if no forecast
     Trigger: signalMap.get(d.dt) || null,
   }));
 
@@ -91,6 +99,10 @@ export default async function CityOverview({ params }: { params: Promise<{ cityI
           <h2 className="text-lg font-semibold text-white">Sales Performance Timeline</h2>
           <div className="flex items-center space-x-4 text-xs font-medium">
             <div className="flex items-center space-x-1.5 text-slate-400">
+              <div className="w-2 h-2 rounded-full bg-slate-500"></div>
+              <span>Finance Forecast</span>
+            </div>
+            <div className="flex items-center space-x-1.5 text-slate-400 ml-4">
               <div className="w-2 h-2 rounded-full bg-rose-500"></div>
               <span>RCA Drop Trigger</span>
             </div>
