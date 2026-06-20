@@ -444,25 +444,25 @@ def build_story_report(
     use_llm: bool = True,
     settings: LLMSettings | None = None,
     client_factory: ClientFactory | None = None,
-) -> tuple[Path, Path]:
+) -> tuple[int, str]:
+    """Build story narrative and upsert to Supabase rca_outcome.
+
+    Returns (city_id, dt) so the caller can confirm what was updated.
+    """
+    from rca.outcomes import update_outcome_story
+
     trace = load_run_trace(run_dir)
+    city_id: int = int(trace["city_id"])
+    dt: str = str(trace["dt"])
+
     markdown_text = build_story_markdown(
         trace,
         use_llm=use_llm,
         settings=settings,
         client_factory=client_factory,
     )
-    html_text = render_story_document(
-        markdown_text,
-        title=f"Story Report for {trace['city_id']} on {trace['dt']}",
-    )
-    output_dir = PROJECT_ROOT / "output" / "story_reports" / run_dir.name
-    output_dir.mkdir(parents=True, exist_ok=True)
-    markdown_path = output_dir / f"{output_name}.md"
-    html_path = output_dir / f"{output_name}.html"
-    markdown_path.write_text(markdown_text, encoding="utf-8")
-    html_path.write_text(html_text, encoding="utf-8")
-    return markdown_path, html_path
+    update_outcome_story(city_id, dt, markdown_text)
+    return city_id, dt
 
 
 def load_run_trace(run_dir: Path) -> dict[str, Any]:

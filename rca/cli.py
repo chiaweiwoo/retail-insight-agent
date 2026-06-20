@@ -369,15 +369,16 @@ def _cmd_story(args: argparse.Namespace) -> None:
         print("[dry-run] Using stub LLM story writer.")
 
     run_dir = Path(args.run_dir)
-    markdown_path, html_path = build_story_report(
+    city_id, dt = build_story_report(
         run_dir=run_dir,
-        output_name=args.output_name,
         use_llm=use_llm,
         settings=settings,
         client_factory=client_factory,
     )
-    print(f"Story markdown written to {markdown_path}")
-    print(f"Story HTML written to {html_path}")
+    if args.dry_run:
+        print(f"[dry-run] Story narrative generated for city {city_id} on {dt} (not written to Supabase).")
+    else:
+        print(f"Story narrative upserted to Supabase rca_outcome for city {city_id} on {dt}.")
 
 
 def _cmd_mcp(args: argparse.Namespace) -> None:
@@ -621,7 +622,7 @@ def main() -> None:
     # rca story
     story_parser = subparsers.add_parser(
         "story",
-        help="Build a story-style HTML walkthrough from one run folder",
+        help="Generate a story narrative from a run folder and upsert to Supabase",
     )
     story_parser.add_argument(
         "--run-dir",
@@ -629,20 +630,15 @@ def main() -> None:
         help="Path to a run folder containing run_trace.json or coordinator_trace.json",
     )
     story_parser.add_argument(
-        "--output-name",
-        default="story_report",
-        help="Basename for the generated markdown and html files",
-    )
-    story_parser.add_argument(
         "--no-llm",
         action="store_true",
-        help="Skip the final LLM polish and use deterministic report assembly only",
+        help="Skip the LLM polish and use deterministic assembly only",
     )
     story_parser.add_argument(
         "--dry-run",
         action="store_true",
         dest="dry_run",
-        help="Use the stub LLM story writer",
+        help="Generate narrative without writing to Supabase",
     )
     story_parser.set_defaults(func=_cmd_story)
 

@@ -3,10 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 import os
 import re
-from pathlib import Path
 from typing import Any
 
-from rca.config import make_supabase_client
+from rca.config import current_timestamp_sgt_iso, make_supabase_client
 
 
 @dataclass(frozen=True)
@@ -21,10 +20,15 @@ class OutcomeRecord:
     escalated: bool
     brief_headline: str
     decision_card_markdown: str
+    report_markdown: str
 
 
 def record_outcome(record: OutcomeRecord, dry_run: bool = False) -> None:
-    """Upsert a run outcome to Supabase rca_outcome. No-ops on dry-run."""
+    """Upsert a run outcome to Supabase rca_outcome. No-ops on dry-run.
+
+    Conflict key is (city_id, dt) — one row per triggered day per city.
+    Re-running the same city-day overwrites the previous result.
+    """
     if dry_run or not os.getenv("SUPABASE_URL"):
         return
 
@@ -41,8 +45,31 @@ def record_outcome(record: OutcomeRecord, dry_run: bool = False) -> None:
             "escalated": record.escalated,
             "brief_headline": record.brief_headline,
             "decision_card_markdown": record.decision_card_markdown,
+            "report_markdown": record.report_markdown,
+            "generated_at": current_timestamp_sgt_iso(),
         },
-        on_conflict="run_name",
+        on_conflict="city_id,dt",
+    ).execute()
+
+
+def update_outcome_story(city_id: int, dt: str, story_markdown: str) -> None:
+    """Overlay the polished story narrative on an existing (city_id, dt) row.
+
+    Called by `rca story` after running the LLM narrative pass.
+    No-ops if SUPABASE_URL is not set.
+    """
+    if not os.getenv("SUPABASE_URL"):
+        return
+
+    client = make_supabase_client()
+    client.table("rca_outcome").upsert(
+        {
+            "city_id": city_id,
+            "dt": dt,
+            "story_markdown": story_markdown,
+            "generated_at": current_timestamp_sgt_iso(),
+        },
+        on_conflict="city_id,dt",
     ).execute()
 
 
@@ -50,7 +77,7 @@ def get_prior_rca(
     city_id: int,
     limit: int = 5,
 ) -> dict[str, Any]:
-    """Read prior RCA outcomes for a store from Supabase."""
+    """Read prior RCA outcomes for a city from Supabase."""
     if not os.getenv("SUPABASE_URL"):
         return _empty_prior(city_id)
 
@@ -69,7 +96,6 @@ def get_prior_rca(
     except Exception:
         return _empty_prior(city_id)
 
-    # Aggregate top drivers
     driver_counts: dict[str, int] = {}
     for row in data:
         d = str(row.get("top_driver", "unknown"))
@@ -129,6 +155,7 @@ def build_outcome_record(
         ),
         brief_headline=_extract_bullet_value(decision_card_markdown, "headline") or "",
         decision_card_markdown=decision_card_markdown,
+        report_markdown=coordinator_report_markdown,
     )
 
 

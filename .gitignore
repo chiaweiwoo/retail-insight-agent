@@ -22,3 +22,6 @@ data/raw/*.parquet
 # Generated run logs and benchmark artifacts — not committed.
 data/runs.duckdb
 data/analysis/agent_benchmark_runs/
+
+# Story report outputs — stored in Supabase, not git.
+output/
