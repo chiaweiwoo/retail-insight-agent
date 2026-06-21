@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Projects — Redesign Analysis</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #222536;
+    --border: #2e3248;
+    --accent: #6c8efb;
+    --accent2: #a78bfa;
+    --green: #34d399;
+    --amber: #fbbf24;
+    --red: #f87171;
+    --text: #e2e8f0;
+    --muted: #8892a4;
+    --code-bg: #12141e;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; font-size: 14px; line-height: 1.7; }
+
+  /* NAV */
+  nav { position: sticky; top: 0; z-index: 100; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 0; padding: 0 24px; }
+  nav .brand { font-weight: 700; font-size: 13px; color: var(--muted); padding: 16px 20px 16px 0; border-right: 1px solid var(--border); margin-right: 8px; white-space: nowrap; }
+  .tab-btn { padding: 16px 20px; font-size: 13px; font-weight: 500; color: var(--muted); background: none; border: none; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; white-space: nowrap; }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* LAYOUT */
+  .tab-panel { display: none; max-width: 1100px; margin: 0 auto; padding: 40px 24px 80px; }
+  .tab-panel.active { display: block; }
+
+  /* TYPOGRAPHY */
+  h1 { font-size: 26px; font-weight: 700; margin-bottom: 8px; }
+  h2 { font-size: 18px; font-weight: 600; margin: 40px 0 14px; color: var(--text); }
+  h3 { font-size: 14px; font-weight: 600; margin: 24px 0 8px; color: var(--accent); text-transform: uppercase; letter-spacing: 0.06em; }
+  p { color: var(--muted); margin-bottom: 12px; }
+  p strong { color: var(--text); }
+  ul { padding-left: 20px; color: var(--muted); }
+  ul li { margin-bottom: 6px; }
+  ul li strong { color: var(--text); }
+
+  /* HERO */
+  .hero { border: 1px solid var(--border); border-radius: 12px; padding: 28px 32px; margin-bottom: 32px; background: var(--surface); }
+  .hero-meta { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+  .badge { font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 20px; letter-spacing: 0.04em; }
+  .badge-blue { background: rgba(108,142,251,0.15); color: var(--accent); border: 1px solid rgba(108,142,251,0.3); }
+  .badge-purple { background: rgba(167,139,250,0.15); color: var(--accent2); border: 1px solid rgba(167,139,250,0.3); }
+  .badge-green { background: rgba(52,211,153,0.12); color: var(--green); border: 1px solid rgba(52,211,153,0.3); }
+
+  /* GRID */
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0; }
+  @media (max-width: 700px) { .grid2 { grid-template-columns: 1fr; } }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin: 16px 0; }
+  @media (max-width: 800px) { .grid3 { grid-template-columns: 1fr 1fr; } }
+
+  /* CARDS */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px 22px; }
+  .card h4 { font-size: 13px; font-weight: 600; margin-bottom: 10px; color: var(--text); }
+  .card p, .card li { font-size: 13px; color: var(--muted); }
+  .card.danger { border-color: rgba(248,113,113,0.3); }
+  .card.success { border-color: rgba(52,211,153,0.3); }
+  .card.warn { border-color: rgba(251,191,36,0.3); }
+
+  /* PROBLEM/SOLUTION BLOCKS */
+  .problem-block { background: rgba(248,113,113,0.06); border: 1px solid rgba(248,113,113,0.25); border-radius: 10px; padding: 18px 22px; margin-bottom: 12px; }
+  .problem-block .label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--red); margin-bottom: 6px; }
+  .problem-block h4 { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
+  .problem-block p { font-size: 13px; color: var(--muted); margin: 0; }
+  .fix-block { background: rgba(52,211,153,0.05); border: 1px solid rgba(52,211,153,0.2); border-radius: 10px; padding: 14px 18px; margin-top: 8px; }
+  .fix-block .label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--green); margin-bottom: 4px; }
+  .fix-block p { font-size: 13px; color: var(--muted); margin: 0; }
+
+  /* FLOW DIAGRAM */
+  .flow { display: flex; align-items: center; gap: 0; flex-wrap: wrap; margin: 16px 0; }
+  .flow-node { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 14px; font-size: 12px; font-weight: 500; color: var(--text); white-space: nowrap; }
+  .flow-node.highlight { border-color: var(--accent); color: var(--accent); background: rgba(108,142,251,0.08); }
+  .flow-node.new { border-color: var(--green); color: var(--green); background: rgba(52,211,153,0.07); }
+  .flow-node.warn { border-color: var(--amber); color: var(--amber); background: rgba(251,191,36,0.07); }
+  .flow-arrow { color: var(--border); font-size: 16px; padding: 0 6px; flex-shrink: 0; }
+  .flow-label { font-size: 10px; color: var(--muted); text-align: center; margin-top: 3px; }
+
+  /* ARCH TABLE */
+  .arch-table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 13px; }
+  .arch-table th { text-align: left; padding: 10px 14px; background: var(--surface2); color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--border); }
+  .arch-table td { padding: 10px 14px; border-bottom: 1px solid rgba(46,50,72,0.5); vertical-align: top; color: var(--muted); }
+  .arch-table td:first-child { color: var(--text); font-weight: 500; }
+  .arch-table td .old { color: var(--red); font-size: 12px; }
+  .arch-table td .new { color: var(--green); font-size: 12px; }
+  .arch-table tr:last-child td { border-bottom: none; }
+
+  /* DEPLOYMENT DIAGRAM */
+  .deploy-box { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; }
+  .deploy-box .title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 8px; }
+  .deploy-box ul { padding-left: 16px; }
+  .deploy-box li { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .deploy-box li strong { color: var(--text); }
+
+  /* STACK PILLS */
+  .stack-grid { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+  .stack-pill { font-size: 12px; padding: 4px 12px; border-radius: 20px; border: 1px solid var(--border); color: var(--text); background: var(--surface2); }
+  .stack-pill.core { border-color: rgba(108,142,251,0.4); color: var(--accent); background: rgba(108,142,251,0.08); }
+  .stack-pill.infra { border-color: rgba(167,139,250,0.4); color: var(--accent2); background: rgba(167,139,250,0.08); }
+  .stack-pill.new { border-color: rgba(52,211,153,0.4); color: var(--green); background: rgba(52,211,153,0.07); }
+
+  /* TOOLS */
+  .tool-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; }
+  .tool-card .agent-name { font-size: 11px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+  .tool-card ul { padding-left: 16px; }
+  .tool-card li { font-size: 12px; color: var(--muted); margin-bottom: 3px; }
+  .tool-card li code { font-family: 'Fira Code', monospace; font-size: 11px; color: var(--accent2); }
+
+  /* INTERVIEW */
+  .interview-block { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent2); border-radius: 0 10px 10px 0; padding: 18px 22px; margin: 12px 0; }
+  .interview-block .q { font-size: 12px; font-weight: 700; color: var(--accent2); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+  .interview-block p { font-size: 13px; color: var(--muted); margin: 0; font-style: italic; }
+  .interview-block p strong { color: var(--text); font-style: normal; }
+
+  /* CODE */
+  code { font-family: 'Fira Code', 'Courier New', monospace; font-size: 12px; background: var(--code-bg); color: var(--accent2); padding: 1px 5px; border-radius: 3px; }
+
+  /* DIVIDER */
+  hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
+
+  /* MCP SECTION */
+  .mcp-row { display: flex; gap: 12px; margin: 12px 0; flex-wrap: wrap; }
+  .mcp-tag { font-size: 12px; padding: 6px 14px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface2); }
+  .mcp-tag strong { color: var(--green); display: block; font-size: 11px; }
+  .mcp-tag span { color: var(--muted); font-size: 11px; }
+
+  .section-intro { color: var(--muted); font-size: 13px; margin-bottom: 24px; }
+
+  .current-tag { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--red); border: 1px solid rgba(248,113,113,0.3); padding: 2px 8px; border-radius: 4px; }
+  .redesign-tag { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--green); border: 1px solid rgba(52,211,153,0.3); padding: 2px 8px; border-radius: 4px; }
+
+  .section-header { display: flex; align-items: center; gap: 12px; margin: 40px 0 14px; }
+  .section-header h2 { margin: 0; }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="brand">AI Projects</div>
+  <button class="tab-btn active" onclick="switchTab('rca')">Project A — Root Cause Analysis</button>
+  <button class="tab-btn" onclick="switchTab('email')">Project B — Email Automation</button>
+</nav>
+
+<!-- ===================== TAB A: RCA ===================== -->
+<div id="tab-rca" class="tab-panel active">
+
+  <div class="hero">
+    <div class="hero-meta">
+      <span class="badge badge-blue">Project A</span>
+      <span class="badge badge-purple">Multi-Agent · LangGraph</span>
+      <span class="badge badge-green">RCA · Sales Intelligence</span>
+    </div>
+    <h1>AI Root Cause Analysis</h1>
+    <p>Investigates sales deviations across retail locations in HK and Macau. Orchestrates analyst, manager, and finance-controller style agents across sales, inventory, promotions, traffic, and external news signals to produce a structured executive brief.</p>
+  </div>
+
+  <!-- DELIVERABLES -->
+  <h3>What Was Delivered (Fixed Scope)</h3>
+  <div class="grid3">
+    <div class="card">
+      <h4>Signal Detection</h4>
+      <p>Triggered when actual vs. forecast deviation exceeds ±10–15% threshold.</p>
+    </div>
+    <div class="card">
+      <h4>Multi-Agent Investigation</h4>
+      <p>Parallel domain agents (sales, traffic, inventory, promotions, news) each analyse one dimension.</p>
+    </div>
+    <div class="card">
+      <h4>Executive Brief</h4>
+      <p>Manager agent synthesises all insights into a structured report with causal chain and driver ranking.</p>
+    </div>
+    <div class="card">
+      <h4>Critique & Iteration</h4>
+      <p>Critique agent reviews report quality, triggers manager rewrites until "SATISFACTORY".</p>
+    </div>
+    <div class="card">
+      <h4>Snowflake Integration</h4>
+      <p>Reads sales, traffic, inventory, promotions from Snowflake. Writes all outputs back.</p>
+    </div>
+    <div class="card">
+      <h4>Streamlit Dashboard</h4>
+      <p>Portal for viewing executive reports per location/date.</p>
+    </div>
+  </div>
+
+  <!-- CURRENT ARCH -->
+  <div class="section-header">
+    <h2>Current Architecture</h2>
+    <span class="current-tag">As Built</span>
+  </div>
+
+  <h3>Pipeline Flow</h3>
+  <div class="flow">
+    <div>
+      <div class="flow-node">Sales Deviation Agent</div>
+      <div class="flow-label">LLM + single tool</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div>
+      <div class="flow-node">check_rca</div>
+      <div class="flow-label">threshold gate</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div>
+      <div class="flow-node highlight">5 Agents (Parallel)</div>
+      <div class="flow-label">always all 5</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div>
+      <div class="flow-node">Manager Agent</div>
+      <div class="flow-label">synthesis</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div>
+      <div class="flow-node warn">Critique Agent</div>
+      <div class="flow-label">style review × up to 5</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div>
+      <div class="flow-node">Report Agent</div>
+      <div class="flow-label">format</div>
+    </div>
+  </div>
+
+  <h3>Tech Stack (Current)</h3>
+  <div class="stack-grid">
+    <span class="stack-pill core">LangGraph</span>
+    <span class="stack-pill core">LangChain AgentExecutor</span>
+    <span class="stack-pill core">Azure OpenAI gpt-4.1-mini (all nodes)</span>
+    <span class="stack-pill infra">Snowflake</span>
+    <span class="stack-pill infra">Streamlit</span>
+    <span class="stack-pill infra">YAML config files</span>
+  </div>
+
+  <!-- WEAKNESSES -->
+  <h2>Structural Weaknesses (Code-Verified)</h2>
+
+  <div class="problem-block">
+    <div class="label">Problem 1</div>
+    <h4>LLM used to compute a number</h4>
+    <p><code>sales_deviation_agent</code> wraps a single <code>sales_deviation_calculator</code> Python function inside <code>create_tool_calling_agent + AgentExecutor</code>. The LLM is asked to call one tool and return a float. This adds latency, cost, and non-determinism to a formula: <code>(actual − forecast) / forecast × 100</code>. If the model misformats the output, <code>result.get("output")</code> silently returns the wrong value.</p>
+    <div class="fix-block">
+      <div class="label">Redesign Fix</div>
+      <p>Move signal computation offline to a precompute step (<code>rca signal</code>). Run once as a deterministic pandas/SQL job, persist to a signals table. Never recompute at agent runtime.</p>
+    </div>
+  </div>
+
+  <div class="problem-block">
+    <div class="label">Problem 2</div>
+    <h4>No planner — all agents always run</h4>
+    <p><code>route_deviation</code> returns either <code>["__end__"]</code> or <code>["traffic","sales","inventory","promotions","news"]</code>. Every deviation triggers all 5 agents at equal cost, regardless of signal type. A holiday lift that is obviously promotions-driven still runs the inventory and news agents at full token cost.</p>
+    <div class="fix-block">
+      <div class="label">Redesign Fix</div>
+      <p>Add a <strong>Planner node</strong> that reads the signal, calendar context, and prior memory to select which agents to run this round. A clear holiday lift may only need calendar + promotions. A supply disruption needs inventory + news. Cost scales with complexity, not uniformly.</p>
+    </div>
+  </div>
+
+  <div class="problem-block">
+    <div class="label">Problem 3</div>
+    <h4>Critique loop never gains new information</h4>
+    <p>The manager → critique loop runs up to 5 iterations. Each pass receives the same five tool summaries and rewrites prose based on style feedback (baseline values, driver order, sentence clarity). No new Snowflake queries are made. At iteration 5, you have spent 5× LLM cost and produced a better-worded version of the same analysis. The critique checks formatting compliance, not evidence gaps.</p>
+    <div class="fix-block">
+      <div class="label">Redesign Fix</div>
+      <p>Replace the style-review loop with an <strong>evidence-gap critic</strong>. Critic outputs typed gaps (<code>missing_internal_evidence</code>, <code>baseline_conflict</code>, <code>missing_external_context</code>, <code>unavailable_data</code>) and a <code>continue_investigation</code> flag. When <code>true</code>, the next round calls new tools and gathers evidence the previous round didn't have. The loop grows the evidence base, not the prose.</p>
+    </div>
+  </div>
+
+  <div class="problem-block">
+    <div class="label">Problem 4</div>
+    <h4>No evaluation means no measurable quality</h4>
+    <p><code>observability.py</code> tracks token counts and latency per agent — useful for cost management. There is no mechanism to score output quality. You cannot answer: "Is today's report better than yesterday's? Did the prompt change improve anything? Which locations have low-confidence RCAs?"</p>
+    <div class="fix-block">
+      <div class="label">Redesign Fix</div>
+      <p>Add a two-layer evaluation node: (1) <strong>8 deterministic rule checks</strong> (no currency terms, no product root cause, evidence non-empty, etc.) as cheap fast gates; (2) <strong>LLM alignment judge</strong> that scores 0.0–1.0 against guardrails. Store scores per run in a queryable table. Every prompt change can be A/B tested against a consistent baseline.</p>
+    </div>
+  </div>
+
+  <div class="problem-block">
+    <div class="label">Problem 5</div>
+    <h4>Monolithic prompts doing five jobs at once</h4>
+    <p>The manager prompt is ~400 lines encoding: output format, baseline compliance rules, contradiction avoidance, zero-sales protocol, driver prioritization, JSON formatting, domain knowledge, and iteration tracking. The critique prompt is ~500 lines doing the same. Any model update that handles the prompt differently silently breaks the output structure.</p>
+    <div class="fix-block">
+      <div class="label">Redesign Fix</div>
+      <p>Narrow mandate per node: Planner (~10 lines, select agents), Critic (~20 lines, return gaps JSON), Coordinator (~30 lines, synthesise brief). Evaluation logic lives in Python, not prompts. Each prompt is independently testable.</p>
+    </div>
+  </div>
+
+  <!-- REDESIGNED ARCH -->
+  <div class="section-header">
+    <h2>Redesigned Architecture</h2>
+    <span class="redesign-tag">Hypothetical</span>
+  </div>
+  <p class="section-intro">Same deliverables — sales deviation RCA with executive brief. Redesigned internals to fix the five problems above. Based on the live retail_insight_agent rebuild.</p>
+
+  <h3>Redesigned Pipeline Flow</h3>
+  <div class="flow" style="flex-wrap:wrap; gap: 4px 0;">
+    <div>
+      <div class="flow-node new">Precomputed Signal</div>
+      <div class="flow-label">offline, deterministic</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div>
+      <div class="flow-node new">Planner</div>
+      <div class="flow-label">select agents</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div>
+      <div class="flow-node new">Specialists (dynamic)</div>
+      <div class="flow-label">parallel, per-round</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div>
+      <div class="flow-node new">Evidence Critic</div>
+      <div class="flow-label">gaps → loop/stop</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div>
+      <div class="flow-node new">Coordinator</div>
+      <div class="flow-label">deep model synthesis</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div>
+      <div class="flow-node new">Evaluation</div>
+      <div class="flow-label">deterministic + LLM judge</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div>
+      <div class="flow-node new">Memory Distiller</div>
+      <div class="flow-label">lessons → next run</div>
+    </div>
+  </div>
+
+  <h3>Tech Stack (Redesigned)</h3>
+  <div class="stack-grid">
+    <span class="stack-pill core">LangGraph (graph orchestration)</span>
+    <span class="stack-pill core">Fast model — planner, critics, specialists</span>
+    <span class="stack-pill core">Deep model — coordinator, LLM judge</span>
+    <span class="stack-pill new">Supabase (Postgres) — replaces Snowflake for agent output</span>
+    <span class="stack-pill new">Next.js App Router — replaces Streamlit</span>
+    <span class="stack-pill new">Typed EvidenceItem ledger</span>
+    <span class="stack-pill new">Per-run alignment scoring (0–1)</span>
+    <span class="stack-pill new">Cross-run memory (rca.memory)</span>
+    <span class="stack-pill infra">Python · uv · GitHub Actions CI</span>
+    <span class="stack-pill infra">Vercel (dashboard deployment)</span>
+  </div>
+
+  <h3>Agent Tools &amp; Skills per Node</h3>
+  <div class="grid2">
+    <div class="tool-card">
+      <div class="agent-name">Planner</div>
+      <ul>
+        <li><code>get_signal_evidence</code> — signal + deviation</li>
+        <li><code>get_sales_context</code> — 14-day history</li>
+        <li><code>get_calendar_weather_context</code></li>
+        <li><code>get_memory_context</code> — prior city lessons</li>
+      </ul>
+    </div>
+    <div class="tool-card">
+      <div class="agent-name">Statistician</div>
+      <ul>
+        <li><code>compare_recent_baseline</code></li>
+        <li><code>compare_same_weekday_baseline</code></li>
+        <li><code>get_intraday_profile</code></li>
+        <li><code>detect_intraday_shift</code></li>
+        <li><code>run_stat_analysis</code> (gated)</li>
+      </ul>
+    </div>
+    <div class="tool-card">
+      <div class="agent-name">Inventory Agent</div>
+      <ul>
+        <li><code>get_inventory_context</code> — stockout rates</li>
+        <li><code>get_intraday_profile</code></li>
+        <li><code>compare_recent_baseline</code></li>
+      </ul>
+    </div>
+    <div class="tool-card">
+      <div class="agent-name">News Agent (gated)</div>
+      <ul>
+        <li><code>search_external_events</code> — web search</li>
+        <li>Requires: internal evidence + critic gap <code>missing_external_context</code></li>
+        <li>Blocked in round 1</li>
+      </ul>
+    </div>
+    <div class="tool-card">
+      <div class="agent-name">Coordinator (deep model)</div>
+      <ul>
+        <li>Reads full evidence ledger</li>
+        <li>Outputs structured <code>DecisionBrief</code> JSON</li>
+        <li>Produces RCA, Prediction, Prescription markdown</li>
+      </ul>
+    </div>
+    <div class="tool-card">
+      <div class="agent-name">Alignment Reviewer (deep model)</div>
+      <ul>
+        <li>Scores 0.0–1.0 against 9 guardrails</li>
+        <li>Outputs pros, cons, improvements</li>
+        <li>Stored in <code>rca.simulate_review</code></li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>Hypothetical MCP Integration</h3>
+  <div class="mcp-row">
+    <div class="mcp-tag"><strong>Snowflake MCP</strong><span>Direct schema queries without custom DB client</span></div>
+    <div class="mcp-tag"><strong>Brave Search MCP</strong><span>News agent web search — replaces custom search wrapper</span></div>
+    <div class="mcp-tag"><strong>Supabase MCP</strong><span>Schema management and evidence storage</span></div>
+    <div class="mcp-tag"><strong>Slack MCP</strong><span>Push RCA alerts to ops channel when signal fires</span></div>
+  </div>
+
+  <h3>Deployment Architecture (Redesigned)</h3>
+  <div class="grid2">
+    <div class="deploy-box">
+      <div class="title">Signal Layer (Batch)</div>
+      <ul>
+        <li><strong>Trigger:</strong> Daily scheduled job (GitHub Actions / cron)</li>
+        <li><strong>Process:</strong> Python + pandas — compute deviations, write to signals table</li>
+        <li><strong>Storage:</strong> Supabase <code>rca.signals</code></li>
+        <li><strong>Output:</strong> Pre-qualified city/date pairs ready for RCA</li>
+      </ul>
+    </div>
+    <div class="deploy-box">
+      <div class="title">Agent Layer (On-demand or batch)</div>
+      <ul>
+        <li><strong>Trigger:</strong> CLI or queue consumer</li>
+        <li><strong>Runtime:</strong> LangGraph graph via Python, <code>ThreadPoolExecutor</code> for parallel agents</li>
+        <li><strong>LLM:</strong> DeepSeek / GPT-4o — fast + deep model routing</li>
+        <li><strong>Storage:</strong> Supabase <code>rca.outcomes</code>, <code>rca.completions</code>, <code>rca.memory</code></li>
+      </ul>
+    </div>
+    <div class="deploy-box">
+      <div class="title">Dashboard Layer</div>
+      <ul>
+        <li><strong>Framework:</strong> Next.js App Router (Vercel)</li>
+        <li><strong>Auth:</strong> Supabase RLS + anon key for read</li>
+        <li><strong>Pages:</strong> Signal heatmap, city trend, RCA report, logs, memory profile</li>
+        <li><strong>Replaces:</strong> Streamlit — production-ready, SSR, no Python server</li>
+      </ul>
+    </div>
+    <div class="deploy-box">
+      <div class="title">Evaluation Layer</div>
+      <ul>
+        <li><strong>Inline:</strong> 8 deterministic checks run on every <code>rca run</code></li>
+        <li><strong>LLM judge:</strong> Alignment scorer on every run (toggled by flag)</li>
+        <li><strong>Batch:</strong> <code>rca simulate</code> — runs all signal dates, compares alignment scores</li>
+        <li><strong>Storage:</strong> <code>rca.simulate_review</code> — queryable quality history</li>
+      </ul>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- COMPARISON TABLE -->
+  <h2>Side-by-Side Comparison</h2>
+  <table class="arch-table">
+    <thead>
+      <tr><th>Dimension</th><th>Current (DFS)</th><th>Redesigned</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Signal detection</td><td class="old">LLM + AgentExecutor at runtime</td><td class="new">Precomputed offline (deterministic)</td></tr>
+      <tr><td>Agent selection</td><td class="old">All 5 always run</td><td class="new">Planner selects per round based on signal</td></tr>
+      <tr><td>Investigation loop</td><td class="old">Polish prose (style review)</td><td class="new">Gather evidence (gap-type driven)</td></tr>
+      <tr><td>Critique output</td><td class="old">Text with "SATISFACTORY" string</td><td class="new">Typed JSON: gaps, severity, suggested_agents</td></tr>
+      <tr><td>Model routing</td><td class="old">gpt-4.1-mini everywhere</td><td class="new">Fast (tools/planner/critic) + Deep (coordinator/judge)</td></tr>
+      <tr><td>Evidence tracking</td><td class="old">Free-text strings per agent</td><td class="new">Typed EvidenceItem ledger with IDs</td></tr>
+      <tr><td>Evaluation</td><td class="old">Token cost only</td><td class="new">8 deterministic checks + LLM alignment score (0–1)</td></tr>
+      <tr><td>Memory</td><td class="old">None — each run blank</td><td class="new">Lessons persist in rca.memory, loaded by planner</td></tr>
+      <tr><td>Dashboard</td><td class="old">Streamlit</td><td class="new">Next.js App Router on Vercel</td></tr>
+      <tr><td>Prompt size</td><td class="old">400–500 lines per node</td><td class="new">10–30 lines per node</td></tr>
+    </tbody>
+  </table>
+
+  <hr>
+
+  <!-- INTERVIEW -->
+  <h2>Interview Talking Points</h2>
+
+  <div class="interview-block">
+    <div class="q">Opening narrative</div>
+    <p>"In the first version, we got multi-agent orchestration running end-to-end — LangGraph, Snowflake, Streamlit, all connected. But in production we noticed that the critique loop was polishing prose rather than gathering evidence, every deviation triggered all five agents at the same cost regardless of signal type, and there was no quality score so we couldn't tell if a prompt change helped or hurt. In the redesign I addressed each problem with a specific engineering decision: precomputed signals, a planner that selects agents dynamically, a gap-type critic that drives real investigation rounds, and a two-layer evaluation system — deterministic checks first, LLM judge second — so every run produces a score you can track over time."</p>
+  </div>
+
+  <div class="interview-block">
+    <div class="q">On the critique loop</div>
+    <p>"The original critique ran up to five iterations over the same data. That's <strong>prompt engineering masquerading as intelligence</strong>. The LLM was checking formatting compliance — baseline values present, driver order correct, no contradictions. Valid checks, but not new information. I redesigned the loop so the critic identifies evidence gaps with types — missing_internal_evidence, baseline_conflict, unavailable_data — and those gap types tell the planner what to do next round. Now each iteration actually calls new tools."</p>
+  </div>
+
+  <div class="interview-block">
+    <div class="q">On evaluation</div>
+    <p>"I'd build the scoring harness first next time, then build the agents. Without a score you can track per run, you're flying blind every time you change a prompt. Deterministic checks are cheap and reliable — eight rule-based gates catch the obvious violations. The LLM judge then adds calibration and nuance scoring on top. You need both layers."</p>
+  </div>
+
+  <div class="interview-block">
+    <div class="q">On model routing</div>
+    <p>"Running everything on the same model was leaving quality on the table in one place and wasting cost in the other. The planner and critic need consistent JSON output, not deep reasoning — that's the fast model's job. The coordinator synthesises across all evidence and needs better nuanced reasoning — that's the deep model. <strong>Match model capability to task complexity.</strong>"</p>
+  </div>
+
+</div><!-- end tab-rca -->
+
+
+<!-- ===================== TAB B: EMAIL ===================== -->
+<div id="tab-email" class="tab-panel">
+
+  <div class="hero">
+    <div class="hero-meta">
+      <span class="badge badge-blue">Project B</span>
+      <span class="badge badge-purple">LLM Pipeline · Azure Functions</span>
+      <span class="badge badge-green">Email Triage · RTV Operations</span>
+    </div>
+    <h1>AI Email Automation</h1>
+    <p>Triages inbound email threads for Return-to-Vendor (RTV) operations. Classifies whether an email is RTV-related, identifies the current process scenario, determines if a follow-up action is needed, and drafts a contextual reply email. Reduced manual handling from 80 to 20 hours/month across 2,500 monthly cases.</p>
+  </div>
+
+  <!-- DELIVERABLES -->
+  <h3>What Was Delivered (Fixed Scope)</h3>
+  <div class="grid3">
+    <div class="card">
+      <h4>Process Classification</h4>
+      <p>Identifies whether an email belongs to the RTV process or should be excluded.</p>
+    </div>
+    <div class="card">
+      <h4>Scenario Matching</h4>
+      <p>Maps the email to one of ~30 predefined RTV workflow scenarios from a SharePoint tracker.</p>
+    </div>
+    <div class="card">
+      <h4>Next Responder Detection</h4>
+      <p>Determines which team needs to act next and whether the Central Planning team has an actionable task.</p>
+    </div>
+    <div class="card">
+      <h4>Draft Email Generation</h4>
+      <p>Produces a contextual follow-up email with AI effectiveness disclosure and suggested recipients.</p>
+    </div>
+    <div class="card">
+      <h4>Ground Truth Evaluation</h4>
+      <p>Human reviewers label draft outcomes. Accuracy tracked per scenario in Snowflake.</p>
+    </div>
+    <div class="card">
+      <h4>Azure Function Trigger</h4>
+      <p>Two-queue Azure Function: mutable ID → immutable ID → pipeline processing.</p>
+    </div>
+  </div>
+
+  <!-- CURRENT ARCH -->
+  <div class="section-header">
+    <h2>Current Architecture</h2>
+    <span class="current-tag">As Built</span>
+  </div>
+
+  <h3>Pipeline Flow</h3>
+  <div class="flow" style="flex-wrap:wrap; gap:4px 0;">
+    <div>
+      <div class="flow-node">Azure Queue Trigger</div>
+      <div class="flow-label">mutable → immutable ID</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div>
+      <div class="flow-node highlight">identify_process</div>
+      <div class="flow-label">LLM call #1</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div>
+      <div class="flow-node highlight">analyze_thread</div>
+      <div class="flow-label">LLM call #2</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div>
+      <div class="flow-node highlight">next_responders</div>
+      <div class="flow-label">LLM call #3</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div>
+      <div class="flow-node highlight">scenario_match</div>
+      <div class="flow-label">LLM call #4</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div>
+      <div class="flow-node warn">RL ID lookup</div>
+      <div class="flow-label">fuzzy + LLM fallback</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div>
+      <div class="flow-node highlight">draft_email</div>
+      <div class="flow-label">LLM call #5</div>
+    </div>
+  </div>
+  <p style="font-size:12px; color: var(--muted); margin-top:8px;">All 5 LLM calls are sequential. Each one depends on the previous result. No parallelism. Every email incurs the full chain cost.</p>
+
+  <h3>Tech Stack (Current)</h3>
+  <div class="stack-grid">
+    <span class="stack-pill core">Azure OpenAI gpt-4.1-mini (all calls)</span>
+    <span class="stack-pill core">Azure Functions (queue trigger)</span>
+    <span class="stack-pill core">Azure Storage Queue</span>
+    <span class="stack-pill infra">Snowflake (email store, evaluation)</span>
+    <span class="stack-pill infra">SharePoint (scenario table, RL master DB)</span>
+    <span class="stack-pill infra">MS Graph API (shared mailbox)</span>
+    <span class="stack-pill infra">regex JSON parsing (<code>re.search</code>)</span>
+    <span class="stack-pill infra">fuzzywuzzy + difflib (RL matching)</span>
+  </div>
+
+  <!-- WEAKNESSES -->
+  <h2>Structural Weaknesses (Code-Verified)</h2>
+
+  <div class="problem-block">
+    <div class="label">Problem 1</div>
+    <h4>All 5 LLM calls are sequential with no early-exit optimisation</h4>
+    <p><code>run_llm_analysis</code> in <code>core/pipeline.py</code> is a linear method chain: identify_process → analyze_thread → next_responders → scenario_match → extract_rl_id → draft_email. There is one early exit (if <code>is_rtv=False</code>, return early), but calls #2 and #3 could run in parallel since they only need the raw email data. The current design forces them to run one after another, increasing end-to-end latency unnecessarily.</p>
+    <div class="fix-block">
+      <div class="label">Redesign Fix</div>
+      <p>Use a LangGraph parallel branch: <code>analyze_thread</code> and <code>next_responders</code> read only email data and can fire simultaneously. The <code>scenario_match</code> waits on both. An asyncio-based graph cuts total latency on the critical path by ~30–40%.</p>
+    </div>
+  </div>
+
+  <div class="problem-block">
+    <div class="label">Problem 2</div>
+    <h4>Scenario matching returns an integer index into a spreadsheet</h4>
+    <p><code>extract_scenario_insights</code> asks the LLM to return an <code>index</code> field, then does <code>df_scenario.loc[idx]</code>. This means the LLM is matching an email to a row position in a SharePoint Excel sheet. If anyone inserts or reorders rows in the spreadsheet, all prior index matches are wrong. The LLM is also not designed to reason about positional indices — it is reasoning about semantics but forced to express that as a number.</p>
+    <div class="fix-block">
+      <div class="label">Redesign Fix</div>
+      <p>Embed scenario descriptions as vectors at startup. At runtime, do semantic cosine similarity search over the vector store to find top-3 candidate scenarios. Pass those candidates to the LLM to select the best match. Decouples the match from spreadsheet row order entirely. Use pgvector on Supabase or a lightweight FAISS index.</p>
+    </div>
+  </div>
+
+  <div class="problem-block">
+    <div class="label">Problem 3</div>
+    <h4>LLM used as a string matcher for RL IDs</h4>
+    <p><code>RTVFollowupTools.get_llm_best_match</code> in <code>rtv/tools.py</code> sends fuzzy-matched RL ID candidates to the LLM to pick the best one. This adds a full LLM API call latency and cost for a task that is fundamentally a string comparison — one that good deterministic fuzzy matching (already in place with fuzzywuzzy) could handle. The LLM adds variance, not accuracy, to a high-confidence fuzzy match.</p>
+    <div class="fix-block">
+      <div class="label">Redesign Fix</div>
+      <p>Use deterministic matching only: exact match → normalised token sort → Levenshtein distance with a threshold (e.g. ≥0.92). If no match above threshold, flag as <code>rl_id_uncertain: true</code> in the output and include it in the draft's TO-DO section rather than asking the LLM to guess.</p>
+    </div>
+  </div>
+
+  <div class="problem-block">
+    <div class="label">Problem 4</div>
+    <h4>JSON parsing via regex is fragile</h4>
+    <p>Every LLM call in <code>rtv/llm.py</code> parses the response with <code>re.search(r'\{.*\}', result, re.DOTALL)[0]</code>. If the model wraps the JSON in a markdown code fence (<code>```json ... ```</code>), adds a preamble sentence, or returns nested objects, the regex either fails silently, extracts the wrong slice, or raises an unhandled exception. There are no structured output guarantees.</p>
+    <div class="fix-block">
+      <div class="label">Redesign Fix</div>
+      <p>Use <code>response_format={"type": "json_object"}</code> (GPT-4o+) or Pydantic structured outputs with <code>.with_structured_output(ScenarioMatch)</code>. The model is forced to return valid JSON matching the schema. Remove all regex parsing. If the model cannot conform, the API raises a typed error — not a silent wrong parse.</p>
+    </div>
+  </div>
+
+  <div class="problem-block">
+    <div class="label">Problem 5</div>
+    <h4>Evaluation is offline and manual — not inline</h4>
+    <p>The evaluation system (notebooks 09, 22, 25, 26, etc.) is a separate offline process. A human reviewer marks a draft as "Done" in the Snowflake table (<code>FEEDBACK_STATUS = 'Done'</code>), and only then can the accuracy calculation run. There is no inline quality signal for each new email processed. A failing prompt can process hundreds of emails before the offline evaluation catches the degradation.</p>
+    <div class="fix-block">
+      <div class="label">Redesign Fix</div>
+      <p>Add an <strong>inline evaluation node</strong> to the pipeline: after every draft is generated, an LLM judge verifies that (1) scenario matches the email thread, (2) draft addresses all required follow-up actions, (3) recipients are appropriate, (4) no confidential information is leaked. Score stored per email in Snowflake. A degrading score triggers an alert before the queue backlog fills.</p>
+    </div>
+  </div>
+
+  <div class="problem-block">
+    <div class="label">Problem 6</div>
+    <h4>No structured workflow graph — just a class method chain</h4>
+    <p><code>Pipeline.run_llm_analysis</code> is a flat imperative Python method with nested <code>if/else</code> for early exits. There is no LangGraph graph for the email processing flow itself. This means: no conditional parallel branches, no reusable node definitions, no typed state transitions, and no way to add retry/fallback logic declaratively. The flow is opaque — you can only understand it by reading the method top to bottom.</p>
+    <div class="fix-block">
+      <div class="label">Redesign Fix</div>
+      <p>Define the email pipeline as a proper LangGraph <code>StateGraph</code>: each step is a named node, routing is via conditional edges, parallel analysis via <code>fan_out</code> edges. State is a typed <code>EmailState</code> TypedDict. Graph structure is inspectable, testable node-by-node, and extendable without touching unrelated nodes.</p>
+    </div>
+  </div>
+
+  <!-- REDESIGNED ARCH -->
+  <div class="section-header">
+    <h2>Redesigned Architecture</h2>
+    <span class="redesign-tag">Hypothetical</span>
+  </div>
+  <p class="section-intro">Same deliverables — triage, scenario match, draft email generation. Redesigned internals: LangGraph graph, vector scenario matching, structured outputs, inline evaluation, parallel branches, deterministic RL lookup.</p>
+
+  <h3>Redesigned Pipeline Flow</h3>
+  <div class="flow" style="flex-wrap:wrap; gap:4px 0;">
+    <div>
+      <div class="flow-node new">Queue Trigger</div>
+      <div class="flow-label">Azure Function</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div>
+      <div class="flow-node new">Classify Process</div>
+      <div class="flow-label">fast model, early exit</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div style="text-align:center">
+      <div style="display:flex; gap:8px;">
+        <div>
+          <div class="flow-node new">Analyse Thread</div>
+          <div class="flow-label">parallel</div>
+        </div>
+        <div style="display:flex; align-items:center; color: var(--muted)">‖</div>
+        <div>
+          <div class="flow-node new">Next Responders</div>
+          <div class="flow-label">parallel</div>
+        </div>
+      </div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div>
+      <div class="flow-node new">Vector Scenario Match</div>
+      <div class="flow-label">embed → cosine → LLM select</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div>
+      <div class="flow-node new">RL Lookup (deterministic)</div>
+      <div class="flow-label">exact → fuzzy, no LLM</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div>
+      <div class="flow-node new">Draft Generation</div>
+      <div class="flow-label">structured output</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div>
+      <div class="flow-node new">Inline Evaluation</div>
+      <div class="flow-label">LLM judge, scored</div>
+    </div>
+  </div>
+
+  <h3>Tech Stack (Redesigned)</h3>
+  <div class="stack-grid">
+    <span class="stack-pill core">LangGraph StateGraph (email pipeline)</span>
+    <span class="stack-pill core">GPT-4o-mini — classification, thread analysis</span>
+    <span class="stack-pill core">GPT-4o — draft generation, LLM judge</span>
+    <span class="stack-pill core">Pydantic structured outputs (no regex parsing)</span>
+    <span class="stack-pill new">pgvector / FAISS — scenario embedding store</span>
+    <span class="stack-pill new">text-embedding-3-small — scenario embeddings</span>
+    <span class="stack-pill new">Inline LLM evaluation node</span>
+    <span class="stack-pill new">Typed EmailState TypedDict</span>
+    <span class="stack-pill infra">Azure Functions (queue trigger, unchanged)</span>
+    <span class="stack-pill infra">Azure Storage Queue (unchanged)</span>
+    <span class="stack-pill infra">Snowflake (email store, unchanged)</span>
+    <span class="stack-pill infra">MS Graph API (mailbox, unchanged)</span>
+    <span class="stack-pill infra">SharePoint (scenario source, unchanged)</span>
+  </div>
+
+  <h3>Agent Tools &amp; Skills per Node</h3>
+  <div class="grid2">
+    <div class="tool-card">
+      <div class="agent-name">Classify Process</div>
+      <ul>
+        <li><code>read_email_thread</code> — fetch body + subject</li>
+        <li><code>rtv_exclusion_check</code> — rule-based pre-filter</li>
+        <li>Fast model — binary RTV/non-RTV</li>
+        <li>Early exit if non-RTV (saves 4 downstream calls)</li>
+      </ul>
+    </div>
+    <div class="tool-card">
+      <div class="agent-name">Thread Analyser (parallel)</div>
+      <ul>
+        <li><code>extract_latest_thread</code> — strip quoted history</li>
+        <li><code>anonymise_names</code> — replace names with roles</li>
+        <li><code>extract_rl_ids</code> — regex first, LLM fallback only</li>
+      </ul>
+    </div>
+    <div class="tool-card">
+      <div class="agent-name">Next Responders (parallel)</div>
+      <ul>
+        <li><code>get_dfs_email_addresses</code> — SharePoint lookup</li>
+        <li><code>classify_action_needed</code> — is central planning actionable?</li>
+        <li>Structured output: <code>NextRespondersResult</code></li>
+      </ul>
+    </div>
+    <div class="tool-card">
+      <div class="agent-name">Vector Scenario Matcher</div>
+      <ul>
+        <li><code>embed_email_summary</code> — text-embedding-3-small</li>
+        <li><code>cosine_search_scenarios</code> — top-3 from pgvector</li>
+        <li>LLM selects best from top-3 candidates (not raw index)</li>
+        <li>Returns scenario + sub-scenario + confidence</li>
+      </ul>
+    </div>
+    <div class="tool-card">
+      <div class="agent-name">RL Lookup (deterministic)</div>
+      <ul>
+        <li>Step 1: Exact string match</li>
+        <li>Step 2: Normalised token sort (fuzzywuzzy ≥0.92)</li>
+        <li>Step 3: Flag <code>rl_id_uncertain</code> if no match — no LLM fallback</li>
+        <li>Reads RL Master Database from SharePoint cache</li>
+      </ul>
+    </div>
+    <div class="tool-card">
+      <div class="agent-name">Inline Evaluation Node</div>
+      <ul>
+        <li>Checks: scenario matches email intent</li>
+        <li>Checks: draft covers all required follow-up actions</li>
+        <li>Checks: recipients are appropriate</li>
+        <li>Checks: no PII or sensitive data in draft body</li>
+        <li>Score stored per email in Snowflake</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>Hypothetical MCP Integration</h3>
+  <div class="mcp-row">
+    <div class="mcp-tag"><strong>MS Graph MCP</strong><span>Read shared mailbox, create draft, move to folder, add category — replaces custom SharedMailboxEmailManager</span></div>
+    <div class="mcp-tag"><strong>SharePoint MCP</strong><span>Read scenario table and RL master database — replaces custom Sharepoint client</span></div>
+    <div class="mcp-tag"><strong>Snowflake MCP</strong><span>Write email records and evaluation scores without custom SnowflakeDatabase wrapper</span></div>
+    <div class="mcp-tag"><strong>Slack MCP</strong><span>Alert ops channel when draft quality score drops below threshold</span></div>
+  </div>
+
+  <h3>Deployment Architecture (Redesigned)</h3>
+  <div class="grid2">
+    <div class="deploy-box">
+      <div class="title">Ingestion Layer</div>
+      <ul>
+        <li><strong>Trigger:</strong> Azure Storage Queue (unchanged)</li>
+        <li><strong>Step 1:</strong> mutable ID → immutable ID via MS Graph</li>
+        <li><strong>Step 2:</strong> Push immutable ID to processing queue</li>
+        <li><strong>Note:</strong> Two-queue design retained — prevents ID drift</li>
+      </ul>
+    </div>
+    <div class="deploy-box">
+      <div class="title">Processing Layer</div>
+      <ul>
+        <li><strong>Runtime:</strong> LangGraph StateGraph inside Azure Function</li>
+        <li><strong>Parallel branches:</strong> thread analysis + next responders fire together</li>
+        <li><strong>Scenario store:</strong> FAISS index loaded at Function cold start, refreshed nightly</li>
+        <li><strong>Structured outputs:</strong> Pydantic models for every LLM call</li>
+      </ul>
+    </div>
+    <div class="deploy-box">
+      <div class="title">Storage Layer</div>
+      <ul>
+        <li><strong>Snowflake:</strong> email records, LLM output, evaluation scores, retest history</li>
+        <li><strong>SharePoint:</strong> scenario master (read-only source of truth)</li>
+        <li><strong>Azure Blob:</strong> execution logs per email</li>
+        <li><strong>pgvector (optional):</strong> persistent scenario embeddings if FAISS insufficient</li>
+      </ul>
+    </div>
+    <div class="deploy-box">
+      <div class="title">Quality Layer</div>
+      <ul>
+        <li><strong>Inline:</strong> Evaluation node scores every draft (0–1) before writing to DB</li>
+        <li><strong>Threshold alert:</strong> Score &lt;0.7 → flag in Snowflake, notify via Slack MCP</li>
+        <li><strong>Offline:</strong> Human review still needed for ground truth labelling</li>
+        <li><strong>Dashboard:</strong> Streamlit or Power BI over Snowflake eval table</li>
+      </ul>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- COMPARISON TABLE -->
+  <h2>Side-by-Side Comparison</h2>
+  <table class="arch-table">
+    <thead>
+      <tr><th>Dimension</th><th>Current (DFS)</th><th>Redesigned</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Pipeline structure</td><td class="old">Linear class method chain</td><td class="new">LangGraph StateGraph with conditional edges</td></tr>
+      <tr><td>Thread + responder analysis</td><td class="old">Sequential — call #2 waits on call #1</td><td class="new">Parallel branches — run simultaneously</td></tr>
+      <tr><td>Scenario matching</td><td class="old">LLM returns integer row index into spreadsheet</td><td class="new">Vector embed → cosine search → LLM selects from top-3</td></tr>
+      <tr><td>RL ID lookup</td><td class="old">Fuzzy match + LLM API call as fallback</td><td class="new">Exact + normalised fuzzy only; flag uncertain, no LLM</td></tr>
+      <tr><td>JSON parsing</td><td class="old">regex re.search on free-text LLM output</td><td class="new">Pydantic structured outputs — schema enforced</td></tr>
+      <tr><td>Model routing</td><td class="old">gpt-4.1-mini everywhere</td><td class="new">Fast (classify, thread) + GPT-4o (draft, judge)</td></tr>
+      <tr><td>Evaluation</td><td class="old">Offline, human-triggered, notebook-driven</td><td class="new">Inline LLM judge on every draft; score in Snowflake</td></tr>
+      <tr><td>Scenario store</td><td class="old">Live SharePoint read every request</td><td class="new">Nightly-refreshed FAISS/pgvector index</td></tr>
+      <tr><td>State management</td><td class="old">Dict passed through class methods</td><td class="new">Typed EmailState TypedDict through graph nodes</td></tr>
+      <tr><td>External integrations</td><td class="old">Custom clients (Sharepoint, SharedMailbox, Snowflake)</td><td class="new">MCP servers (MS Graph, SharePoint, Snowflake)</td></tr>
+    </tbody>
+  </table>
+
+  <hr>
+
+  <!-- INTERVIEW -->
+  <h2>Interview Talking Points</h2>
+
+  <div class="interview-block">
+    <div class="q">Opening narrative</div>
+    <p>"The email automation project shipped a working pipeline that processed 2,500 cases per month and cut manual handling from 80 to 20 hours. But looking at the code, there are structural gaps that would matter at higher scale or with a stricter quality bar. The scenario matching returns an integer row index into a SharePoint spreadsheet — that breaks silently if someone inserts a row. JSON parsing uses regex on free-text LLM output — that fails unpredictably as models change. And evaluation was offline and manual, which means a failing prompt can degrade hundreds of drafts before anyone notices. <strong>If I were redesigning it, I'd fix those three things first</strong>: vector-based scenario matching, structured outputs everywhere, and an inline evaluation node on every draft."</p>
+  </div>
+
+  <div class="interview-block">
+    <div class="q">On scenario matching</div>
+    <p>"The LLM is asked to return an integer index into a spreadsheet row. That conflates semantic reasoning with positional lookup. The model reasons about meaning but expresses it as a number — and the number is meaningless if the spreadsheet changes. The fix is to separate concerns: embed scenario descriptions once into a vector store, do cosine similarity at runtime to get the top-3 candidates, then let the LLM pick the best match from three readable options. Now the spreadsheet can be reordered without breaking anything."</p>
+  </div>
+
+  <div class="interview-block">
+    <div class="q">On inline evaluation</div>
+    <p>"The evaluation setup in this project is actually more sophisticated than most — there's a ground truth labelling system, accuracy tracking per scenario, a retest workflow. The gap is that it's all offline. The production queue can process a hundred emails on a degraded prompt before the weekly review catches it. Adding an inline judge node that scores every draft and writes to a Snowflake quality table gives you a real-time signal. <strong>You don't need human review to go faster — you need a machine proxy that alerts you when quality drops, so humans can review the right cases.</strong>"</p>
+  </div>
+
+  <div class="interview-block">
+    <div class="q">On the LLM as string matcher</div>
+    <p>"Using an LLM to pick the best fuzzy match for a 10-character RL ID number is like using a chef to wash dishes. The LLM adds latency and variance to a task that deterministic string similarity handles better. I'd remove that LLM call entirely and instead surface the uncertainty explicitly — if no match clears the threshold, mark the RL ID as uncertain in the output and include it as a to-do in the draft. That's more honest and faster than asking the LLM to guess."</p>
+  </div>
+
+  <div class="interview-block">
+    <div class="q">If asked about the AI evaluation & prompt governance bullet on your résumé</div>
+    <p>"We built a layered evaluation approach: first, ground truth labelling where human reviewers marked draft outcomes as passed/failed across scenario types. Second, an accuracy tracking system per scenario stored in Snowflake, so we could see which scenario types had low AI effectiveness and needed prompt work. Third, automated retest — when a user flagged a bad draft, we'd retrigger the pipeline and compare old vs. new output. <strong>What I'd add if building from scratch is an inline scoring node so the system catches regressions in real-time rather than waiting for human review.</strong>"</p>
+  </div>
+
+</div><!-- end tab-email -->
+
+<script>
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  document.querySelector('[onclick="switchTab(\'' + name + '\')"]').classList.add('active');
+  window.scrollTo(0, 0);
+}
+</script>
+</body>
+</html>
