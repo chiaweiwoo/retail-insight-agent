@@ -1,202 +1,806 @@
 # Agent System Study Notes
 
+This document is meant to be a learning guide for the agent system in this project.
+
+It is written for a wide range of readers:
+
+- beginner: you want to understand what an autonomous agent system is and how the pieces fit together
+- intermediate: you can already build LLM apps and want to understand orchestration, tools, and memory more deeply
+- advanced: you want to inspect design tradeoffs, runtime behavior, and implementation details
+
+The goal is not only to explain what the system does, but why it is designed this way.
+
 ## Table of Contents
 
-1. What this project is for
-2. Why city/date evidence only
-3. Internal vs external factors
-4. Why LangGraph
-5. Runtime skills vs Claude skills
-6. The agent lineup
-7. Why a statistician agent matters
-8. Why a news agent matters
-9. Memory design
-10. Signals and synthetic business goals
-11. Retail concepts that shape decisions
-12. MCP in this project
-13. Dashboard reading guide
-14. Common failure modes
+1. What this project is trying to teach
+2. Big picture architecture
+3. Why the system uses city/date grain
+4. Why `build`, `signal`, and `run` are split
+5. Runtime data model
+6. Agent system overview
+7. LangGraph orchestration design
+8. Planning design
+9. Specialist agent design
+10. Tool design
+11. Dynamic memory design
+12. Outcome, logging, and trace persistence
+13. Dashboard design
+14. External research design
+15. Technical tradeoffs and non-goals
+16. Common debugging workflow
+17. How to extend this system
+18. Key lessons for agent engineering
 
-## What this project is for
+## What this project is trying to teach
 
-This project is not trying to be the perfect retail analytics stack. It is trying to be a clear learning environment for autonomous-agent engineering.
+This project is not a production retail analytics platform.
 
-The design goal is:
+It is a learning sandbox for building a small but real autonomous agent system. The main teaching goals are:
 
-- keep the data meaningful
-- keep the workflows inspectable
-- keep the dashboard small
-- push more reasoning into the runtime
+- how to turn rawer business data into a tool-using agent workflow
+- how to split a system into ingestion, screening, reasoning, memory, and presentation layers
+- how to let the LLM do meaningful work at runtime instead of hiding everything in ETL
+- how to inspect what the agent did after the run
+- how to keep the system simple enough that you can reason about it end to end
 
-## Why city/date evidence only
+In other words: this is meant to feel closer to a small coding agent or analyst agent harness than to a static dashboard.
 
-The raw parquet has store and product identifiers, but v2 deliberately aggregates them away.
+## Big picture architecture
 
-That gives us a clean learning constraint:
+At a high level, the project has four layers:
 
-- the database stores facts at city/date grain
-- the agent must reason from those facts
-- the system avoids becoming a product drilldown app
+1. Data ingestion layer
+2. Signal generation layer
+3. LLM runtime layer
+4. Dashboard and inspection layer
 
-Store and product values still contribute to city/date facts such as `store_count` and `product_count`.
+The flow is:
 
-## Internal vs external factors
+```text
+parquet
+  ->
+rca build
+  ->
+base tables in Supabase
+  ->
+rca signal
+  ->
+signal table in Supabase
+  ->
+rca run --city --date
+  ->
+agent workflow + tools + memory
+  ->
+outcomes / logs / completions / memory
+  ->
+dashboard
+```
 
-Internal factors are everything we can read from Supabase:
+This split is important.
 
-- sales
-- inventory
-- pricing
-- promotions
-- calendar
-- weather
-- goals
-- signals
-- memory
+Many early agent projects mix all of these concerns together. That usually creates confusion:
 
-External factors come from web search:
+- you do not know which layer is wrong
+- you cannot tune the signal logic without reingesting everything
+- you cannot tell whether a bug is from data prep or LLM reasoning
 
-- public events
-- local disruptions
-- retail headlines
-- macro context
+This repo separates those layers on purpose.
 
-This split is useful because it keeps the agent honest about evidence provenance.
+## Why the system uses city/date grain
 
-## Why LangGraph
+The runtime grain is city/date only.
 
-LangGraph already exists in the repo and is a good fit for:
+That means every tool the agent uses is based on evidence like:
 
-- stateful orchestration
-- planner -> workers -> critic -> coordinator flow
-- bounded loops
-- dynamic routing
-- memory-aware execution
+- city 0 on 2024-06-09
+- total sales for that day
+- expected sales for that day
+- hourly sales shape for that day
+- stockout rates for that day
 
-We do not need another dynamic graph library for v2.
+We intentionally do not expose store-level or product-level runtime tools.
 
-## Runtime skills vs Claude skills
+### Why this constraint exists
 
-`.claude/skills` are developer-assistant helpers. They do not run in Vercel or Supabase.
+Because it teaches better.
 
-`rca/agent_skills/*.md` are project-owned runtime instruction cards. The Python app loads them during `rca run`.
+If you keep full store/product detail in the live agent loop, several things happen:
 
-That makes skills part of the deployed project logic instead of only a local assistant feature.
+- the prompt context explodes
+- tools become too granular
+- the dashboard turns into a drilldown app
+- the agent spends effort navigating detail instead of reasoning over business signals
 
-## The agent lineup
+By forcing city/date grain:
 
-- planner
-- statistician/data scientist
-- sales agent
-- inventory agent
-- pricing agent
-- promotions agent
-- calendar/weather agent
-- news agent
-- critic
-- coordinator
-- memory distiller
+- the database stays compact
+- the tools stay interpretable
+- the dashboard stays simple
+- the agent still has real work to do
 
-## Why a statistician agent matters
+### What happens to raw store/product data
 
-The statistician agent lets the runtime compute:
+It is not ignored.
+
+It is aggregated into city/date evidence such as:
+
+- `store_count`
+- `product_count`
+- `active_product_count`
+- `stockout_product_count`
+- hourly sales totals
+- hourly stockout rates
+
+So store/product data still influences the runtime, just not as first-class runtime entities.
+
+## Why `build`, `signal`, and `run` are split
+
+This is one of the most important design decisions in the repo.
+
+### `rca build`
+
+Purpose:
+
+- stable ingestion
+- deterministic transformation
+- parquet -> Supabase base tables
+
+What it should feel like:
+
+- reliable
+- boring
+- easy to rerun
+- low conceptual risk
+
+Tables produced:
+
+- `rca.sales`
+- `rca.inventory`
+- `rca.pricing`
+- `rca.promotions`
+- `rca.calendar`
+- `rca.weather`
+- `rca.goals`
+
+### `rca signal`
+
+Purpose:
+
+- create the screening layer that tells us which city/date is interesting enough to inspect
+
+What it should feel like:
+
+- tunable
+- debatable
+- changeable without rebuilding the whole warehouse
+
+Table produced:
+
+- `rca.signals`
+
+This is where we create labels like:
+
+- `drop`
+- `lift`
+- `neutral`
+- `insufficient_history`
+
+This layer is intentionally separate because signal logic is usually much more experimental than ingestion logic.
+
+### `rca run`
+
+Purpose:
+
+- use the signal and base evidence to run the LLM workflow for one city/date
+
+Outputs:
+
+- `rca.outcomes`
+- `rca.events`
+- `rca.completions`
+- `rca.memory`
+- sometimes `rca.evidence_cache`
+- sometimes `rca.external_events`
+
+This separation gives us a cleaner mental model:
+
+- build prepares facts
+- signal chooses where to look
+- run explains what happened
+
+## Runtime data model
+
+The runtime system of record is Supabase under schema `rca`.
+
+### Base evidence tables
+
+- `sales`
+  - city/date sales totals
+  - store/product counts
+  - hourly sales columns
+
+- `inventory`
+  - stockout-related counts and rates
+  - hourly stockout rates
+
+- `pricing`
+  - discount depth and discount participation
+
+- `promotions`
+  - activity signal features
+  - activity sales and activity share
+
+- `calendar`
+  - weekday
+  - weekend flag
+  - inferred holiday name
+
+- `weather`
+  - aggregate weather context
+
+- `goals`
+  - synthetic expected sales
+  - baseline method metadata
+
+### Screening table
+
+- `signals`
+  - current sales
+  - expected sales
+  - deviation percentage
+  - signal label
+
+### LLM runtime tables
+
+- `outcomes`
+  - final synthesized result
+
+- `events`
+  - workflow and tool event log
+
+- `completions`
+  - raw node-level LLM outputs
+  - includes `tool_calls_json`
+
+- `memory`
+  - distilled lessons
+
+- `evidence_cache`
+  - cached tool outputs keyed by build version and arguments
+
+- `external_events`
+  - cached web search results
+
+## Agent system overview
+
+The system is built around a small set of agents, each with a narrow role.
+
+### Planner
+
+Decides which agents to run for a city/date.
+
+Its job is not to explain the business result.
+Its job is to choose the investigation shape.
+
+### Statistician
+
+Acts like a lightweight data scientist.
+
+It checks:
 
 - recent baselines
 - same-weekday baselines
 - intraday shifts
-- simple descriptive comparisons
+- descriptive comparisons
 
-This is exactly the kind of work that used to be baked into ETL, but now lives in the agent/tool layer.
+This agent exists because we want the system to demonstrate runtime analysis instead of shoving all analysis into ETL.
 
-## Why a news agent matters
+### Sales agent
 
-Retail is not only internal.
+Focuses on the sales movement itself.
 
-Weather, public events, disruptions, holidays, and news can change demand. A news agent teaches:
+### Inventory agent
 
-- external evidence gathering
-- cached search behavior
-- how to blend weak external evidence with stronger internal facts
+Focuses on stockout and availability pressure.
 
-## Memory design
+### Pricing agent
 
-Memory is split into:
+Focuses on discount behavior and price pressure.
 
-- `memory`: reusable lessons
-- `evidence_cache`: computed tool outputs keyed by build version
-- `external_events`: cached search results
+### Promotions agent
 
-This touches the main memory concepts without needing a dedicated memory framework.
+Focuses on `activity_flag`, but with caution because the flag is unlabeled.
 
-## Signals and synthetic business goals
+### Calendar/weather agent
 
-The dataset has no real corporate target. v2 therefore creates a synthetic expected-sales goal.
+Focuses on weekday, inferred holiday, and weather context.
 
-Use:
+### News agent
 
-- same-weekday history when available
-- recent rolling history as fallback
+Focuses on external factors if research is enabled.
 
-Signals are then:
+### Critic
 
-- drop
-- lift
-- neutral
-- insufficient_history
+Reviews the specialist output and downgrades weak claims.
 
-The LLM can challenge the signal later, but the dashboard needs a fast screening layer.
+This is important.
 
-The operational split is deliberate:
+Without a critic, many agent systems become overconfident and sloppy.
 
-- `rca build` creates stable base facts
-- `rca signal` creates the more tunable screening layer
-- `rca run` consumes the signal plus the raw city/date evidence
+### Coordinator
 
-## Retail concepts that shape decisions
+Synthesizes the evidence into the final business-facing answer.
 
-- realized sales are not always demand
-- stockouts can cap sales
-- intraday timing matters
-- discounting can change sales and risk
-- activity is unlabeled and must be handled cautiously
-- holidays are inferred
-- weather is context, not automatic proof
-- external events may matter more than internal metrics on some days
+### Memory distiller
 
-## MCP in this project
+Extracts reusable lessons from a completed run.
 
-`rca mcp` exposes the same evidence tools used by the agent runtime.
+## LangGraph orchestration design
 
-That makes this project a good MCP learning sandbox:
+The graph is implemented in `rca/graph.py`.
 
-- tools are real
-- domain is concrete
-- outputs are inspectable in the dashboard
+The state contains:
 
-## Dashboard reading guide
+- `city_id`
+- `dt`
+- `run_id`
+- `signal_evidence`
+- `planner_decision`
+- `agent_results`
+- `critic_note`
+- `final_report`
+- `memory_note`
 
-Start with the heatmap.
+### Why LangGraph is used
 
-Then:
+LangGraph is a good fit because it supports:
 
-1. open a city
-2. inspect actual versus synthetic goal
-3. click a signal marker
-4. read the RCA result
-5. inspect logs and completions
-6. check the distilled memory
+- explicit node-based orchestration
+- state passed between nodes
+- dynamic fanout
+- bounded loops
+- inspectable execution structure
 
-The Logs page also exposes:
+This matters for learning because it makes the workflow visible.
+
+### Actual flow
+
+```mermaid
+flowchart TD
+    A["plan"] --> B["run chosen agents in parallel"]
+    B --> C["critic"]
+    C --> D["coordinator"]
+    D --> E["memory_distiller"]
+    E --> F["record"]
+```
+
+### Why this graph is good for learning
+
+It is simple enough to inspect, but still teaches real design ideas:
+
+- planning before action
+- specialized workers
+- critique before synthesis
+- memory after outcome
+- persistence at the end
+
+## Planning design
+
+Planning is often underestimated.
+
+Many beginners think planning means “ask the model what to do.”
+That is only part of it.
+
+A useful planning layer should:
+
+- know the allowed specialists
+- know which ones are mandatory
+- know when external research is disabled
+- understand what evidence already exists
+- produce structured output
+
+In this project, the planner:
+
+- always includes `statistician`
+- always includes `sales_agent`
+- can add or omit others based on context
+- avoids `news_agent` when `RCA_RESEARCH_ENABLED=false`
+
+This is a good example of “LLM freedom inside guardrails.”
+
+## Specialist agent design
+
+Each specialist has:
+
+- a narrow focus
+- a bounded tool set
+- a skill file in `rca/agent_skills/`
+- a structured markdown output format
+
+This is important because open-ended agents tend to drift.
+
+A specialist should not be “smart about everything.”
+It should be “useful for one part of the investigation.”
+
+### Why bounded tool sets matter
+
+If every agent gets every tool:
+
+- prompts become noisier
+- tool choice becomes less meaningful
+- debugging becomes harder
+- agents start duplicating each other
+
+By narrowing tool access, you create cleaner role boundaries.
+
+## Tool design
+
+Tools are implemented in `rca/tools.py`.
+
+The key idea is that tools are not random helpers. They are the runtime evidence API.
+
+Examples:
+
+- `get_signal_evidence`
+- `get_sales_context`
+- `get_inventory_context`
+- `get_pricing_context`
+- `get_promotions_context`
+- `get_calendar_weather_context`
+- `get_intraday_profile`
+- `compare_recent_baseline`
+- `compare_same_weekday_baseline`
+- `detect_intraday_shift`
+- `get_memory_context`
+- `search_external_events`
+
+### Why this tool set is good for learning
+
+It covers several important patterns:
+
+- direct evidence retrieval
+- derived comparison logic
+- cached repeated computation
+- internal vs external evidence
+- semantic memory retrieval
+
+### Important implementation lesson
+
+Tools should return structured data that a model can reason over.
+
+They should not dump giant raw tables or huge text blobs if a structured JSON result is possible.
+
+## Dynamic memory design
+
+This project uses a small custom memory system instead of a heavyweight memory framework.
+
+That choice is deliberate.
+
+### Memory types in this repo
+
+1. Semantic-ish distilled memory
+   - stored in `rca.memory`
+   - short reusable lessons
+
+2. Evidence cache
+   - stored in `rca.evidence_cache`
+   - avoids recomputing tool outputs
+
+3. External event cache
+   - stored in `rca.external_events`
+   - avoids repeated web search
+
+### Why this is called dynamic memory
+
+Because the next run can reuse prior artifacts:
+
+- prior lessons
+- prior cached evidence
+- prior external search results
+
+This is not “memory” in the human sense.
+It is reusable runtime state.
+
+### Why we did not use a full memory framework
+
+Because for v2:
+
+- the scope is small
+- the structure is clear
+- Supabase tables are enough
+- the custom implementation is easier to learn from
+
+Frameworks are useful, but they can also hide how memory really works.
+
+## Outcome, logging, and trace persistence
+
+Persistence is one of the most educational parts of the system.
+
+### `rca.outcomes`
+
+Stores the final answer for a city/date.
+
+This is what the RCA page mainly renders.
+
+### `rca.events`
+
+Stores workflow and tool events such as:
+
+- planner started
+- tool call completed
+- coordinator completed
+
+This is the coarse-grained execution trace.
+
+### `rca.completions`
+
+Stores node-level LLM outputs.
+
+This includes:
+
+- node name
+- model
+- token counts
+- raw content
+- `tool_calls_json`
+
+This is the fine-grained LLM trace.
+
+### `rca.memory`
+
+Stores distilled lessons after a run.
+
+### Why this matters
+
+If you cannot inspect what the agent did, you cannot really learn from it.
+
+Many demos only show the final answer.
+That is not enough.
+
+This project tries to preserve:
+
+- what was decided
+- what tools were used
+- what the model wrote
+- what reusable lesson was extracted
+
+## Dashboard design
+
+The dashboard is intentionally simple.
+
+It is not meant to be an enterprise BI suite.
+
+It is meant to help you inspect the system.
+
+### Home page
+
+The home page is a city signal heatmap.
+
+Its job is to answer:
+
+- which city/date is interesting
+- which signal is drop or lift
+- where should I click next
+
+### City page
+
+The city page is a lightweight investigation surface.
+
+Its job is to answer:
+
+- what is the actual vs synthetic goal trend
+- which dates were triggered
+- where should I jump into RCA
+
+### RCA page
+
+Shows the final business-facing explanation.
+
+### Logs page
+
+Shows:
 
 - workflow events
-- raw node completions
-- tool call traces from `tool_calls_json`
+- recent completions
+- tool call traces
 
-## Common failure modes
+This is extremely important for learning agent behavior.
 
-- overclaiming from weak evidence
-- treating activity as a labeled promotion
-- treating inferred holidays as source truth
-- mistaking descriptive statistics for causality
-- stale cached evidence after rebuild
-- overusing external search when internal evidence is already sufficient
+### Memory page
+
+Shows distilled lessons.
+
+This helps you see whether the system is actually learning reusable patterns.
+
+## External research design
+
+External research is optional.
+
+That is a feature, not a weakness.
+
+### Why it is optional
+
+Because:
+
+- local debugging should still work without web search
+- not every RCA needs external evidence
+- external evidence is noisier than internal evidence
+
+### Current rule
+
+If `RCA_RESEARCH_ENABLED=false`, the planner should not dispatch the news agent.
+
+This is an example of operational policy controlling agent behavior.
+
+## Technical tradeoffs and non-goals
+
+This design is intentionally not trying to do everything.
+
+### What we optimize for
+
+- clarity
+- inspectability
+- reasonable realism
+- modularity
+- learning value
+
+### What we do not optimize for yet
+
+- perfect causal inference
+- large-scale production observability
+- multi-tenant SaaS architecture
+- product/store drilldown analysis
+- automated scheduling
+
+### Why that is okay
+
+Because educational systems benefit from strong boundaries.
+
+You learn faster when the system is small enough to hold in your head.
+
+## Common debugging workflow
+
+When something looks wrong, debug by layer.
+
+### 1. Check base ingestion
+
+Run:
+
+```bash
+uv run python -m rca.cli build
+```
+
+Then check row counts in:
+
+- `sales`
+- `inventory`
+- `pricing`
+- `promotions`
+- `calendar`
+- `weather`
+- `goals`
+
+### 2. Check signal generation
+
+Run:
+
+```bash
+uv run python -m rca.cli signal
+```
+
+Then inspect `rca.signals`.
+
+Questions:
+
+- are row counts correct
+- are drop/lift counts plausible
+- is the city/date you care about present
+
+### 3. Check run execution
+
+Run:
+
+```bash
+uv run python -m rca.cli run --city 0 --date 2024-06-09
+```
+
+Then inspect:
+
+- `rca.outcomes`
+- `rca.events`
+- `rca.completions`
+- `rca.memory`
+
+### 4. Check dashboard wiring
+
+If the backend tables are correct but the dashboard looks wrong:
+
+- verify the dashboard is deployed from the correct branch
+- verify the page is querying the correct table and correct typed `city_id`
+- verify stale deployments are not showing old UI
+
+### 5. Check permissions
+
+If writes silently disappear:
+
+- check schema exposure
+- check RLS
+- check table grants
+- check sequence grants for `bigserial` tables
+
+## How to extend this system
+
+Here are good extension ideas.
+
+### Better signal logic
+
+You can improve `rca signal` without changing ingestion.
+
+Examples:
+
+- better holiday-aware baselines
+- more robust outlier handling
+- confidence scores for signals
+
+### Better memory
+
+You can extend `rca.memory` into richer memory types:
+
+- lessons by theme
+- city profiles
+- durable hypotheses
+- confidence-weighted memory
+
+### Better external research
+
+You can:
+
+- add another search provider
+- store better metadata
+- add source ranking
+- distinguish rumor vs verified source
+
+### Better dashboard inspection
+
+You can add:
+
+- per-run trace pages
+- node timeline views
+- tool usage summaries
+- memory diff views
+
+## Key lessons for agent engineering
+
+If you only remember a few things from this project, remember these:
+
+### 1. Separate stable layers from experimental layers
+
+Ingestion is more stable than signals.
+Signals are more stable than LLM reasoning.
+
+Do not collapse them together.
+
+### 2. Let the LLM do real work, but not all the work
+
+The model should reason, compare, and synthesize.
+It should not replace data modeling, permissions, or storage design.
+
+### 3. Bounded agents are easier to trust
+
+Small role boundaries beat one giant vague analyst.
+
+### 4. Memory is often just reusable state with policy
+
+You do not need a magical memory system to get learning behavior.
+
+### 5. Observability is part of the product
+
+If you want to learn from an agent, logs and completions are not optional.
+
+### 6. A simple dashboard can teach more than a fancy dashboard
+
+A smaller surface often makes the agent behavior easier to understand.
+
+### 7. Deployment discipline matters
+
+If you debug on a deployed environment like Vercel, your finished work must be merged back to the deployed branch. Otherwise backend correctness and frontend correctness drift apart and you end up debugging the wrong thing.
