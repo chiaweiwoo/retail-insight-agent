@@ -47,7 +47,7 @@ uv run python -m rca.cli mcp
   - deletes prior city outputs, memory, and caches before running
   - reruns all triggered signal dates oldest to latest so memory accumulates across the batch
   - reviews each simulated date with deterministic audits plus the alignment reviewer
-  - stores per-date quality scores in `rca.replay_review` for incremental improvement tracking
+  - stores per-date quality scores in `rca.simulate_review` for incremental improvement tracking
   - prints a batch summary: average evaluator score, average alignment score, pass count, and top recurring cons
 
 - `rca mcp`

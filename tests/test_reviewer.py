@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from rca.reviewer import ReplayReview, _extract_json_object, _failed_check_summary, review_outcome
+from rca.reviewer import SimulateReview, _extract_json_object, _failed_check_summary, review_outcome
 from rca.stubclient import stub_client_factory
 
 _BRIEF = {
@@ -104,7 +104,7 @@ def test_review_outcome_stub_returns_replay_review():
         run_id="test_run",
     )
 
-    assert isinstance(result, ReplayReview)
+    assert isinstance(result, SimulateReview)
 
 
 def test_review_outcome_stub_eval_score_in_range():

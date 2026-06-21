@@ -22,7 +22,7 @@ from rca.config import (
     make_supabase_schema_client,
 )
 from rca.graph import run_rca_graph
-from rca.reviewer import ReplayReview, review_outcome, store_replay_review
+from rca.reviewer import SimulateReview, review_outcome, store_simulate_review
 
 
 # ── Summary type ──────────────────────────────────────────────────────────────
@@ -156,7 +156,7 @@ def simulate_city(
             alignment_scores.append(rv.alignment_score)
             all_cons.extend(rv.cons)
             alignment_label = rv.alignment_label
-            store_replay_review(
+            store_simulate_review(
                 batch_id=effective_batch_id,
                 run_id=run_id,
                 city_id=city_id,
@@ -189,23 +189,6 @@ def simulate_city(
     )
     _print_summary(summary)
     return summary
-
-
-def replay_city(
-    city_id: int,
-    *,
-    reset: bool = True,
-    settings: Any = None,
-    client_factory: Any = None,
-) -> SimulateSummary:
-    """Backward-compatible wrapper around the city simulation flow.
-
-    Public callers should use `simulate_city()` or the `rca simulate` CLI.
-    """
-    if not reset:
-        # The old non-destructive mode is intentionally gone.
-        _print("Ignoring reset=False; city simulation is always cold-start now.")
-    return simulate_city(city_id, settings=settings, client_factory=client_factory)
 
 
 # Helpers

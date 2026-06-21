@@ -82,7 +82,7 @@ All tools read directly from Supabase `rca.*` tables.
 - `rca.memory`
 - `rca.evidence_cache`
 - `rca.external_events`
-- `rca.replay_review`
+- `rca.simulate_review`
 
 ## Simulation and Self-Review
 
@@ -90,10 +90,10 @@ All tools read directly from Supabase `rca.*` tables.
 
 1. **Cold start is mandatory**: the command always deletes prior outputs + caches for the city (outcomes, events, completions, memory, evidence_cache, external_events). Signals and base tables are untouched.
 2. **Rerun**: process all triggered `drop`/`lift` dates oldest to latest. Memory accumulates across dates so the agent learns as it processes the batch.
-3. **Review**: after each date, the alignment reviewer scores the output against the project guardrails (deterministic audits + LLM judge). Result stored in `rca.replay_review`.
+3. **Review**: after each date, the alignment reviewer scores the output against the project guardrails (deterministic audits + LLM judge). Result stored in `rca.simulate_review`.
 4. **Batch summary**: prints average eval score, average alignment score, pass count, and top 3 recurring cons.
 
-Batches are identified internally by timestamp `batch_id`. Compare batch quality by querying `rca.replay_review` across `batch_id` values.
+Batches are identified internally by timestamp `batch_id`. Compare batch quality by querying `rca.simulate_review` across `batch_id` values.
 
 ## The Dashboard
 

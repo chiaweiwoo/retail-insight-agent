@@ -81,7 +81,7 @@ outcomes / logs / completions / memory
   ->
 rca simulate --city
   ->
-replay_review rows + batch summary
+simulate_review rows + batch summary
   ->
 dashboard
 ```
@@ -214,7 +214,7 @@ Purpose:
 
 Outputs:
 
-- `rca.replay_review`
+- `rca.simulate_review`
 - printed batch summaries
 - comparative learning signals for later debugging
 
@@ -303,7 +303,7 @@ LLM runtime tables:
 - `memory`
 - `evidence_cache`
 - `external_events`
-- `replay_review`
+- `simulate_review`
 
 Supabase matters here because it gives us one place to inspect both data facts and agent traces.
 
@@ -417,7 +417,7 @@ uv run python -m rca.cli simulate --city 0
 
 Then inspect:
 
-- `rca.replay_review`
+- `rca.simulate_review`
 - the printed batch summary
 - whether later dates seem to benefit from prior memory
 

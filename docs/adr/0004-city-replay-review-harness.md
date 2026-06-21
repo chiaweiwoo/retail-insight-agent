@@ -31,13 +31,13 @@ This keeps CI useful without exposing a dry-run flag to humans or agents.
 
 The cold-start reset is mandatory, not optional: reproducibility and batch comparability require a clean slate each time. If you want to accumulate on top of existing memory, use `rca run` per date manually.
 
-Simulation always runs the alignment reviewer after each date and stores review rows in `rca.replay_review`.
+Simulation always runs the alignment reviewer after each date and stores review rows in `rca.simulate_review`.
 
 There are no public `--limit`, `--no-review`, or `--batch-id` flags. Batch IDs are generated internally with a timestamp.
 
 ## Decision 3: Review Storage
 
-`rca.replay_review` stores one row per simulated city/date within a generated batch. The table name retains `replay` because renaming it would require a migration with no functional benefit.
+`rca.simulate_review` stores one row per simulated city/date within a generated batch.
 
 Important fields:
 

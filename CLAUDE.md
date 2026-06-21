@@ -29,7 +29,7 @@ Three-layer split:
 | --- | --- | --- |
 | Fixed / precomputed | `rca.sales`, `rca.inventory`, `rca.pricing`, `rca.promotions`, `rca.calendar`, `rca.weather`, `rca.goals` | `rca build` |
 | Precomputed signals | `rca.signals` | `rca signal` |
-| Agent output | `rca.outcomes`, `rca.memory`, `rca.events`, `rca.completions`, `rca.evidence_cache`, `rca.external_events`, `rca.replay_review` | `rca run` / `rca simulate` |
+| Agent output | `rca.outcomes`, `rca.memory`, `rca.events`, `rca.completions`, `rca.evidence_cache`, `rca.external_events`, `rca.simulate_review` | `rca run` / `rca simulate` |
 
 Signal trigger: drop <= -10%, lift >= +25% vs synthetic business goal. Thresholds live in `config.py` only, not in SQL.
 

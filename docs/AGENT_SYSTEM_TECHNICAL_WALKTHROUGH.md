@@ -53,7 +53,7 @@ Recommended order:
 6. `rca/tools.py`
 7. `rca/state.py`
 8. `rca/outcomes.py`
-9. `rca/replay.py`
+9. `rca/simulate.py`
 10. `dashboard/src/app/...`
 
 ## 1. Start at the public CLI
@@ -81,7 +81,7 @@ uv run python -m rca.cli mcp
 | `build` | `ingest_to_supabase()` in `rca/database.py` |
 | `signal` | `materialize_signals_to_supabase()` in `rca/database.py` |
 | `run` | `run_rca_graph()` in `rca/graph.py` |
-| `simulate` | `simulate_city()` in `rca/replay.py` |
+| `simulate` | `simulate_city()` in `rca/simulate.py` |
 | `mcp` | `mcp.run()` in `rca/mcp_server.py` |
 
 ### Why this matters
@@ -616,7 +616,7 @@ This is one of the best first places to look when something feels wrong but you 
 
 Open this file:
 
-- `rca/replay.py`
+- `rca/simulate.py`
 
 This module moves the system beyond one-off RCA demos.
 
@@ -627,7 +627,7 @@ This module moves the system beyond one-off RCA demos.
 3. runs them oldest to latest
 4. lets memory accumulate across the batch
 5. reviews each output
-6. writes review rows to `rca.replay_review`
+6. writes review rows to `rca.simulate_review`
 7. prints a batch summary
 
 ### Why chronology matters
@@ -657,7 +657,7 @@ This module combines:
 ### Functions to study
 
 - `review_outcome()`
-- `store_replay_review()`
+- `store_simulate_review()`
 
 ### What gets stored
 
@@ -729,7 +729,7 @@ Read:
 3. `rca/agents.py`
 4. `rca/tools.py`
 5. `rca/outcomes.py`
-6. `rca/replay.py`
+6. `rca/simulate.py`
 
 ### If you are advanced
 
@@ -776,7 +776,7 @@ Check:
 
 Open:
 
-- `rca/replay.py`
+- `rca/simulate.py`
 - `rca/reviewer.py`
 - `rca/memory.py`
 

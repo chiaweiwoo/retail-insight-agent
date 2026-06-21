@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from rca.audits import run_evaluation
-from rca.config import TABLE_REPLAY_REVIEW, current_timestamp_sgt_iso, make_supabase_schema_client
+from rca.config import TABLE_SIMULATE_REVIEW, current_timestamp_sgt_iso, make_supabase_schema_client
 from rca.llm import ClientFactory, LLMSettings, make_routed_settings
 
 # ── Prompt ────────────────────────────────────────────────────────────────────
@@ -61,7 +61,7 @@ If a criterion is not applicable to this brief, omit it from cons rather than fo
 
 
 @dataclass
-class ReplayReview:
+class SimulateReview:
     eval_score: float
     eval_passed: bool
     alignment_score: float
@@ -162,7 +162,7 @@ def review_outcome(
     settings: LLMSettings,
     client_factory: ClientFactory,
     run_id: str,
-) -> ReplayReview:
+) -> SimulateReview:
     eval_result = run_evaluation(decision_brief, evidence_ledger)
     det_checks = [c.model_dump(mode="json") for c in eval_result.deterministic_checks]
 
@@ -175,7 +175,7 @@ def review_outcome(
         client_factory=client_factory,
     )
 
-    return ReplayReview(
+    return SimulateReview(
         eval_score=eval_result.score,
         eval_passed=eval_result.passed,
         alignment_score=alignment["alignment_score"],
@@ -188,18 +188,18 @@ def review_outcome(
     )
 
 
-def store_replay_review(
+def store_simulate_review(
     *,
     batch_id: str,
     run_id: str,
     city_id: int,
     dt: str,
     signal_label: str,
-    review: ReplayReview,
+    review: SimulateReview,
 ) -> None:
     client = make_supabase_schema_client()
     try:
-        client.table(TABLE_REPLAY_REVIEW).insert(
+        client.table(TABLE_SIMULATE_REVIEW).insert(
             {
                 "batch_id": batch_id,
                 "run_id": run_id,

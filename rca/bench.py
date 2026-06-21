@@ -21,7 +21,7 @@ class BenchmarkScenario:
 # city_id values are integer placeholders (0–17). The dates and signal_strength labels
 # were inherited from the old store-era bench; re-verify actual city signals in Round C2
 # when rca analyze runs on the restudied distribution. In Round D these scenarios will be
-# replaced by rca replay which replays real trigger days chronologically.
+# replaced by rca simulate which simulates real trigger days chronologically.
 SCENARIOS: tuple[BenchmarkScenario, ...] = (
     BenchmarkScenario("drop_high_h555_2024-05-16", "high", "drop", 0, "2024-05-16"),
     BenchmarkScenario("drop_medium_m041_2024-05-09", "medium", "drop", 1, "2024-05-09"),

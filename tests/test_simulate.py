@@ -80,7 +80,7 @@ def test_simulate_city_always_resets_and_reviews_outputs(monkeypatch):
     monkeypatch.setattr("rca.simulate.run_rca_graph", lambda city_id, dt, settings=None, client_factory=None: fake_result)
 
     stored_reviews = []
-    monkeypatch.setattr("rca.simulate.store_replay_review", lambda **kwargs: stored_reviews.append(kwargs))
+    monkeypatch.setattr("rca.simulate.store_simulate_review", lambda **kwargs: stored_reviews.append(kwargs))
 
     summary = simulate_city(0, client_factory=stub_client_factory)
 
@@ -93,45 +93,11 @@ def test_simulate_city_always_resets_and_reviews_outputs(monkeypatch):
     assert reset_calls == [0]
 
 
-def test_replay_city_wrapper_forces_reset(monkeypatch):
-    """The legacy wrapper still forces a cold-start simulation."""
-    from rca.simulate import replay_city
-    from rca.stubclient import stub_client_factory
-
-    monkeypatch.setattr("rca.simulate.find_signal_dates", lambda city_id: ["2024-04-01"])
-    reset_calls = []
-    monkeypatch.setattr("rca.simulate.reset_city_state", lambda city_id: reset_calls.append(city_id) or {})
-
-    fake_result = {
-        "run_id": "city_0_2024-04-01_stub",
-        "final_report": "# Decision Card",
-        "decision_brief": {
-            "headline": "Stub headline",
-            "confidence": "low",
-            "monitoring_plan": {"metrics_to_watch": ["stockout_product_rate"]},
-            "unknowns": ["Margin unavailable."],
-        },
-        "evidence_ledger": [{"id": "ev_001", "evidence_type": "inference", "summary": "stub"}],
-        "evaluation": {"score": 1.0, "passed": True},
-        "signal_evidence": {"signal_label": "drop"},
-        "round_count": 1,
-        "investigation_rounds": [],
-        "memory_note": "",
-    }
-    monkeypatch.setattr("rca.simulate.run_rca_graph", lambda city_id, dt, settings=None, client_factory=None: fake_result)
-    monkeypatch.setattr("rca.simulate.store_replay_review", lambda **kwargs: None)
-
-    summary = replay_city(0, reset=False, client_factory=stub_client_factory)
-
-    assert summary.total_dates == 1
-    assert summary.avg_alignment_score is not None
-    assert reset_calls == [0]
-
 
 def test_simulate_city_returns_correct_top_cons(monkeypatch):
     """Top cons are aggregated across dates and sorted by frequency."""
     from rca.simulate import simulate_city
-    from rca.reviewer import ReplayReview
+    from rca.reviewer import SimulateReview
 
     monkeypatch.setattr("rca.simulate.find_signal_dates", lambda city_id: ["2024-04-01", "2024-04-03"])
     monkeypatch.setattr("rca.simulate.reset_city_state", lambda city_id: {})
@@ -149,7 +115,7 @@ def test_simulate_city_returns_correct_top_cons(monkeypatch):
     }
     monkeypatch.setattr("rca.simulate.run_rca_graph", lambda city_id, dt, settings=None, client_factory=None: fake_result)
 
-    fake_review = ReplayReview(
+    fake_review = SimulateReview(
         eval_score=0.8,
         eval_passed=True,
         alignment_score=0.7,
@@ -160,7 +126,7 @@ def test_simulate_city_returns_correct_top_cons(monkeypatch):
         reviewer_comment="Stub.",
     )
     monkeypatch.setattr("rca.simulate.review_outcome", lambda **kwargs: fake_review)
-    monkeypatch.setattr("rca.simulate.store_replay_review", lambda **kwargs: None)
+    monkeypatch.setattr("rca.simulate.store_simulate_review", lambda **kwargs: None)
 
     summary = simulate_city(0, client_factory=lambda _: None)
 

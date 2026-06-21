@@ -38,7 +38,7 @@ export default async function SimulationPage({ params }: { params: Promise<{ cit
   const { cityId } = await params;
   const cityKey = Number(cityId);
   const { data, error } = await rca
-    .from("replay_review")
+    .from("simulate_review")
     .select(
       "batch_id,run_id,city_id,dt,signal_label,eval_score,eval_passed,alignment_score,alignment_label,pros,cons,improvements,reviewer_comment,deterministic_checks,created_at",
     )
