@@ -30,8 +30,8 @@ If you want the long teaching notes from beginner to advanced, read `docs/AGENT_
 12. Deterministic evaluation
 13. Memory writes and caches
 14. Outcome and trace persistence
-15. Replay harness
-16. Replay reviewer
+15. Simulation harness
+16. Simulation reviewer
 17. Dashboard routes for inspection
 18. Suggested reading order by skill level
 19. Best debugging paths
@@ -70,8 +70,7 @@ This is the best entrypoint because it tells you what the project treats as publ
 uv run python -m rca.cli build
 uv run python -m rca.cli signal
 uv run python -m rca.cli run --city 0 --date 2024-06-09
-uv run python -m rca.cli replay --city 0
-uv run python -m rca.cli replay --city 0 --reset
+uv run python -m rca.cli simulate --city 0
 uv run python -m rca.cli mcp
 ```
 
@@ -82,7 +81,7 @@ uv run python -m rca.cli mcp
 | `build` | `ingest_to_supabase()` in `rca/database.py` |
 | `signal` | `materialize_signals_to_supabase()` in `rca/database.py` |
 | `run` | `run_rca_graph()` in `rca/graph.py` |
-| `replay` | `replay_city()` in `rca/replay.py` |
+| `simulate` | `simulate_city()` in `rca/replay.py` |
 | `mcp` | `mcp.run()` in `rca/mcp_server.py` |
 
 ### Why this matters
@@ -284,7 +283,7 @@ That means:
 - `city_id` + `dt` identify the business case
 - `run_id` identifies the specific attempt
 
-That distinction is important for replay, logs, and debugging.
+That distinction is important for simulation batches, logs, and debugging.
 
 ## 6. The bounded investigation loop
 
@@ -613,7 +612,7 @@ This is one of the best first places to look when something feels wrong but you 
 - stop conditions
 - persistence
 
-## 14. Replay harness
+## 14. Simulation harness
 
 Open this file:
 
@@ -621,9 +620,9 @@ Open this file:
 
 This module moves the system beyond one-off RCA demos.
 
-### What `replay_city()` does
+### What `simulate_city()` does
 
-1. optionally resets existing outputs for a city
+1. resets existing outputs for a city
 2. finds all triggered signal dates for that city
 3. runs them oldest to latest
 4. lets memory accumulate across the batch
@@ -633,7 +632,7 @@ This module moves the system beyond one-off RCA demos.
 
 ### Why chronology matters
 
-The replay harness is more meaningful because dates are processed oldest to latest.
+The simulation harness is more meaningful because dates are processed oldest to latest.
 
 That means later runs can benefit from:
 
@@ -641,9 +640,9 @@ That means later runs can benefit from:
 - prior cached evidence
 - prior cached external context
 
-This makes replay a useful study tool for "does the system learn over time?"
+This makes simulation a useful study tool for "does the system learn over time?"
 
-## 15. Replay reviewer
+## 15. Simulation reviewer
 
 Open this file:
 
@@ -653,7 +652,7 @@ This module combines:
 
 - deterministic evaluation
 - LLM alignment review
-- replay review persistence
+- simulation review persistence
 
 ### Functions to study
 
@@ -662,7 +661,7 @@ This module combines:
 
 ### What gets stored
 
-Each replay review row includes conceptually:
+Each simulation review row includes conceptually:
 
 - batch ID
 - city/date
@@ -674,7 +673,7 @@ Each replay review row includes conceptually:
 - reviewer comment
 - deterministic checks
 
-This is exactly the payload used by the replay dashboard page.
+This is exactly the payload used by the simulation dashboard page.
 
 ## 16. Dashboard routes for inspection
 
@@ -683,7 +682,7 @@ Open these files:
 - `dashboard/src/app/page.tsx`
 - `dashboard/src/app/cities/[cityId]/page.tsx`
 - `dashboard/src/app/cities/[cityId]/rca/page.tsx`
-- `dashboard/src/app/cities/[cityId]/replay/page.tsx`
+- `dashboard/src/app/cities/[cityId]/simulate/page.tsx`
 - `dashboard/src/app/cities/[cityId]/logs/page.tsx`
 - `dashboard/src/app/cities/[cityId]/profile/page.tsx`
 
@@ -694,13 +693,13 @@ Open these files:
 | `/` | city/date signal overview |
 | `/cities/[cityId]` | actual vs goal timeline and signal markers |
 | `/cities/[cityId]/rca` | RCA results for that city, optionally date-prioritized |
-| `/cities/[cityId]/replay` | replay batch review results from `rca replay` |
+| `/cities/[cityId]/simulate` | simulation batch review results from `rca simulate` |
 | `/cities/[cityId]/logs` | events and LLM completion traces |
 | `/cities/[cityId]/profile` | memory notes |
 
-### Why the replay route matters
+### Why the simulation route matters
 
-This route is the bridge between CLI replay and dashboard inspection.
+This route is the bridge between CLI simulation and dashboard inspection.
 
 It lets you review:
 
@@ -773,7 +772,7 @@ Check:
 - which tools were actually called
 - whether the evaluator flagged any issue
 
-### Case 3: replay exists but quality is not improving
+### Case 3: simulation exists but quality is not improving
 
 Open:
 
@@ -806,4 +805,4 @@ Check:
 
 If you want one final sentence to remember the whole codebase:
 
-This project is a city/date retail RCA harness where deterministic data prep feeds a bounded investigation loop, the loop writes structured evidence and decision artifacts into Supabase, replay adds quality comparison across many runs, and the dashboard exists to help humans inspect and improve the system over time.
+This project is a city/date retail RCA harness where deterministic data prep feeds a bounded investigation loop, the loop writes structured evidence and decision artifacts into Supabase, simulation adds quality comparison across many runs, and the dashboard exists to help humans inspect and improve the system over time.

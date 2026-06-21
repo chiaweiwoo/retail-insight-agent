@@ -25,8 +25,7 @@ Working notes and guardrails for the v2 RCA agent system.
 - `uv run python -m rca.cli build`
 - `uv run python -m rca.cli signal`
 - `uv run python -m rca.cli run --city <id> --date <YYYY-MM-DD>`
-- `uv run python -m rca.cli replay --city <id>`
-- `uv run python -m rca.cli replay --city <id> --reset`
+- `uv run python -m rca.cli simulate --city <id>`
 - `uv run python -m rca.cli mcp`
 
 ## Delivery Rule
@@ -85,11 +84,11 @@ All tools read directly from Supabase `rca.*` tables.
 - `rca.external_events`
 - `rca.replay_review`
 
-## Replay and Self-Review
+## Simulation and Self-Review
 
-`rca replay --city N` orchestrates incremental quality improvement:
+`rca simulate --city N` orchestrates incremental quality improvement:
 
-1. **Optional reset**: only `--reset` deletes outputs + caches for the city (outcomes, events, completions, memory, evidence_cache, external_events). Signals and base tables are untouched.
+1. **Cold start is mandatory**: the command always deletes prior outputs + caches for the city (outcomes, events, completions, memory, evidence_cache, external_events). Signals and base tables are untouched.
 2. **Rerun**: process all triggered `drop`/`lift` dates oldest to latest. Memory accumulates across dates so the agent learns as it processes the batch.
 3. **Review**: after each date, the alignment reviewer scores the output against the project guardrails (deterministic audits + LLM judge). Result stored in `rca.replay_review`.
 4. **Batch summary**: prints average eval score, average alignment score, pass count, and top 3 recurring cons.
@@ -103,7 +102,7 @@ The UI is a Next.js App Router app in `dashboard/`. It reads from the `rca` sche
 - `/` -> City signal heatmap with clickable city/date cells.
 - `/cities/[cityId]` -> City timeline of actual sales versus synthetic business goal with clickable signal markers.
 - `/cities/[cityId]/rca` -> RCA history with decision card, RCA, prediction, and prescription.
-- `/cities/[cityId]/replay` -> Replay batch review page for `rca replay`, including evaluator scores, reviewer notes, and recurring weaknesses.
+- `/cities/[cityId]/simulate` -> Simulation batch review page for `rca simulate`, including evaluator scores, reviewer notes, and recurring weaknesses.
 - `/cities/[cityId]/logs` -> Run logs and completion records.
 - `/cities/[cityId]/profile` -> Distilled memory notes.
 

@@ -45,19 +45,16 @@ def _cmd_mcp(_: argparse.Namespace) -> None:
     mcp.run()
 
 
-def _cmd_replay(args: argparse.Namespace) -> None:
-    from rca.replay import replay_city
+def _cmd_simulate(args: argparse.Namespace) -> None:
+    from rca.replay import simulate_city
 
-    if args.reset:
-        _safe_print(
-            f"WARNING: --reset is ON. This will delete all outcomes, events, completions,\n"
-            f"         memory, evidence_cache, and external_events for city {args.city}.\n"
-        )
-
-    replay_city(
-        args.city,
-        reset=args.reset,
+    _safe_print(
+        f"Starting cold-start city simulation for city {args.city}.\n"
+        f"This will delete existing outcomes, events, completions,\n"
+        f"memory, evidence_cache, and external_events for that city first.\n"
     )
+
+    simulate_city(args.city)
 
 
 def main() -> None:
@@ -93,18 +90,12 @@ def main() -> None:
     )
     mcp_parser.set_defaults(func=_cmd_mcp)
 
-    replay_parser = subparsers.add_parser(
-        "replay",
-        help="Rerun all triggered signal dates for a city, with quality review",
+    simulate_parser = subparsers.add_parser(
+        "simulate",
+        help="Run a cold-start city simulation across all triggered signal dates",
     )
-    replay_parser.add_argument("--city", required=True, type=int, help="City ID (0-17)")
-    replay_parser.add_argument(
-        "--reset",
-        action="store_true",
-        dest="reset",
-        help="Delete existing outputs and memory for the city before replaying",
-    )
-    replay_parser.set_defaults(func=_cmd_replay)
+    simulate_parser.add_argument("--city", required=True, type=int, help="City ID (0-17)")
+    simulate_parser.set_defaults(func=_cmd_simulate)
 
     args = parser.parse_args()
     args.func(args)

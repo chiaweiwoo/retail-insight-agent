@@ -21,7 +21,7 @@ If you want the more advanced design material about how to build a strong agenti
 3. Big picture architecture
 4. What data and assets we have
 5. Why the system uses city/date grain
-6. Why `build`, `signal`, `run`, and `replay` are split
+6. Why `build`, `signal`, `run`, and `simulate` are split
 7. What the main agents do
 8. What Supabase stores
 9. What the dashboard shows
@@ -57,7 +57,7 @@ At a high level, the project has five layers:
 1. Data ingestion layer
 2. Signal generation layer
 3. LLM runtime layer
-4. Replay and quality-review layer
+4. Simulation and quality-review layer
 5. Dashboard and inspection layer
 
 The flow is:
@@ -79,7 +79,7 @@ agent workflow + tools + memory
   ->
 outcomes / logs / completions / memory
   ->
-rca replay --city
+rca simulate --city
   ->
 replay_review rows + batch summary
   ->
@@ -91,7 +91,7 @@ This split matters because it keeps each layer understandable:
 - `build` prepares stable facts
 - `signal` chooses where attention should go
 - `run` explains what happened for one city/date
-- `replay` compares many runs and helps us study learning behavior
+- `simulate` compares many runs and helps us study learning behavior
 
 ## What data and assets we have
 
@@ -107,7 +107,7 @@ The main assets in this project are:
 There are two broad classes of assets:
 
 - stable assets such as raw data, base tables, and CLI commands
-- experimental assets such as signal rules, prompts, memory, replay review, and agent behavior
+- experimental assets such as signal rules, prompts, memory, simulation review, and agent behavior
 
 That split is important because not every part of an AI system should change at the same speed.
 
@@ -157,7 +157,7 @@ It is aggregated into city/date evidence such as:
 
 So product/store data still influences the runtime, just not as first-class runtime entities.
 
-## Why `build`, `signal`, `run`, and `replay` are split
+## Why `build`, `signal`, `run`, and `simulate` are split
 
 This is one of the most important design choices in the project.
 
@@ -203,11 +203,12 @@ Outputs:
 - sometimes `rca.evidence_cache`
 - sometimes `rca.external_events`
 
-### `rca replay`
+### `rca simulate`
 
 Purpose:
 
 - rerun every triggered date for one city
+- always start from a cold reset for that city
 - let memory accumulate over time
 - evaluate how stable or helpful the system is across many dates
 
@@ -222,7 +223,7 @@ This separation gives the project a clean mental model:
 - build prepares facts
 - signal chooses where to look
 - run explains what happened
-- replay tells us whether the system is getting better
+- simulate tells us whether the system is getting better
 
 ## What the main agents do
 
@@ -272,9 +273,9 @@ Synthesizes the investigation into the final business-facing answer.
 
 Extracts reusable lessons from a completed run.
 
-### Replay reviewer
+### Simulation reviewer
 
-Scores replayed outputs after the fact so we can compare batches and recurring weaknesses.
+Scores simulated outputs after the fact so we can compare batches and recurring weaknesses.
 
 ## What Supabase stores
 
@@ -330,14 +331,14 @@ Shows actual sales versus the synthetic business goal through time.
 
 Shows the final business-facing explanation.
 
-### Replay page
+### Simulation page
 
-Shows the batch-level output of `rca replay`:
+Shows the batch-level output of `rca simulate`:
 
-- which dates were replayed
+- which dates were simulated
 - average evaluator and alignment scores
 - reviewer pros, cons, and improvements
-- deterministic checks per replayed date
+- deterministic checks per simulated date
 
 ### Logs page
 
@@ -406,12 +407,12 @@ Then inspect:
 - `rca.completions`
 - `rca.memory`
 
-### 4. Check replay review
+### 4. Check simulation review
 
 Run:
 
 ```bash
-uv run python -m rca.cli replay --city 0
+uv run python -m rca.cli simulate --city 0
 ```
 
 Then inspect:
@@ -445,6 +446,6 @@ If you only remember a few things from this project, remember these:
 - let the LLM do real reasoning, but not all the work
 - small, bounded agents are easier to trust than one vague super-agent
 - memory is usually reusable state with policy
-- replay plus review is how learning systems become inspectable over time
+- simulation plus review is how learning systems become inspectable over time
 - logs and traces are part of the product when the goal is learning
 - a simple dashboard can teach more than a fancy one

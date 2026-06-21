@@ -1,4 +1,4 @@
-"""Tests for the city replay harness."""
+"""Tests for the city simulation harness."""
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
@@ -52,9 +52,9 @@ def test_find_signal_dates_all_strings(fake_client):
     assert all(isinstance(d, str) for d in dates)
 
 
-def test_replay_city_no_reset_reviews_outputs(monkeypatch):
-    """replay_city keeps existing state by default and always reviews outputs."""
-    from rca.replay import replay_city
+def test_simulate_city_always_resets_and_reviews_outputs(monkeypatch):
+    """simulate_city always cold-starts and always reviews outputs."""
+    from rca.replay import simulate_city
     from rca.stubclient import stub_client_factory
 
     monkeypatch.setattr("rca.replay.find_signal_dates", lambda city_id: ["2024-04-01"])
@@ -82,7 +82,7 @@ def test_replay_city_no_reset_reviews_outputs(monkeypatch):
     stored_reviews = []
     monkeypatch.setattr("rca.replay.store_replay_review", lambda **kwargs: stored_reviews.append(kwargs))
 
-    summary = replay_city(0, client_factory=stub_client_factory)
+    summary = simulate_city(0, client_factory=stub_client_factory)
 
     assert isinstance(summary, ReplaySummary)
     assert summary.total_dates == 1
@@ -90,11 +90,11 @@ def test_replay_city_no_reset_reviews_outputs(monkeypatch):
     assert summary.avg_eval_score == pytest.approx(0.9)
     assert summary.avg_alignment_score is not None
     assert len(stored_reviews) == 1
-    assert reset_calls == []
+    assert reset_calls == [0]
 
 
-def test_replay_city_reset_clears_state(monkeypatch):
-    """replay_city only resets when explicitly requested."""
+def test_replay_city_wrapper_forces_reset(monkeypatch):
+    """The legacy wrapper still forces a cold-start simulation."""
     from rca.replay import replay_city
     from rca.stubclient import stub_client_factory
 
@@ -121,16 +121,16 @@ def test_replay_city_reset_clears_state(monkeypatch):
     monkeypatch.setattr("rca.replay.run_rca_graph", lambda city_id, dt, settings=None, client_factory=None: fake_result)
     monkeypatch.setattr("rca.replay.store_replay_review", lambda **kwargs: None)
 
-    summary = replay_city(0, reset=True, client_factory=stub_client_factory)
+    summary = replay_city(0, reset=False, client_factory=stub_client_factory)
 
     assert summary.total_dates == 1
     assert summary.avg_alignment_score is not None
     assert reset_calls == [0]
 
 
-def test_replay_city_returns_correct_top_cons(monkeypatch):
+def test_simulate_city_returns_correct_top_cons(monkeypatch):
     """Top cons are aggregated across dates and sorted by frequency."""
-    from rca.replay import replay_city
+    from rca.replay import simulate_city
     from rca.reviewer import ReplayReview
 
     monkeypatch.setattr("rca.replay.find_signal_dates", lambda city_id: ["2024-04-01", "2024-04-03"])
@@ -162,19 +162,19 @@ def test_replay_city_returns_correct_top_cons(monkeypatch):
     monkeypatch.setattr("rca.replay.review_outcome", lambda **kwargs: fake_review)
     monkeypatch.setattr("rca.replay.store_replay_review", lambda **kwargs: None)
 
-    summary = replay_city(0, client_factory=lambda _: None)
+    summary = simulate_city(0, client_factory=lambda _: None)
 
     con_texts = [text for text, _ in summary.top_cons]
     assert "Evidence is thin." in con_texts
 
 
-def test_replay_city_no_signal_dates_returns_empty_summary(monkeypatch):
-    from rca.replay import replay_city
+def test_simulate_city_no_signal_dates_returns_empty_summary(monkeypatch):
+    from rca.replay import simulate_city
 
     monkeypatch.setattr("rca.replay.find_signal_dates", lambda city_id: [])
     monkeypatch.setattr("rca.replay.reset_city_state", lambda city_id: {})
 
-    summary = replay_city(0)
+    summary = simulate_city(0)
 
     assert summary.total_dates == 0
     assert summary.passed_count == 0

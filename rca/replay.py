@@ -1,9 +1,9 @@
-"""City replay harness: reset state, rerun all signal dates, review output.
+"""City simulation harness: reset state, rerun all signal dates, review output.
 
 reset_city_state  - deletes all outputs + caches for a city (outcomes,
                     events, completions, memory, evidence_cache, external_events)
 find_signal_dates - returns triggered city dates oldest to latest from rca.signals
-replay_city       - orchestrates reset, rerun, review, store, and progress output
+simulate_city     - orchestrates reset, rerun, review, store, and progress output
 """
 from __future__ import annotations
 
@@ -82,28 +82,26 @@ def find_signal_dates(city_id: int) -> list[str]:
     return [str(row["dt"]) for row in (result.data or [])]
 
 
-# ── Replay loop ───────────────────────────────────────────────────────────────
+# ── Simulation loop ───────────────────────────────────────────────────────────
 
 
-def replay_city(
+def simulate_city(
     city_id: int,
     *,
-    reset: bool = False,
     settings: Any = None,
     client_factory: Any = None,
 ) -> ReplaySummary:
-    """Run reset, rerun all signal dates, and optionally review one city.
+    """Run a cold-start city simulation across all triggered signal dates.
 
     Memory accumulates across dates within the batch so the agent learns
-    as it processes oldest to latest dates: the intended learning-mode replay.
+    as it processes oldest to latest dates: the intended learning-mode simulation.
     """
     effective_batch_id = current_timestamp_sgt_label()
 
-    if reset:
-        counts = reset_city_state(city_id)
-        _print(f"Reset city {city_id}:")
-        for table, n in counts.items():
-            _print(f"  {table}: {n} rows deleted")
+    counts = reset_city_state(city_id)
+    _print(f"Reset city {city_id}:")
+    for table, n in counts.items():
+        _print(f"  {table}: {n} rows deleted")
 
     dates = find_signal_dates(city_id)
     if not dates:
@@ -117,7 +115,7 @@ def replay_city(
             avg_alignment_score=None,
         )
 
-    _print(f"\nBatch: {effective_batch_id}  |  City: {city_id}  |  Dates: {len(dates)}\n")
+    _print(f"\nSimulation batch: {effective_batch_id}  |  City: {city_id}  |  Dates: {len(dates)}\n")
 
     eval_scores: list[float] = []
     alignment_scores: list[float] = []
@@ -191,6 +189,23 @@ def replay_city(
     )
     _print_summary(summary)
     return summary
+
+
+def replay_city(
+    city_id: int,
+    *,
+    reset: bool = True,
+    settings: Any = None,
+    client_factory: Any = None,
+) -> ReplaySummary:
+    """Backward-compatible wrapper around the city simulation flow.
+
+    Public callers should use `simulate_city()` or the `rca simulate` CLI.
+    """
+    if not reset:
+        # The old non-destructive mode is intentionally gone.
+        _print("Ignoring reset=False; city simulation is always cold-start now.")
+    return simulate_city(city_id, settings=settings, client_factory=client_factory)
 
 
 # Helpers

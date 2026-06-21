@@ -8,7 +8,7 @@ The v2 direction is:
 - rawer business facts in Supabase
 - agent-side reasoning at runtime
 - internal plus external factor investigation
-- simple dashboard for signals, results, replay review, memory, and logs
+- simple dashboard for signals, results, simulation review, memory, and logs
 
 ## Public CLI
 
@@ -16,8 +16,7 @@ The v2 direction is:
 uv run python -m rca.cli build
 uv run python -m rca.cli signal
 uv run python -m rca.cli run --city 0 --date 2024-04-01
-uv run python -m rca.cli replay --city 0
-uv run python -m rca.cli replay --city 0 --reset
+uv run python -m rca.cli simulate --city 0
 uv run python -m rca.cli mcp
 ```
 
@@ -43,11 +42,11 @@ uv run python -m rca.cli mcp
   - distils reusable lessons into city memory
   - stores the full outcome (decision brief, evidence ledger, investigation rounds, evaluation) in Supabase
 
-- `rca replay`
-  - keeps existing city outputs and memory by default
-  - deletes city outputs, memory, and caches only when `--reset` is passed
+- `rca simulate`
+  - always starts with a cold-start reset for that city
+  - deletes prior city outputs, memory, and caches before running
   - reruns all triggered signal dates oldest to latest so memory accumulates across the batch
-  - reviews each replayed date with deterministic audits plus the alignment reviewer
+  - reviews each simulated date with deterministic audits plus the alignment reviewer
   - stores per-date quality scores in `rca.replay_review` for incremental improvement tracking
   - prints a batch summary: average evaluator score, average alignment score, pass count, and top recurring cons
 
@@ -81,7 +80,7 @@ The dashboard keeps the surface intentionally small:
 - city timeline of actual sales vs synthetic business goal
 - clickable drop/lift markers
 - RCA page with root cause, prediction, and prescription
-- replay page with batch summaries and per-date review feedback from `rca replay`
+- simulation page with batch summaries and per-date review feedback from `rca simulate`
 - logs page for events, completions, and tool-call traces
 - memory page for distilled lessons
 

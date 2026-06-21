@@ -33,10 +33,10 @@ The goal is to teach:
 12. The agents and their jobs
 13. The tools and why they are structured
 14. Dynamic memory in this project
-15. Evaluation, replay, and self-review
+15. Evaluation, simulation, and self-review
 16. The dashboard as an inspection surface
 17. End-to-end walkthrough of one `rca run`
-18. End-to-end walkthrough of one `rca replay`
+18. End-to-end walkthrough of one `rca simulate`
 19. Why this is more than a static workflow
 20. What makes the output useful for management
 21. Common failure modes
@@ -73,11 +73,11 @@ The output matters, but the more important lesson is how to build a system that 
 
 If you only want one paragraph, use this:
 
-> Raw retail data is ingested into city/day tables, a signal layer decides which city/date looks interesting, a bounded multi-agent investigation loop runs RCA for one case, memory and traces are written back to Supabase, and a replay harness reruns many dates to study whether the system is improving over time.
+> Raw retail data is ingested into city/day tables, a signal layer decides which city/date looks interesting, a bounded multi-agent investigation loop runs RCA for one case, memory and traces are written back to Supabase, and a city simulation harness reruns many dates to study whether the system is improving over time.
 
 If you want the one-line version:
 
-> `build` prepares facts, `signal` chooses where to look, `run` explains one case, `replay` evaluates learning behavior across many cases.
+> `build` prepares facts, `signal` chooses where to look, `run` explains one case, `simulate` evaluates learning behavior across many cases.
 
 ## What kind of AI system this is
 
@@ -145,7 +145,7 @@ More concretely:
 | Tool use | LLM within bounded schemas |
 | Critique and stopping | LLM within bounded loop |
 | Final business synthesis | LLM |
-| Replay scoring | Deterministic evaluator plus reviewer LLM |
+| Simulation scoring | Deterministic evaluator plus reviewer LLM |
 
 This is why the project feels more agentic than a fixed workflow, but much more disciplined than a totally open agent.
 
@@ -176,7 +176,7 @@ We want to inspect:
 - tool calls
 - evidence ledger
 - memory writes
-- replay review scores
+- simulation review scores
 
 ### 3. The system should preserve lessons
 
@@ -184,7 +184,7 @@ Even in a small project, we want the idea of memory to be real:
 
 - some knowledge from previous runs should survive
 - some repeated work should be cached
-- later runs in a replay batch should not behave like total amnesia
+- later runs in a simulation batch should not behave like total amnesia
 
 ### 4. The system should support learning by the builder
 
@@ -294,7 +294,7 @@ flowchart TD
     E --> F["rca run --city --date"]
     F --> G["Bounded investigation loop"]
     G --> H["outcomes + events + completions + memory"]
-    H --> I["rca replay --city"]
+    H --> I["rca simulate --city"]
     I --> J["rca.replay_review"]
     H --> K["Dashboard"]
     J --> K
@@ -330,9 +330,9 @@ It should feel:
 - evidence-driven
 - bounded
 
-### Layer 4: Replay and review
+### Layer 4: Simulation and review
 
-`rca replay` is the learning and quality-comparison layer.
+`rca simulate` is the learning and quality-comparison layer.
 
 It should feel:
 
@@ -351,7 +351,7 @@ It should help you answer:
 - where is the signal
 - what did the system conclude
 - what did it do internally
-- is replay quality improving
+- is simulation quality improving
 
 ## Public CLI and why each command exists
 
@@ -361,8 +361,7 @@ The public CLI is intentionally small:
 uv run python -m rca.cli build
 uv run python -m rca.cli signal
 uv run python -m rca.cli run --city 0 --date 2024-06-09
-uv run python -m rca.cli replay --city 0
-uv run python -m rca.cli replay --city 0 --reset
+uv run python -m rca.cli simulate --city 0
 uv run python -m rca.cli mcp
 ```
 
@@ -400,28 +399,18 @@ Why it exists separately:
 - single-case debugging is essential
 - it is the cleanest way to inspect one investigation
 
-### `rca replay --city`
+### `rca simulate --city`
 
 Purpose:
 
 - rerun every triggered date for one city, oldest to latest
+- always start from a cold reset for that city
 
 Why it exists separately:
 
 - it is the closest thing to a learning harness in the repo
 - it lets memory accumulate
 - it produces quality comparisons across a batch
-
-### `rca replay --city --reset`
-
-Purpose:
-
-- wipe outputs and caches for a city before replaying
-
-Why it exists:
-
-- sometimes you want a true cold start
-- it helps compare "warm memory" vs "fresh memory" behavior
 
 ### `rca mcp`
 
@@ -825,7 +814,7 @@ then it is just archival storage, not operational memory.
 
 This is a good lens for evaluating any future memory feature.
 
-## Evaluation, replay, and self-review
+## Evaluation, simulation, and self-review
 
 This is one of the most valuable learning areas in the repo.
 
@@ -834,7 +823,7 @@ This is one of the most valuable learning areas in the repo.
 The system has:
 
 1. **Evaluator** inside normal `rca run` completion
-2. **Replay reviewer** after replayed runs
+2. **Simulation reviewer** after simulated runs
 
 These are different on purpose.
 
@@ -852,7 +841,7 @@ It checks rules such as:
 
 This is the system's first quality wall.
 
-### Replay reviewer
+### Simulation reviewer
 
 Replay adds another layer:
 
@@ -897,17 +886,17 @@ Its job is to help you inspect the system from different angles.
 | `/` | show city/date signals and where attention should go |
 | `/cities/[cityId]` | show actual vs goal trend and signal markers |
 | `/cities/[cityId]/rca` | show final RCA outputs |
-| `/cities/[cityId]/replay` | show replay batch reviews from the CLI |
+| `/cities/[cityId]/simulate` | show simulation batch reviews from the CLI |
 | `/cities/[cityId]/logs` | show workflow and completion traces |
 | `/cities/[cityId]/profile` | show distilled memory notes |
 
-### Why the replay page matters
+### Why the simulation page matters
 
-You asked for a page that shows the CLI replay result.
+You asked for a page that shows the CLI simulation result.
 
-That is useful because replay output is otherwise easy to forget once the terminal scrolls away.
+That is useful because simulation output is otherwise easy to forget once the terminal scrolls away.
 
-The replay page turns batch output into an inspectable artifact:
+The simulation page turns batch output into an inspectable artifact:
 
 - batch ID
 - scores
@@ -1043,14 +1032,14 @@ The system writes:
 
 Now the run is inspectable from the dashboard and the database.
 
-## End-to-end walkthrough of one `rca replay`
+## End-to-end walkthrough of one `rca simulate`
 
 Replay is a different experience.
 
 Example:
 
 ```bash
-uv run python -m rca.cli replay --city 0
+uv run python -m rca.cli simulate --city 0
 ```
 
 ### Step 1: find all triggered dates
@@ -1252,7 +1241,7 @@ A good baseline can help answer:
 
 - did we still detect the same signal
 - did the RCA stay calibrated
-- did replay still produce review rows
+- did simulation still produce review rows
 - did the system regress in obvious ways
 
 ## Debugging checklist
