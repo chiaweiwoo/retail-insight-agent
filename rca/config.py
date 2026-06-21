@@ -147,7 +147,7 @@ def get_llm_thinking_enabled() -> bool:
 
 
 def get_research_enabled() -> bool:
-    return os.getenv("RCA_RESEARCH_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
+    return os.getenv("RCA_RESEARCH_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def get_max_investigation_rounds() -> int:
