@@ -18,7 +18,8 @@ from rca.agents import (
     run_memory_distiller,
 )
 from rca.audits import run_evaluation
-from rca.config import current_timestamp_sgt_label
+from rca.config import current_timestamp_sgt_label, get_llm_judge_enabled
+from rca.reviewer import review_outcome
 from rca.llm import ClientFactory, LLMSettings, build_openai_compatible_client, load_llm_settings, make_routed_settings
 from rca.memory import get_memory_notes
 from rca.outcomes import OutcomeRecord, record_outcome
@@ -113,11 +114,32 @@ def decision_node(state: RcaState, config: RunnableConfig) -> dict[str, Any]:
 
 
 def evaluation_node(state: RcaState, config: RunnableConfig) -> dict[str, Any]:
+    cfg = _cfg(config)
     evaluation = run_evaluation(
         decision_brief=state["decision_brief"],
         evidence_ledger=state["evidence_ledger"],
     )
-    return {"evaluation": evaluation.model_dump(mode="json")}
+    result = evaluation.model_dump(mode="json")
+
+    if get_llm_judge_enabled():
+        settings: LLMSettings = cfg["settings"]
+        client_factory: ClientFactory = cfg["client_factory"]
+        rv = review_outcome(
+            decision_brief=state["decision_brief"],
+            evidence_ledger=state["evidence_ledger"],
+            decision_card_markdown=state.get("decision_card_markdown", ""),
+            settings=make_routed_settings(settings, "reviewer"),
+            client_factory=client_factory,
+            run_id=state["run_id"],
+        )
+        result["alignment_score"] = rv.alignment_score
+        result["alignment_label"] = rv.alignment_label
+        result["alignment_pros"] = rv.pros
+        result["alignment_cons"] = rv.cons
+        result["alignment_improvements"] = rv.improvements
+        result["alignment_comment"] = rv.reviewer_comment
+
+    return {"evaluation": result}
 
 
 def memory_node(state: RcaState, config: RunnableConfig) -> dict[str, Any]:

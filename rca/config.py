@@ -159,7 +159,7 @@ def get_stat_tools_enabled() -> bool:
 
 
 def get_llm_judge_enabled() -> bool:
-    return os.getenv("RCA_LLM_JUDGE_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
+    return os.getenv("RCA_LLM_JUDGE_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def get_model_fast() -> str:
