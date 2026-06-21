@@ -27,11 +27,11 @@ NODE_MODEL_MAP: dict[str, str] = {
     "calendar_weather_agent": "fast",
     "news_agent": "fast",
     "critic": "fast",
-    "coordinator": "fast",
-    "decision_brief": "fast",
+    "coordinator": "deep",
+    "decision_brief": "deep",
     "evaluation": "fast",
     "memory_distiller": "fast",
-    "reviewer": "fast",
+    "reviewer": "deep",
 }
 
 

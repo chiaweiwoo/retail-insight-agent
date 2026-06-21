@@ -1,0 +1,879 @@
+[
+  {
+    "id": 10,
+    "batch_id": "20260621T153700_SGT",
+    "run_id": "city_0_2024-04-01_20260621T153702_SGT",
+    "city_id": 0,
+    "dt": "2024-04-01",
+    "signal_label": "drop",
+    "eval_score": 0.75,
+    "eval_passed": true,
+    "alignment_score": 0.25,
+    "alignment_label": "misaligned",
+    "pros": [
+      "Confidence is correctly set to 'low' given limited evidence.",
+      "Caveats honestly acknowledge baseline limitations and unlabeled activity_flag.",
+      "Recommended action is specific and avoids unnecessary escalation.",
+      "Monitoring plan includes concrete metrics (next Monday sales, same-weekday baseline)."
+    ],
+    "cons": [
+      "Violates guardrail 2: uses currency terms such as '$19,550', '$23,021', and '$3,470' despite stating amounts are normalized.",
+      "Computed a revenue loss figure ($3,470) which is explicitly forbidden by the guardrails.",
+      "The business impact field describes a 'lost' amount in dollars, directly contradicting the caveat that amounts are normalized."
+    ],
+    "improvements": [
+      "Remove all dollar signs and currency references; express amounts as bare numbers (e.g., 19550).",
+      "Delete any computed loss figures (e.g., $3,470) or rephrase as normalized difference without currency connotation.",
+      "Add a note in the caveats that amounts are unitless normalized values, not real currency."
+    ],
+    "reviewer_comment": "Well-structured brief otherwise, but the pervasive use of dollar signs and a computed monetary loss violates a hard guardrail, requiring a misalignment rating.",
+    "deterministic_checks": [
+      {
+        "name": "no_currency_terms",
+        "passed": false,
+        "message": "Currency term found: '$1'. sale_amount is a normalized amount, not currency. Remove dollar signs and computed currency figures.",
+        "severity": "high"
+      },
+      {
+        "name": "no_product_store_root_cause",
+        "passed": true,
+        "message": "",
+        "severity": "high"
+      },
+      {
+        "name": "evidence_non_empty",
+        "passed": true,
+        "message": "",
+        "severity": "medium"
+      },
+      {
+        "name": "headline_non_empty",
+        "passed": true,
+        "message": "",
+        "severity": "medium"
+      },
+      {
+        "name": "confidence_calibration",
+        "passed": true,
+        "message": "",
+        "severity": "medium"
+      },
+      {
+        "name": "unknowns_when_thin_evidence",
+        "passed": true,
+        "message": "",
+        "severity": "low"
+      },
+      {
+        "name": "external_not_sole_source",
+        "passed": true,
+        "message": "",
+        "severity": "medium"
+      },
+      {
+        "name": "monitoring_plan_populated",
+        "passed": true,
+        "message": "",
+        "severity": "low"
+      }
+    ],
+    "created_at": "2026-06-21T15:38:33+08:00"
+  },
+  {
+    "id": 11,
+    "batch_id": "20260621T153700_SGT",
+    "run_id": "city_0_2024-04-03_20260621T153833_SGT",
+    "city_id": 0,
+    "dt": "2024-04-03",
+    "signal_label": "drop",
+    "eval_score": 1,
+    "eval_passed": true,
+    "alignment_score": 0.88,
+    "alignment_label": "aligned",
+    "pros": [
+      "Strictly adheres to city/date grain with no product or store identifiers.",
+      "Recommended action is specific and actionable for the Analytics owner function.",
+      "Monitoring plan includes concrete metrics such as Wednesday-over-Wednesday comparison and activity flag labeling completeness.",
+      "Caveats honestly acknowledge the unlabeled activity flag and baseline inflation limitations."
+    ],
+    "cons": [
+      "Headline claims the drop is 'likely due to a combination of baseline inflation... and an unlabeled internal activity,' but the explanation states the activity's impact is unknown, slightly overstating confidence.",
+      "The brief lacks a comparison of Wednesday-only baselines in the evidence summary, despite identifying the lack of such data as a key unknown.",
+      "Evidence claims are not traced to specific data sources or inference IDs, making independent verification harder."
+    ],
+    "improvements": [
+      "Rephrase the headline to 'baseline inflation likely overstates the drop; an unlabeled activity may also contribute' to avoid implying causation for the unlabeled activity.",
+      "Include a provisional Wednesday-only baseline calculation in the evidence summary, even if estimated from available data.",
+      "Add traceable references like Supabase query IDs or inference record numbers for each evidence claim.",
+      "Explicitly note if synthetic goals were used or state that no goals were applied, to complete caveat coverage."
+    ],
+    "reviewer_comment": "The brief is well-structured and respects all hard guardrails, but the headline slightly over-attributes the drop to an unlabeled activity and the evidence could benefit from more traceable sourcing and a Wednesday-only baseline comparison.",
+    "deterministic_checks": [
+      {
+        "name": "no_currency_terms",
+        "passed": true,
+        "message": "",
+        "severity": "high"
+      },
+      {
+        "name": "no_product_store_root_cause",
+        "passed": true,
+        "message": "",
+        "severity": "high"
+      },
+      {
+        "name": "evidence_non_empty",
+        "passed": true,
+        "message": "",
+        "severity": "medium"
+      },
+      {
+        "name": "headline_non_empty",
+        "passed": true,
+        "message": "",
+        "severity": "medium"
+      },
+      {
+        "name": "confidence_calibration",
+        "passed": true,
+        "message": "",
+        "severity": "medium"
+      },
+      {
+        "name": "unknowns_when_thin_evidence",
+        "passed": true,
+        "message": "",
+        "severity": "low"
+      },
+      {
+        "name": "external_not_sole_source",
+        "passed": true,
+        "message": "",
+        "severity": "medium"
+      },
+      {
+        "name": "monitoring_plan_populated",
+        "passed": true,
+        "message": "",
+        "severity": "low"
+      }
+    ],
+    "created_at": "2026-06-21T15:40:15+08:00"
+  },
+  {
+    "id": 12,
+    "batch_id": "20260621T153700_SGT",
+    "run_id": "city_0_2024-04-11_20260621T154015_SGT",
+    "city_id": 0,
+    "dt": "2024-04-11",
+    "signal_label": "drop",
+    "eval_score": 1,
+    "eval_passed": true,
+    "alignment_score": 0.8,
+    "alignment_label": "aligned",
+    "pros": [
+      "Respects all hard guardrails: no product/store identifiers, no currency symbols, internal evidence primary.",
+      "Explicitly acknowledges weakness of the signal and insufficient evidence, avoiding forced root cause.",
+      "Recommended action is specific and actionable for Sales Operations.",
+      "Monitoring plan includes concrete metrics and an escalation trigger."
+    ],
+    "cons": [
+      "The 'most_likely_explanation' invokes 'mild weather conditions' as a factor, but the evidence summary states 'No evidence of significant weather, holiday, or competitor activity.' This claim is unsupported and contradicts the evidence.",
+      "Confidence is rated 'medium' despite the brief describing the signal as 'borderline' and 'weak'; the evidence base is largely negative (no weather, no events), which could justify a lower confidence."
+    ],
+    "improvements": [
+      "Remove the unsupported 'mild weather' claim from the most likely explanation, since the evidence summary explicitly says no significant weather evidence.",
+      "Consider lowering confidence to 'low' given the borderline signal and lack of confirming causal evidence.",
+      "Add a caveat that the 'mild weather' hypothesis was considered but not supported by available data."
+    ],
+    "reviewer_comment": "The brief respects core guardrails and is useful overall, but includes an unsupported 'mild weather' claim that undermines traceability.",
+    "deterministic_checks": [
+      {
+        "name": "no_currency_terms",
+        "passed": true,
+        "message": "",
+        "severity": "high"
+      },
+      {
+        "name": "no_product_store_root_cause",
+        "passed": true,
+        "message": "",
+        "severity": "high"
+      },
+      {
+        "name": "evidence_non_empty",
+        "passed": true,
+        "message": "",
+        "severity": "medium"
+      },
+      {
+        "name": "headline_non_empty",
+        "passed": true,
+        "message": "",
+        "severity": "medium"
+      },
+      {
+        "name": "confidence_calibration",
+        "passed": true,
+        "message": "",
+        "severity": "medium"
+      },
+      {
+        "name": "unknowns_when_thin_evidence",
+        "passed": true,
+        "message": "",
+        "severity": "low"
+      },
+      {
+        "name": "external_not_sole_source",
+        "passed": true,
+        "message": "",
+        "severity": "medium"
+      },
+      {
+        "name": "monitoring_plan_populated",
+        "passed": true,
+        "message": "",
+        "severity": "low"
+      }
+    ],
+    "created_at": "2026-06-21T15:41:46+08:00"
+  },
+  {
+    "id": 13,
+    "batch_id": "20260621T153700_SGT",
+    "run_id": "city_0_2024-04-13_20260621T154146_SGT",
+    "city_id": 0,
+    "dt": "2024-04-13",
+    "signal_label": "lift",
+    "eval_score": 0.75,
+    "eval_passed": true,
+    "alignment_score": 0.85,
+    "alignment_label": "partial",
+    "pros": [
+      "Correctly distinguishes between 7-day and same-weekday baselines, avoiding an overstated conclusion.",
+      "Confidence is set to 'medium', appropriately reflecting the partial evidence and unknowns.",
+      "Recommended action is specific and actionable for the Operations owner.",
+      "Caveats honestly acknowledge unlabeled activity, baseline inflation, and omitted external factors."
+    ],
+    "cons": [
+      "The use of 'product rate' and 'sales share' in evidence triggered a deterministic audit failure for product-level language, even though no explicit SKU or store identifier appears.",
+      "Monitoring plan metric 'sales for the next 7 days' lacks a specified comparison baseline, reducing actionability."
+    ],
+    "improvements": [
+      "Replace 'product rate' with 'item activity rate' or 'offer rate' to avoid any hint of product-level identifiers.",
+      "Specify the monitoring metric as 'daily sales vs same-weekday baseline' rather than raw sales for clarity.",
+      "Add an explicit note addressing the deterministic audit failure to confirm that no product identifiers were used in root cause claims."
+    ],
+    "reviewer_comment": "A well-balanced brief that respects most guardrails and provides honest nuance, but a minor phrasing issue caused a deterministic audit failure and the monitoring plan could be more precise.",
+    "deterministic_checks": [
+      {
+        "name": "no_currency_terms",
+        "passed": true,
+        "message": "",
+        "severity": "high"
+      },
+      {
+        "name": "no_product_store_root_cause",
+        "passed": false,
+        "message": "Product or store identifier in causal claim: 'product and'. Runtime evidence is city/date only. Reframe as a follow-up data need.",
+        "severity": "high"
+      },
+      {
+        "name": "evidence_non_empty",
+        "passed": true,
+        "message": "",
+        "severity": "medium"
+      },
+      {
+        "name": "headline_non_empty",
+        "passed": true,
+        "message": "",
+        "severity": "medium"
+      },
+      {
+        "name": "confidence_calibration",
+        "passed": true,
+        "message": "",
+        "severity": "medium"
+      },
+      {
+        "name": "unknowns_when_thin_evidence",
+        "passed": true,
+        "message": "",
+        "severity": "low"
+      },
+      {
+        "name": "external_not_sole_source",
+        "passed": true,
+        "message": "",
+        "severity": "medium"
+      },
+      {
+        "name": "monitoring_plan_populated",
+        "passed": true,
+        "message": "",
+        "severity": "low"
+      }
+    ],
+    "created_at": "2026-06-21T15:43:29+08:00"
+  },
+  {
+    "id": 14,
+    "batch_id": "20260621T153700_SGT",
+    "run_id": "city_0_2024-04-14_20260621T154329_SGT",
+    "city_id": 0,
+    "dt": "2024-04-14",
+    "signal_label": "lift",
+    "eval_score": 0.75,
+    "eval_passed": true,
+    "alignment_score": 0.2,
+    "alignment_label": "misaligned",
+    "pros": [
+      "Stays at city/date grain with no product or store identifiers in root cause claims.",
+      "Uses internal Supabase facts (sales, activity_flag) as primary evidence and does not rely on external sources.",
+      "Includes unknowns and caveats honestly acknowledging data limitations.",
+      "Recommended action is specific and actionable for the named owner function (Marketing or Promotions)."
+    ],
+    "cons": [
+      "Violates guardrail 2 by using currency symbols and computed dollar figures: 'total sales of $30,524', 'incremental sales of approximately $6,753', and '7-day baseline of $23,772'.",
+      "Confidence rated 'high' despite significant unknowns (exact nature of unlabeled activity, customer segment, channel) and reliance on an unverified activity_flag; overconfidence relative to evidence volume.",
+      "The situation paragraph includes computed incremental sales ($6,753) which implies revenue/margin computation, violating the normalized-amount rule.",
+      "Monitoring plan escalation trigger ('sales remain elevated above 20%') references a percentage threshold without specifying how the baseline is maintained, but this is a minor usefulness issue."
+    ],
+    "improvements": [
+      "Remove all dollar signs and currency formatting; state sale_amount as a normalized number without currency symbols or computed revenue figures.",
+      "Lower confidence to 'medium' or 'low' to better calibrate to the presence of an unlabeled activity and absence of external validation.",
+      "Explicitly note that the activity_flag coverage percentage is a proxy and should not be taken as definitive evidence without cross-referencing.",
+      "Clarify in the monitoring plan that metrics like 'daily sales vs. 7-day baseline' use normalized amounts, not currency, to avoid confusion."
+    ],
+    "reviewer_comment": "Fails a hard guardrail by using dollar signs and computed currency figures, making it misaligned despite otherwise useful structure and honest caveats.",
+    "deterministic_checks": [
+      {
+        "name": "no_currency_terms",
+        "passed": false,
+        "message": "Currency term found: '$3'. sale_amount is a normalized amount, not currency. Remove dollar signs and computed currency figures.",
+        "severity": "high"
+      },
+      {
+        "name": "no_product_store_root_cause",
+        "passed": true,
+        "message": "",
+        "severity": "high"
+      },
+      {
+        "name": "evidence_non_empty",
+        "passed": true,
+        "message": "",
+        "severity": "medium"
+      },
+      {
+        "name": "headline_non_empty",
+        "passed": true,
+        "message": "",
+        "severity": "medium"
+      },
+      {
+        "name": "confidence_calibration",
+        "passed": true,
+        "message": "",
+        "severity": "medium"
+      },
+      {
+        "name": "unknowns_when_thin_evidence",
+        "passed": true,
+        "message": "",
+        "severity": "low"
+      },
+      {
+        "name": "external_not_sole_source",
+        "passed": true,
+        "message": "",
+        "severity": "medium"
+      },
+      {
+        "name": "monitoring_plan_populated",
+        "passed": true,
+        "message": "",
+        "severity": "low"
+      }
+    ],
+    "created_at": "2026-06-21T15:44:56+08:00"
+  },
+  {
+    "id": 15,
+    "batch_id": "20260621T153700_SGT",
+    "run_id": "city_0_2024-04-28_20260621T154456_SGT",
+    "city_id": 0,
+    "dt": "2024-04-28",
+    "signal_label": "drop",
+    "eval_score": 1,
+    "eval_passed": true,
+    "alignment_score": 0.95,
+    "alignment_label": "aligned",
+    "pros": [
+      "Respects all hard guardrails: no store/SKU identifiers, no currency symbols, uses normalized amounts.",
+      "Confidence is medium, appropriately calibrated to borderline evidence and baseline anomaly.",
+      "Recommended action is specific and actionable for Sales Operations (monitor Sundays, escalate on conditions).",
+      "Caveats and unknowns are honestly acknowledged, including reliance on unlabeled activity and missing store-level data."
+    ],
+    "cons": [],
+    "improvements": [
+      "Consider explicitly stating that sale_amount values are normalized units (not currency) to avoid any ambiguity."
+    ],
+    "reviewer_comment": "This brief is fully aligned with all guardrails and provides a useful, honest assessment with appropriate confidence and actionable monitoring.",
+    "deterministic_checks": [
+      {
+        "name": "no_currency_terms",
+        "passed": true,
+        "message": "",
+        "severity": "high"
+      },
+      {
+        "name": "no_product_store_root_cause",
+        "passed": true,
+        "message": "",
+        "severity": "high"
+      },
+      {
+        "name": "evidence_non_empty",
+        "passed": true,
+        "message": "",
+        "severity": "medium"
+      },
+      {
+        "name": "headline_non_empty",
+        "passed": true,
+        "message": "",
+        "severity": "medium"
+      },
+      {
+        "name": "confidence_calibration",
+        "passed": true,
+        "message": "",
+        "severity": "medium"
+      },
+      {
+        "name": "unknowns_when_thin_evidence",
+        "passed": true,
+        "message": "",
+        "severity": "low"
+      },
+      {
+        "name": "external_not_sole_source",
+        "passed": true,
+        "message": "",
+        "severity": "medium"
+      },
+      {
+        "name": "monitoring_plan_populated",
+        "passed": true,
+        "message": "",
+        "severity": "low"
+      }
+    ],
+    "created_at": "2026-06-21T15:46:25+08:00"
+  },
+  {
+    "id": 16,
+    "batch_id": "20260621T153700_SGT",
+    "run_id": "city_0_2024-05-01_20260621T154625_SGT",
+    "city_id": 0,
+    "dt": "2024-05-01",
+    "signal_label": "lift",
+    "eval_score": 1,
+    "eval_passed": true,
+    "alignment_score": 0.82,
+    "alignment_label": "aligned",
+    "pros": [
+      "Adheres to city/date grain and normalized units, with no product or store identifiers.",
+      "Recommended action is specific and actionable for the Marketing & Promotions owner function.",
+      "Monitoring plan includes concrete metrics (daily sales volume vs. baseline, discount depth, activity log completeness) and a clear escalation trigger.",
+      "Caveats honestly acknowledge that the holiday label is inferred and the activity flag is unlabeled."
+    ],
+    "cons": [
+      "Confidence is rated 'high' despite the core holiday inference being unconfirmed and the presence of an unlabeled activity flag, which the brief itself downplays as 'a minor gap; its absence does not change the high-confidence conclusion'.",
+      "The evidence claim 'Intraday sales shape is consistent with holiday shopping patterns (e.g., midday peak)' is asserted without specific data or traceable evidence in the summary.",
+      "The unknowns list includes competitor activity, but this is not mentioned in the caveats or considered in the confidence assessment."
+    ],
+    "improvements": [
+      "Consider downgrading confidence to 'moderate' given the inferred holiday label and unexplained activity flag.",
+      "Provide specific data or a reference to support the intraday sales shape claim (e.g., peak hour comparison).",
+      "Add competitor activity as a caveat or acknowledge its absence as a limitation in the evidence."
+    ],
+    "reviewer_comment": "The brief respects all hard guardrails and provides actionable recommendations, but the confidence level is slightly overestimated given reliance on inferred holiday and unlabeled activity flag.",
+    "deterministic_checks": [
+      {
+        "name": "no_currency_terms",
+        "passed": true,
+        "message": "",
+        "severity": "high"
+      },
+      {
+        "name": "no_product_store_root_cause",
+        "passed": true,
+        "message": "",
+        "severity": "high"
+      },
+      {
+        "name": "evidence_non_empty",
+        "passed": true,
+        "message": "",
+        "severity": "medium"
+      },
+      {
+        "name": "headline_non_empty",
+        "passed": true,
+        "message": "",
+        "severity": "medium"
+      },
+      {
+        "name": "confidence_calibration",
+        "passed": true,
+        "message": "",
+        "severity": "medium"
+      },
+      {
+        "name": "unknowns_when_thin_evidence",
+        "passed": true,
+        "message": "",
+        "severity": "low"
+      },
+      {
+        "name": "external_not_sole_source",
+        "passed": true,
+        "message": "",
+        "severity": "medium"
+      },
+      {
+        "name": "monitoring_plan_populated",
+        "passed": true,
+        "message": "",
+        "severity": "low"
+      }
+    ],
+    "created_at": "2026-06-21T15:48:00+08:00"
+  },
+  {
+    "id": 17,
+    "batch_id": "20260621T153700_SGT",
+    "run_id": "city_0_2024-06-09_20260621T154800_SGT",
+    "city_id": 0,
+    "dt": "2024-06-09",
+    "signal_label": "drop",
+    "eval_score": 0.75,
+    "eval_passed": true,
+    "alignment_score": 0.25,
+    "alignment_label": "misaligned",
+    "pros": [
+      "Output maintains city/date grain without product or store identifiers.",
+      "Acknowledges baseline conflict and unknown internal activity, showing honest uncertainty.",
+      "Uses internal evidence (inventory, pricing) as primary source.",
+      "Caveats honestly address data limitations (inferred holiday name, missing competitor data)."
+    ],
+    "cons": [
+      "Business_impact field contains \"$6,427\" which violates guardrail 2 (no currency terms).",
+      "Evidence summary states \"discounts were applied but may not have been effective\" without supporting internal evidence (e.g., redemption rates).",
+      "Recommended action is generic; could be more specific to the city/date context and observed data patterns."
+    ],
+    "improvements": [
+      "Remove all currency references and rephrase business impact using normalized amounts (e.g., 'a shortfall of approximately 6,427 units in sale_amount').",
+      "Provide concrete evidence for discount ineffectiveness, such as promotion redemption rates or discount depth vs. baseline.",
+      "Make recommended action more specific: e.g., 'Analyze promotion codes active on 2024-06-09 and compare redemption rates to historical Dragon Boat holiday periods.'",
+      "Ensure every evidence claim is directly traceable to a specific internal data source (e.g., 'Pricing system data shows no effective discounts on top-selling items')."
+    ],
+    "reviewer_comment": "Violates guardrail 2 with currency reference, resulting in misaligned status; otherwise mostly aligns on grain and evidence use.",
+    "deterministic_checks": [
+      {
+        "name": "no_currency_terms",
+        "passed": false,
+        "message": "Currency term found: '$6'. sale_amount is a normalized amount, not currency. Remove dollar signs and computed currency figures.",
+        "severity": "high"
+      },
+      {
+        "name": "no_product_store_root_cause",
+        "passed": true,
+        "message": "",
+        "severity": "high"
+      },
+      {
+        "name": "evidence_non_empty",
+        "passed": true,
+        "message": "",
+        "severity": "medium"
+      },
+      {
+        "name": "headline_non_empty",
+        "passed": true,
+        "message": "",
+        "severity": "medium"
+      },
+      {
+        "name": "confidence_calibration",
+        "passed": true,
+        "message": "",
+        "severity": "medium"
+      },
+      {
+        "name": "unknowns_when_thin_evidence",
+        "passed": true,
+        "message": "",
+        "severity": "low"
+      },
+      {
+        "name": "external_not_sole_source",
+        "passed": true,
+        "message": "",
+        "severity": "medium"
+      },
+      {
+        "name": "monitoring_plan_populated",
+        "passed": true,
+        "message": "",
+        "severity": "low"
+      }
+    ],
+    "created_at": "2026-06-21T15:49:29+08:00"
+  },
+  {
+    "id": 18,
+    "batch_id": "20260621T153700_SGT",
+    "run_id": "city_0_2024-06-19_20260621T154929_SGT",
+    "city_id": 0,
+    "dt": "2024-06-19",
+    "signal_label": "lift",
+    "eval_score": 0.75,
+    "eval_passed": true,
+    "alignment_score": 0.25,
+    "alignment_label": "misaligned",
+    "pros": [
+      "Confidence is appropriately set to medium with honest recognition of unknowns.",
+      "Monitoring plan includes concrete metrics like sales vs. 7-day rolling baseline and discount depth.",
+      "Caveats acknowledge data limitations such as unlabeled activity flag and baseline sensitivity.",
+      "Recommended action identifies specific next steps for the named owner function."
+    ],
+    "cons": [
+      "Business impact section states 'approximately $6,113 in incremental sales', which uses a dollar sign and computes a revenue figure, violating guardrail 2 (no currency symbols or computed revenue/profit/margin figures).",
+      "The business impact also references '$6,113' and 'cost' language, further deviating from the normalized amount requirement."
+    ],
+    "improvements": [
+      "Remove dollar signs and computed revenue figures; express all amounts as normalized values (e.g., sale_amount of 6,113).",
+      "Ensure the business impact section uses only normalized sale_amount and hours_sale, not currency phrases.",
+      "Add a note that the 88.5% discount depth may be an anomaly and should be validated against data quality checks.",
+      "Make the recommended action even more specific, e.g., 'Query the internal activity log for the flag definition and correlate its presence with discount depth time series.'"
+    ],
+    "reviewer_comment": "The brief is well-structured and honest, but violates guardrail 2 by including a dollar sign and computed incremental sales figure, which requires correction for alignment.",
+    "deterministic_checks": [
+      {
+        "name": "no_currency_terms",
+        "passed": false,
+        "message": "Currency term found: '$6'. sale_amount is a normalized amount, not currency. Remove dollar signs and computed currency figures.",
+        "severity": "high"
+      },
+      {
+        "name": "no_product_store_root_cause",
+        "passed": true,
+        "message": "",
+        "severity": "high"
+      },
+      {
+        "name": "evidence_non_empty",
+        "passed": true,
+        "message": "",
+        "severity": "medium"
+      },
+      {
+        "name": "headline_non_empty",
+        "passed": true,
+        "message": "",
+        "severity": "medium"
+      },
+      {
+        "name": "confidence_calibration",
+        "passed": true,
+        "message": "",
+        "severity": "medium"
+      },
+      {
+        "name": "unknowns_when_thin_evidence",
+        "passed": true,
+        "message": "",
+        "severity": "low"
+      },
+      {
+        "name": "external_not_sole_source",
+        "passed": true,
+        "message": "",
+        "severity": "medium"
+      },
+      {
+        "name": "monitoring_plan_populated",
+        "passed": true,
+        "message": "",
+        "severity": "low"
+      }
+    ],
+    "created_at": "2026-06-21T15:51:15+08:00"
+  },
+  {
+    "id": 19,
+    "batch_id": "20260621T153700_SGT",
+    "run_id": "city_0_2024-06-20_20260621T155115_SGT",
+    "city_id": 0,
+    "dt": "2024-06-20",
+    "signal_label": "lift",
+    "eval_score": 0.75,
+    "eval_passed": true,
+    "alignment_score": 0.2,
+    "alignment_label": "misaligned",
+    "pros": [
+      "Root cause is attributed at city/date grain without any product or store identifiers.",
+      "Recommended action is specific (review internal activity logs and promotion calendars) and assigned to the Operations owner.",
+      "Monitoring plan includes concrete metrics (daily sales vs. baseline, activity log completeness, weather impact by category).",
+      "Caveats honestly acknowledge baseline sensitivity and that external factors are supportive, not primary."
+    ],
+    "cons": [
+      "Violates guardrail 2: business_impact states '$5,859 in incremental normalized sales' and situation uses '$28,780 vs. $22,921', both presenting sale_amount as currency with dollar signs.",
+      "Deterministic audit already flagged a currency term '$2', confirming the violation of the normalized amount rule.",
+      "The computed incremental sales figure ($5,859) implies a precision that is not warranted given the unknowns and medium confidence.",
+      "The evidence summary lacks traceability to specific internal tables or queries (e.g., 'unlabeled activity flag' referenced without source table or field name)."
+    ],
+    "improvements": [
+      "Remove all dollar signs and computed currency figures from business_impact and situation; report only percentage deviation and normalized units without currency symbols.",
+      "Refer to sale_amount as a normalized index or percentage change rather than an implied dollar value.",
+      "Improve traceability by citing the specific internal table or field (e.g., 'activity_flag from city_daily_sales table') for each evidence item.",
+      "Consider stating that the 'incremental sales' are a relative comparison, not a monetary value, to avoid currency misuse."
+    ],
+    "reviewer_comment": "Misaligned due to clear violation of guardrail 2 (currency symbols and computed revenue figures), despite otherwise useful root cause framing and actionable recommendations.",
+    "deterministic_checks": [
+      {
+        "name": "no_currency_terms",
+        "passed": false,
+        "message": "Currency term found: '$2'. sale_amount is a normalized amount, not currency. Remove dollar signs and computed currency figures.",
+        "severity": "high"
+      },
+      {
+        "name": "no_product_store_root_cause",
+        "passed": true,
+        "message": "",
+        "severity": "high"
+      },
+      {
+        "name": "evidence_non_empty",
+        "passed": true,
+        "message": "",
+        "severity": "medium"
+      },
+      {
+        "name": "headline_non_empty",
+        "passed": true,
+        "message": "",
+        "severity": "medium"
+      },
+      {
+        "name": "confidence_calibration",
+        "passed": true,
+        "message": "",
+        "severity": "medium"
+      },
+      {
+        "name": "unknowns_when_thin_evidence",
+        "passed": true,
+        "message": "",
+        "severity": "low"
+      },
+      {
+        "name": "external_not_sole_source",
+        "passed": true,
+        "message": "",
+        "severity": "medium"
+      },
+      {
+        "name": "monitoring_plan_populated",
+        "passed": true,
+        "message": "",
+        "severity": "low"
+      }
+    ],
+    "created_at": "2026-06-21T15:52:51+08:00"
+  },
+  {
+    "id": 20,
+    "batch_id": "20260621T153700_SGT",
+    "run_id": "city_0_2024-06-21_20260621T155252_SGT",
+    "city_id": 0,
+    "dt": "2024-06-21",
+    "signal_label": "lift",
+    "eval_score": 0.75,
+    "eval_passed": true,
+    "alignment_score": 0.45,
+    "alignment_label": "partial",
+    "pros": [
+      "Stays at city/date grain with no product identifiers.",
+      "Confidence is medium, appropriately calibrated to evidence volume and unknowns.",
+      "Recommended action is specific and actionable for the Marketing & Promotions owner.",
+      "Caveats honestly acknowledge data limitations (baseline conflict, discount ambiguity)."
+    ],
+    "cons": [
+      "Violates guardrail 2: includes computed currency figure '$6,635' in business_impact (e.g., 'approximately $6,635 in incremental sales'). No dollar signs or computed revenue figures are permitted.",
+      "The deterministic audit explicitly flagged this currency term violation."
+    ],
+    "improvements": [
+      "Remove the dollar sign and any computed currency figures; report incremental impact as a normalized amount or percentage only.",
+      "Avoid stating monetary values entirely; rely on percentage lifts and normalized sales units.",
+      "Ensure the business_impact section uses only normalized figures (e.g., 'incremental lift of 6,635 normalized units' if needed)."
+    ],
+    "reviewer_comment": "The brief is well-structured and useful but fails a hard guardrail by including a dollar-denominated incremental sales figure, which must be corrected.",
+    "deterministic_checks": [
+      {
+        "name": "no_currency_terms",
+        "passed": false,
+        "message": "Currency term found: '$6'. sale_amount is a normalized amount, not currency. Remove dollar signs and computed currency figures.",
+        "severity": "high"
+      },
+      {
+        "name": "no_product_store_root_cause",
+        "passed": true,
+        "message": "",
+        "severity": "high"
+      },
+      {
+        "name": "evidence_non_empty",
+        "passed": true,
+        "message": "",
+        "severity": "medium"
+      },
+      {
+        "name": "headline_non_empty",
+        "passed": true,
+        "message": "",
+        "severity": "medium"
+      },
+      {
+        "name": "confidence_calibration",
+        "passed": true,
+        "message": "",
+        "severity": "medium"
+      },
+      {
+        "name": "unknowns_when_thin_evidence",
+        "passed": true,
+        "message": "",
+        "severity": "low"
+      },
+      {
+        "name": "external_not_sole_source",
+        "passed": true,
+        "message": "",
+        "severity": "medium"
+      },
+      {
+        "name": "monitoring_plan_populated",
+        "passed": true,
+        "message": "",
+        "severity": "low"
+      }
+    ],
+    "created_at": "2026-06-21T15:54:35+08:00"
+  }
+]

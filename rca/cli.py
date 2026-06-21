@@ -45,6 +45,24 @@ def _cmd_mcp(_: argparse.Namespace) -> None:
     mcp.run()
 
 
+def _cmd_export(args: argparse.Namespace) -> None:
+    import json
+    import pathlib
+    from rca.config import TABLE_SIMULATE_REVIEW, make_supabase_schema_client
+
+    client = make_supabase_schema_client()
+    query = client.table(TABLE_SIMULATE_REVIEW).select("*").eq("city_id", args.city).order("created_at")
+    if args.batch:
+        query = query.eq("batch_id", args.batch)
+    result = query.execute()
+    rows = result.data or []
+
+    out = pathlib.Path(args.output)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(rows, indent=2, ensure_ascii=False), encoding="utf-8")
+    _safe_print(f"Exported {len(rows)} rows to {out}")
+
+
 def _cmd_simulate(args: argparse.Namespace) -> None:
     from rca.simulate import simulate_city
 
@@ -89,6 +107,15 @@ def main() -> None:
         help="Launch the FastMCP tool server",
     )
     mcp_parser.set_defaults(func=_cmd_mcp)
+
+    export_parser = subparsers.add_parser(
+        "export",
+        help="Export simulate_review rows for a city to a local JSON file",
+    )
+    export_parser.add_argument("--city", required=True, type=int, help="City ID (0-17)")
+    export_parser.add_argument("--batch", default=None, help="Filter to a specific batch_id")
+    export_parser.add_argument("--output", required=True, help="Output file path (e.g. results/city0_flash.json)")
+    export_parser.set_defaults(func=_cmd_export)
 
     simulate_parser = subparsers.add_parser(
         "simulate",
