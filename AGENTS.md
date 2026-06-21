@@ -81,6 +81,18 @@ All tools read directly from Supabase `rca.*` tables.
 - `rca.memory`
 - `rca.evidence_cache`
 - `rca.external_events`
+- `rca.replay_review`
+
+## Replay and Self-Review
+
+`rca replay --city N` orchestrates incremental quality improvement:
+
+1. **Reset** (default on): delete all outputs + caches for the city (outcomes, events, completions, memory, evidence_cache, external_events). Signals and base tables are untouched.
+2. **Rerun**: process all triggered `drop`/`lift` dates oldest→latest. Memory accumulates across dates so the agent learns as it processes the batch.
+3. **Review**: after each date, the alignment reviewer scores the output against the project guardrails (deterministic audits + LLM judge). Result stored in `rca.replay_review`.
+4. **Batch summary**: prints avg eval score, avg alignment score, pass count, and top 3 recurring cons.
+
+Batches are identified by `batch_id` (timestamp by default). Compare batch quality by querying `rca.replay_review` across `batch_id` values.
 
 ## The Dashboard
 

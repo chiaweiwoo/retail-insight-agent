@@ -15,7 +15,10 @@ The v2 direction is:
 ```bash
 uv run python -m rca.cli build
 uv run python -m rca.cli signal
-uv run python -m rca.cli run --city 0 --date 2024-06-09
+uv run python -m rca.cli run --city 0 --date 2024-04-01
+uv run python -m rca.cli run --city 0 --date 2024-04-01 --dry-run
+uv run python -m rca.cli replay --city 0
+uv run python -m rca.cli replay --city 0 --dry-run --limit 3
 uv run python -m rca.cli mcp
 ```
 
@@ -40,6 +43,13 @@ uv run python -m rca.cli mcp
   - evaluates output with 8 deterministic audit checks and a 0-to-1 quality score
   - distils reusable lessons into city memory
   - stores the full outcome (decision brief, evidence ledger, investigation rounds, evaluation) in Supabase
+
+- `rca replay`
+  - resets all city outputs and caches (outcomes, events, completions, memory, evidence_cache)
+  - reruns all triggered signal dates oldest→latest so memory accumulates across the batch
+  - after each date, the alignment reviewer scores the output (deterministic audits + LLM judge)
+  - stores per-date quality scores in `rca.replay_review` for incremental improvement tracking
+  - prints a batch summary: avg eval score, avg alignment score, pass count, top recurring cons
 
 - `rca mcp`
   - exposes the evidence tools through FastMCP for learning and experimentation
@@ -80,7 +90,9 @@ See:
 
 - [AGENT_SYSTEM_OVERVIEW.md](/C:/Users/chiaw/OneDrive/Desktop/playground/retail_insight_agent/docs/AGENT_SYSTEM_OVERVIEW.md)
 - [AGENT_SYSTEM_DESIGN.md](/C:/Users/chiaw/OneDrive/Desktop/playground/retail_insight_agent/docs/AGENT_SYSTEM_DESIGN.md)
+- [AGENT_SYSTEM_TECHNICAL_WALKTHROUGH.md](/C:/Users/chiaw/OneDrive/Desktop/playground/retail_insight_agent/docs/AGENT_SYSTEM_TECHNICAL_WALKTHROUGH.md)
 - [0001-v2-core-decisions.md](/C:/Users/chiaw/OneDrive/Desktop/playground/retail_insight_agent/docs/adr/0001-v2-core-decisions.md)
 - [0002-agentic-investigation-upgrade.md](/C:/Users/chiaw/OneDrive/Desktop/playground/retail_insight_agent/docs/adr/0002-agentic-investigation-upgrade.md)
 - [0003-level-5-learning-mode-agent.md](/C:/Users/chiaw/OneDrive/Desktop/playground/retail_insight_agent/docs/adr/0003-level-5-learning-mode-agent.md)
+- [0004-city-replay-review-harness.md](/C:/Users/chiaw/OneDrive/Desktop/playground/retail_insight_agent/docs/adr/0004-city-replay-review-harness.md)
 - [PRD.md](/C:/Users/chiaw/OneDrive/Desktop/playground/retail_insight_agent/docs/PRD.md)

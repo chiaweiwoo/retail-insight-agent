@@ -47,6 +47,26 @@ def _cmd_mcp(_: argparse.Namespace) -> None:
     mcp.run()
 
 
+def _cmd_replay(args: argparse.Namespace) -> None:
+    from rca.replay import replay_city
+
+    if not args.no_reset:
+        _safe_print(
+            f"WARNING: --reset is ON. This will delete all outcomes, events, completions,\n"
+            f"         memory, evidence_cache, and external_events for city {args.city}.\n"
+            f"         Pass --no-reset to skip. Proceeding in 0s...\n"
+        )
+
+    replay_city(
+        args.city,
+        reset=not args.no_reset,
+        dry_run=args.dry_run,
+        limit=args.limit,
+        review=not args.no_review,
+        batch_id=args.batch_id,
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="rca",
@@ -80,6 +100,45 @@ def main() -> None:
         help="Launch the FastMCP tool server",
     )
     mcp_parser.set_defaults(func=_cmd_mcp)
+
+    replay_parser = subparsers.add_parser(
+        "replay",
+        help="Reset state and rerun all triggered signal dates for a city, with quality review",
+    )
+    replay_parser.add_argument("--city", required=True, type=int, help="City ID (0-17)")
+    replay_parser.add_argument(
+        "--no-reset",
+        action="store_true",
+        dest="no_reset",
+        help="Skip the destructive state reset (keep existing memory and outputs)",
+    )
+    replay_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        dest="dry_run",
+        help="Use the stub LLM client for both RCA and the alignment reviewer",
+    )
+    replay_parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        dest="limit",
+        metavar="N",
+        help="Only process the first N triggered signal dates",
+    )
+    replay_parser.add_argument(
+        "--no-review",
+        action="store_true",
+        dest="no_review",
+        help="Skip the LLM alignment review and replay_review storage",
+    )
+    replay_parser.add_argument(
+        "--batch-id",
+        default=None,
+        dest="batch_id",
+        help="Override the batch ID (default: timestamp)",
+    )
+    replay_parser.set_defaults(func=_cmd_replay)
 
     args = parser.parse_args()
     args.func(args)
