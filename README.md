@@ -8,7 +8,7 @@ The v2 direction is:
 - rawer business facts in Supabase
 - agent-side reasoning at runtime
 - internal plus external factor investigation
-- simple dashboard for signals, results, memory, and logs
+- simple dashboard for signals, results, replay review, memory, and logs
 
 ## Public CLI
 
@@ -37,8 +37,8 @@ uv run python -m rca.cli mcp
 - `rca run`
   - retrieves signal evidence and city memory from Supabase
   - runs a bounded LangGraph investigation loop (up to 5 rounds by default)
-  - each round: planner selects agents → agents run in parallel → evidence accumulates → critic reviews and decides whether to continue
-  - produces a structured DecisionBrief with RCA, prediction, and prescription sections
+  - each round: planner selects agents -> agents run in parallel -> evidence accumulates -> critic reviews and decides whether to continue
+  - produces a structured `DecisionBrief` with RCA, prediction, and prescription sections
   - evaluates output with 8 deterministic audit checks and a 0-to-1 quality score
   - distils reusable lessons into city memory
   - stores the full outcome (decision brief, evidence ledger, investigation rounds, evaluation) in Supabase
@@ -47,9 +47,9 @@ uv run python -m rca.cli mcp
   - keeps existing city outputs and memory by default
   - deletes city outputs, memory, and caches only when `--reset` is passed
   - reruns all triggered signal dates oldest to latest so memory accumulates across the batch
-  - after each date, the alignment reviewer scores the output (deterministic audits + LLM judge)
+  - reviews each replayed date with deterministic audits plus the alignment reviewer
   - stores per-date quality scores in `rca.replay_review` for incremental improvement tracking
-  - prints a batch summary: avg eval score, avg alignment score, pass count, top recurring cons
+  - prints a batch summary: average evaluator score, average alignment score, pass count, and top recurring cons
 
 - `rca mcp`
   - exposes the evidence tools through FastMCP for learning and experimentation
@@ -81,6 +81,7 @@ The dashboard keeps the surface intentionally small:
 - city timeline of actual sales vs synthetic business goal
 - clickable drop/lift markers
 - RCA page with root cause, prediction, and prescription
+- replay page with batch summaries and per-date review feedback from `rca replay`
 - logs page for events, completions, and tool-call traces
 - memory page for distilled lessons
 
@@ -88,6 +89,7 @@ The dashboard keeps the surface intentionally small:
 
 See:
 
+- [AGENT_SYSTEM_STUDY_NOTES.md](/C:/Users/chiaw/OneDrive/Desktop/playground/retail_insight_agent/docs/AGENT_SYSTEM_STUDY_NOTES.md)
 - [AGENT_SYSTEM_OVERVIEW.md](/C:/Users/chiaw/OneDrive/Desktop/playground/retail_insight_agent/docs/AGENT_SYSTEM_OVERVIEW.md)
 - [AGENT_SYSTEM_DESIGN.md](/C:/Users/chiaw/OneDrive/Desktop/playground/retail_insight_agent/docs/AGENT_SYSTEM_DESIGN.md)
 - [AGENT_SYSTEM_TECHNICAL_WALKTHROUGH.md](/C:/Users/chiaw/OneDrive/Desktop/playground/retail_insight_agent/docs/AGENT_SYSTEM_TECHNICAL_WALKTHROUGH.md)

@@ -35,7 +35,7 @@ Working notes and guardrails for the v2 RCA agent system.
 
 ## The LangGraph Pipeline
 
-Orchestration is handled by LangGraph via `RcaState`. Graph: `START → investigation_loop → decision → evaluation → memory → record → END`.
+Orchestration is handled by LangGraph via `RcaState`. Graph: `START -> investigation_loop -> decision -> evaluation -> memory -> record -> END`.
 
 The investigation loop is a bounded Python function (not a LangGraph subgraph) that runs up to `RCA_MAX_INVESTIGATION_ROUNDS` rounds:
 
@@ -92,7 +92,7 @@ All tools read directly from Supabase `rca.*` tables.
 1. **Optional reset**: only `--reset` deletes outputs + caches for the city (outcomes, events, completions, memory, evidence_cache, external_events). Signals and base tables are untouched.
 2. **Rerun**: process all triggered `drop`/`lift` dates oldest to latest. Memory accumulates across dates so the agent learns as it processes the batch.
 3. **Review**: after each date, the alignment reviewer scores the output against the project guardrails (deterministic audits + LLM judge). Result stored in `rca.replay_review`.
-4. **Batch summary**: prints avg eval score, avg alignment score, pass count, and top 3 recurring cons.
+4. **Batch summary**: prints average eval score, average alignment score, pass count, and top 3 recurring cons.
 
 Batches are identified internally by timestamp `batch_id`. Compare batch quality by querying `rca.replay_review` across `batch_id` values.
 
@@ -103,6 +103,7 @@ The UI is a Next.js App Router app in `dashboard/`. It reads from the `rca` sche
 - `/` -> City signal heatmap with clickable city/date cells.
 - `/cities/[cityId]` -> City timeline of actual sales versus synthetic business goal with clickable signal markers.
 - `/cities/[cityId]/rca` -> RCA history with decision card, RCA, prediction, and prescription.
+- `/cities/[cityId]/replay` -> Replay batch review page for `rca replay`, including evaluator scores, reviewer notes, and recurring weaknesses.
 - `/cities/[cityId]/logs` -> Run logs and completion records.
 - `/cities/[cityId]/profile` -> Distilled memory notes.
 

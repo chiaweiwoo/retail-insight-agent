@@ -5,12 +5,12 @@ Read `README.md` first for the current workflow.
 ## Useful Commands
 
 ```bash
-uv run python -m rca.cli build                         # ingest parquet and push base tables to Supabase
-uv run python -m rca.cli signal                        # materialize rca.signals from ingested tables
+uv run python -m rca.cli build                          # ingest parquet and push base tables to Supabase
+uv run python -m rca.cli signal                         # materialize rca.signals from ingested tables
 uv run python -m rca.cli run --city 0 --date 2024-04-01 # run RCA for one city/date
-uv run python -m rca.cli replay --city 0               # rerun all signal dates and review
-uv run python -m rca.cli replay --city 0 --reset       # delete city outputs/memory first, then replay
-uv run python -m rca.cli mcp                           # start the FastMCP tool server
+uv run python -m rca.cli replay --city 0                # rerun all signal dates and review
+uv run python -m rca.cli replay --city 0 --reset        # delete city outputs/memory first, then replay
+uv run python -m rca.cli mcp                            # start the FastMCP tool server
 ```
 
 ## Important Behavior
@@ -38,6 +38,15 @@ Signal trigger: drop <= -10%, lift >= +25% vs synthetic business goal. Threshold
 Runbook: `rca build` -> `rca signal` -> `rca run --city N --date YYYY-MM-DD` or `rca replay --city N`.
 
 Supabase is the sole system of record (`rca` schema).
+
+## Dashboard Inspection Surfaces
+
+- `/` for city/date signals
+- `/cities/[cityId]` for actual vs goal trend and clickable signal markers
+- `/cities/[cityId]/rca` for final decision output
+- `/cities/[cityId]/replay` for replay-review batches from `rca replay`
+- `/cities/[cityId]/logs` for workflow and completion traces
+- `/cities/[cityId]/profile` for distilled memory
 
 ## Sandbox Caveats
 

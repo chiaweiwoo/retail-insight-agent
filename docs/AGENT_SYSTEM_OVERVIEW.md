@@ -21,7 +21,7 @@ If you want the more advanced design material about how to build a strong agenti
 3. Big picture architecture
 4. What data and assets we have
 5. Why the system uses city/date grain
-6. Why `build`, `signal`, and `run` are split
+6. Why `build`, `signal`, `run`, and `replay` are split
 7. What the main agents do
 8. What Supabase stores
 9. What the dashboard shows
@@ -42,21 +42,23 @@ The project is meant to feel closer to a small analyst-agent harness than to a s
 The main learning goals are:
 
 - how to turn rawer business data into an agent workflow
-- how to separate ingestion, screening, reasoning, memory, and presentation
+- how to separate ingestion, screening, reasoning, memory, evaluation, and presentation
 - how to let the LLM do meaningful work at runtime instead of hiding everything in ETL
 - how to inspect what the agent did after a run
+- how to compare batches of runs and see whether the system is improving
 - how to keep the system small enough to understand end to end
 
 This project is designed to teach agent engineering, not just app building.
 
 ## Big picture architecture
 
-At a high level, the project has four layers:
+At a high level, the project has five layers:
 
 1. Data ingestion layer
 2. Signal generation layer
 3. LLM runtime layer
-4. Dashboard and inspection layer
+4. Replay and quality-review layer
+5. Dashboard and inspection layer
 
 The flow is:
 
@@ -77,6 +79,10 @@ agent workflow + tools + memory
   ->
 outcomes / logs / completions / memory
   ->
+rca replay --city
+  ->
+replay_review rows + batch summary
+  ->
 dashboard
 ```
 
@@ -84,7 +90,8 @@ This split matters because it keeps each layer understandable:
 
 - `build` prepares stable facts
 - `signal` chooses where attention should go
-- `run` explains what happened
+- `run` explains what happened for one city/date
+- `replay` compares many runs and helps us study learning behavior
 
 ## What data and assets we have
 
@@ -100,7 +107,7 @@ The main assets in this project are:
 There are two broad classes of assets:
 
 - stable assets such as raw data, base tables, and CLI commands
-- experimental assets such as signal rules, prompts, memory, and agent behavior
+- experimental assets such as signal rules, prompts, memory, replay review, and agent behavior
 
 That split is important because not every part of an AI system should change at the same speed.
 
@@ -150,7 +157,7 @@ It is aggregated into city/date evidence such as:
 
 So product/store data still influences the runtime, just not as first-class runtime entities.
 
-## Why `build`, `signal`, and `run` are split
+## Why `build`, `signal`, `run`, and `replay` are split
 
 This is one of the most important design choices in the project.
 
@@ -196,11 +203,26 @@ Outputs:
 - sometimes `rca.evidence_cache`
 - sometimes `rca.external_events`
 
+### `rca replay`
+
+Purpose:
+
+- rerun every triggered date for one city
+- let memory accumulate over time
+- evaluate how stable or helpful the system is across many dates
+
+Outputs:
+
+- `rca.replay_review`
+- printed batch summaries
+- comparative learning signals for later debugging
+
 This separation gives the project a clean mental model:
 
 - build prepares facts
 - signal chooses where to look
 - run explains what happened
+- replay tells us whether the system is getting better
 
 ## What the main agents do
 
@@ -208,7 +230,7 @@ The system is built around a small set of agents, each with a narrow role.
 
 ### Planner
 
-Chooses which agents to run for a city/date.
+Chooses which agents to run for a city/date and which gaps matter next.
 
 ### Statistician
 
@@ -236,7 +258,7 @@ Looks at weekday, inferred holiday, and weather context.
 
 ### News agent
 
-Looks for external factors if research is enabled.
+Looks for external factors if research is enabled and the loop has a real external-context gap.
 
 ### Critic
 
@@ -249,6 +271,10 @@ Synthesizes the investigation into the final business-facing answer.
 ### Memory distiller
 
 Extracts reusable lessons from a completed run.
+
+### Replay reviewer
+
+Scores replayed outputs after the fact so we can compare batches and recurring weaknesses.
 
 ## What Supabase stores
 
@@ -276,6 +302,7 @@ LLM runtime tables:
 - `memory`
 - `evidence_cache`
 - `external_events`
+- `replay_review`
 
 Supabase matters here because it gives us one place to inspect both data facts and agent traces.
 
@@ -302,6 +329,15 @@ Shows actual sales versus the synthetic business goal through time.
 ### RCA page
 
 Shows the final business-facing explanation.
+
+### Replay page
+
+Shows the batch-level output of `rca replay`:
+
+- which dates were replayed
+- average evaluator and alignment scores
+- reviewer pros, cons, and improvements
+- deterministic checks per replayed date
 
 ### Logs page
 
@@ -370,7 +406,21 @@ Then inspect:
 - `rca.completions`
 - `rca.memory`
 
-### 4. Check dashboard wiring
+### 4. Check replay review
+
+Run:
+
+```bash
+uv run python -m rca.cli replay --city 0
+```
+
+Then inspect:
+
+- `rca.replay_review`
+- the printed batch summary
+- whether later dates seem to benefit from prior memory
+
+### 5. Check dashboard wiring
 
 If backend data looks correct but the UI looks wrong:
 
@@ -378,7 +428,7 @@ If backend data looks correct but the UI looks wrong:
 - verify the page is querying the correct table
 - verify you are not looking at a stale deployment
 
-### 5. Check permissions
+### 6. Check permissions
 
 If writes silently disappear:
 
@@ -395,5 +445,6 @@ If you only remember a few things from this project, remember these:
 - let the LLM do real reasoning, but not all the work
 - small, bounded agents are easier to trust than one vague super-agent
 - memory is usually reusable state with policy
+- replay plus review is how learning systems become inspectable over time
 - logs and traces are part of the product when the goal is learning
 - a simple dashboard can teach more than a fancy one
