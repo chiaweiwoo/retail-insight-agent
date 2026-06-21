@@ -4,7 +4,7 @@ Combines the Phase 3 deterministic audits with an LLM alignment judge that
 scores each outcome against the project's core guardrails and management
 usefulness criteria.
 
-The LLM judge runs by default. Under --dry-run it uses the stub client.
+The LLM judge runs by default. Tests can inject the stub client directly.
 """
 from __future__ import annotations
 

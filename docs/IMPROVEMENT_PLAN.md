@@ -5,6 +5,8 @@
 > right but mechanically half-broken and uncommitted on `main`. This plan stabilises it, makes the city grain
 > real, **adds an intraday (24-hour) explanatory layer and a statistical/ML layer**, fixes the trigger science,
 > and moves logging mostly to the cloud.
+> 
+> **Archived note:** this file is historical planning material. The current public CLI is documented in `README.md` and is limited to `build`, `signal`, `run --city --date`, `replay --city [--reset]`, and `mcp`.
 >
 > **Status: City-Grain Pivot and Dashboard Heatmap are Complete.** The core metrics, database logic, agent prompts, and the Next.js frontend have been successfully refactored to focus on City-Level aggregations (18 cities, 90 days). The Fleet Overview dashboard now uses an elegant 14-day heatmap.
 > 
@@ -102,7 +104,7 @@ _Checkpoint:_ branch exists, WIP committed, scratch gone, import + pytest green.
 - **B5. Supabase schema truth (you run the SQL).** One migration: rename `store_id`→`city_id` (int), `prefix`→`density_tier`/segment, drop the `store_series` (store×product) table, align table names to the `rca_city_*` set, add `rca_city_hourly` + analytics tables. **I author it; you run it in the SQL Editor.** Then fix every `.eq("store_id", …)`/upsert key and the `reset` `.neq` bug.
 - **B6. Read-source abstraction.** Introduce `DataSource` with `SupabaseSource` (production) and `DuckDBSource` (offline test). Move `signals.py` / `tools.py` / `evidence.py` data access off the direct `duckdb.connect(...)` calls onto the injected source. Production runs read Supabase; dry-run/CI inject `DuckDBSource`. (Can land incrementally: keep DuckDB reads working until `SupabaseSource` is verified against the same numbers.)
 
-_Checkpoint:_ `rca run --city 0 --dt <d> --dry-run --full` green via `DuckDBSource`; a live run reads Supabase and returns the same numbers as the local staging file for a spot-checked city-day; pytest green; no "store" except in raw-data column notes and git history.
+_Checkpoint:_ graph integration tests use injected stubs; a live run reads Supabase and returns the same numbers as the local staging file for a spot-checked city-day; pytest green; no "store" except in raw-data column notes and git history.
 
 ---
 
@@ -120,12 +122,12 @@ _Checkpoint:_ residual-based triggers balanced (not lift-swamped); summary doc r
 
 ## Round D — Chronological replay + mostly-cloud logging
 
-- **D1. `rca replay --city <id> [--limit N]`.** Select that city's trigger days (post-warmup), run oldest→newest, distil after each so memory accumulates; write a short "how the profile evolved" summary. Primary demo/test.
+- **D1. `rca replay --city <id>`.** Select that city's trigger days (post-warmup), run oldest to newest, distil after each so memory accumulates; write a short "how the profile evolved" summary. Primary demo/test.
 - **D2. `rca reset-memory --city <id> | --all`.** Int-safe; clears `rca_outcome` (+ `rca_city_profile`); never touches dim/fact/analytics; prints what was cleared.
 - **D3. Mostly-cloud logging.** `RunSink` abstraction (the write side, paired with the `DataSource` read side from B6): `CloudSink` (Supabase + Langfuse) authoritative; `LocalMirrorSink` writes the optional `--save-local` debug copy; dry-run/CI use in-memory or the mirror (no network). Remove `RunLogger.write_to_db`→`runs.duckdb` and the always-on local artifact writes.
 - **D4. Cleanup.** Delete `data/runs.duckdb`, `output/story_reports/`, old `agent_benchmark_runs/`; update `.gitignore`. `eval`/`story` read from Supabase in prod, the local mirror/fixture in dev.
 
-_Checkpoint:_ `reset-memory --city 0` then `replay --city 0 --limit 3 --dry-run` shows trigger count 0→3 and `pattern` reflecting history by run 3; a normal run writes nothing local unless `--save-local`; pytest green.
+_Checkpoint:_ `replay --city 0 --reset` shows triggered dates processed oldest to newest and memory reflecting history by later runs; pytest green.
 
 ---
 

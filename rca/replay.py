@@ -66,7 +66,7 @@ def reset_city_state(city_id: int) -> dict[str, int]:
 # ── Signal dates ──────────────────────────────────────────────────────────────
 
 
-def find_signal_dates(city_id: int, limit: int | None = None) -> list[str]:
+def find_signal_dates(city_id: int) -> list[str]:
     """Return triggered (drop/lift) dates for the city, oldest first."""
     from rca.config import TABLE_SIGNALS
 
@@ -78,8 +78,6 @@ def find_signal_dates(city_id: int, limit: int | None = None) -> list[str]:
         .in_("signal_label", ["drop", "lift"])
         .order("dt")
     )
-    if limit is not None:
-        query = query.limit(limit)
     result = query.execute()
     return [str(row["dt"]) for row in (result.data or [])]
 
@@ -90,11 +88,7 @@ def find_signal_dates(city_id: int, limit: int | None = None) -> list[str]:
 def replay_city(
     city_id: int,
     *,
-    reset: bool = True,
-    dry_run: bool = False,
-    limit: int | None = None,
-    review: bool = True,
-    batch_id: str | None = None,
+    reset: bool = False,
     settings: Any = None,
     client_factory: Any = None,
 ) -> ReplaySummary:
@@ -103,10 +97,7 @@ def replay_city(
     Memory accumulates across dates within the batch so the agent learns
     as it processes oldest to latest dates: the intended learning-mode replay.
     """
-    from rca.stubclient import stub_client_factory
-
-    effective_batch_id = batch_id or current_timestamp_sgt_label()
-    effective_client_factory = stub_client_factory if dry_run else client_factory
+    effective_batch_id = current_timestamp_sgt_label()
 
     if reset:
         counts = reset_city_state(city_id)
@@ -114,7 +105,7 @@ def replay_city(
         for table, n in counts.items():
             _print(f"  {table}: {n} rows deleted")
 
-    dates = find_signal_dates(city_id, limit=limit)
+    dates = find_signal_dates(city_id)
     if not dates:
         _print(f"No triggered signal dates found for city {city_id}.")
         return ReplaySummary(
@@ -139,7 +130,7 @@ def replay_city(
                 city_id=city_id,
                 dt=dt,
                 settings=settings,
-                client_factory=effective_client_factory,
+                client_factory=client_factory,
             )
         except Exception as exc:
             _print(f"  {dt}  ERROR during run: {exc}")
@@ -154,33 +145,33 @@ def replay_city(
             passed_count += 1
 
         alignment_label = ""
-        if review:
-            try:
-                rv = review_outcome(
-                    decision_brief=result.get("decision_brief") or {},
-                    evidence_ledger=result.get("evidence_ledger") or [],
-                    decision_card_markdown=result.get("final_report") or "",
-                    settings=_load_settings_if_needed(settings, dry_run),
-                    client_factory=effective_client_factory,
-                    run_id=run_id,
-                )
-                alignment_scores.append(rv.alignment_score)
-                all_cons.extend(rv.cons)
-                alignment_label = rv.alignment_label
-                store_replay_review(
-                    batch_id=effective_batch_id,
-                    run_id=run_id,
-                    city_id=city_id,
-                    dt=dt,
-                    signal_label=signal_label,
-                    review=rv,
-                )
-            except Exception as exc:
-                alignment_label = f"error:{exc}"
+        try:
+            review_settings = _load_settings_if_needed(settings, client_factory)
+            rv = review_outcome(
+                decision_brief=result.get("decision_brief") or {},
+                evidence_ledger=result.get("evidence_ledger") or [],
+                decision_card_markdown=result.get("final_report") or "",
+                settings=review_settings,
+                client_factory=_client_factory_if_needed(review_settings, client_factory),
+                run_id=run_id,
+            )
+            alignment_scores.append(rv.alignment_score)
+            all_cons.extend(rv.cons)
+            alignment_label = rv.alignment_label
+            store_replay_review(
+                batch_id=effective_batch_id,
+                run_id=run_id,
+                city_id=city_id,
+                dt=dt,
+                signal_label=signal_label,
+                review=rv,
+            )
+        except Exception as exc:
+            alignment_label = f"error:{exc}"
 
         _print(
             f"  {dt}  {signal_label:<6}  eval={eval_score:.2f}{' PASS' if eval_passed else ' FAIL'}"
-            + (f"  {alignment_label}" if review else "")
+            + f"  {alignment_label}"
         )
 
     avg_eval = sum(eval_scores) / len(eval_scores) if eval_scores else 0.0
@@ -230,14 +221,22 @@ def _print_summary(summary: ReplaySummary) -> None:
     _print(f"{'-' * 50}\n")
 
 
-def _load_settings_if_needed(settings: Any, dry_run: bool) -> Any:
-    """Return settings if provided; load from env if not (stub skips the key check)."""
+def _load_settings_if_needed(settings: Any, client_factory: Any) -> Any:
+    """Return settings if provided; use stub settings for injected test clients."""
     if settings is not None:
         return settings
-    if dry_run:
+    if client_factory is not None:
         from rca.llm import LLMSettings
 
         return LLMSettings(api_key="stub", base_url="stub", model="stub", thinking_enabled=False)
     from rca.llm import load_llm_settings
 
     return load_llm_settings()
+
+
+def _client_factory_if_needed(settings: Any, client_factory: Any) -> Any:
+    if client_factory is not None:
+        return client_factory
+    from rca.llm import build_openai_compatible_client
+
+    return lambda _: build_openai_compatible_client(settings)

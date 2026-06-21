@@ -2,49 +2,90 @@
 
 ## Status
 
-Implemented (commit following Phase 3 / ADR 0003).
+Implemented.
 
 ## Context
 
-After Phases 1–3 delivered the bounded investigation loop, deterministic audits, and gated stat tools, a review of the system revealed two gaps:
+After the Level 5 learning-mode refactor, the project needed two practical safeguards:
 
-1. **No end-to-end verification**: CI only ran `import ok`. The dry-run path (`--dry-run` / stub client) was silently broken — `str.format()` in the stub client collided with literal JSON braces introduced in Phase 2's structured outputs, causing a `KeyError` on every dry-run. This went undetected because there was no integration test.
+1. A reliable end-to-end test path that exercises the graph without calling a real LLM.
+2. A way to replay every triggered date for one city, accumulate memory chronologically, and compare RCA quality across batches.
 
-2. **No way to systematically assess output quality**: Running `rca run` on one date gives one result. There was no mechanism to replay all triggered dates for a city, accumulate memory across them (the actual learning-mode use case), and compare quality before/after changes.
+The public CLI was later simplified so agents do not pass unnecessary or dangerous flags.
 
-This ADR records the decisions made to address both gaps.
+## Decision 1: Stub Client Stays Internal
 
-## Decision 1 — Fix the stub client and add an integration test
+The deterministic stub client remains available to tests through Python injection, not through a public CLI flag.
 
-`str.format()` was replaced with `str.replace("{city}", ...).replace("{dt}", ...)` in `rca/stubclient.py`. This affects only the two actual placeholders in the `news_query` stub and is safe for all other stubs (which contain no `{...}` sequences).
+The graph integration test exercises:
 
-A new `tests/test_graph_integration.py` runs the full LangGraph graph (`investigation_loop → decision → evaluation → memory → record`) end-to-end through the stub client, with Supabase calls patched at the module-import boundary. This test would have caught the stub crash immediately. It is now part of CI via the `import ok` check (which imports the graph) and `pytest` (which runs the test). Future sessions must not break this test.
+```text
+investigation_loop -> decision -> evaluation -> memory -> record
+```
 
-## Decision 2 — Reset scope: everything including caches and memory
+This keeps CI useful without exposing `--dry-run` to humans or agents.
 
-`rca replay --city N` deletes: `outcomes`, `events`, `completions`, `memory`, `evidence_cache`, `external_events` for the city. Signals and base tables (`sales`, `inventory`, etc.) are never touched.
+## Decision 2: Replay Is Full-City And Reviewed
 
-Rationale: a full cold-start reset makes each batch reproducible and comparable. If you want to accumulate on top of existing memory (e.g., to test whether a prompt change improves on an already-warmed city), use `--no-reset`. Deleting `evidence_cache` forces fresh tool calls, which is correct when you want to measure whether the investigation itself improved, not just whether the cache helped.
+`rca replay --city N` processes all triggered `drop` and `lift` signal dates for that city from oldest to latest.
 
-## Decision 3 — Alignment reviewer on by default
+Replay always runs the alignment reviewer after each date and stores review rows in `rca.replay_review`.
 
-The LLM alignment judge runs after every date in a replay batch, using the deep model. Rationale: the replay harness is explicitly for quality improvement iteration, not production throughput. The cost of one extra LLM call per date is acceptable. Under `--dry-run`, the stub client handles `"reviewer"` without a real API call. Under `--no-review`, the LLM judge is skipped entirely.
+There is no public `--limit`, `--no-review`, or `--batch-id` flag. Batch IDs are generated internally with a timestamp.
 
-The reviewer prompt (`REVIEWER_ALIGNMENT_PROMPT` in `rca/reviewer.py`) covers eight criteria grouped into hard guardrails (city/date grain, no currency, internal evidence primary, confidence calibrated, "unknown" allowed) and usefulness criteria (actionable recommendation, concrete monitoring, evidence traceability, honest caveats).
+## Decision 3: Reset Is Explicit
 
-## Decision 4 — `rca.replay_review` table for incremental improvement
+Plain replay is non-destructive:
 
-One row per (batch, city, date). Columns: `batch_id`, `run_id`, `eval_score`, `eval_passed`, `alignment_score`, `alignment_label`, `pros`, `cons`, `improvements`, `reviewer_comment`, `deterministic_checks` (JSONB), `created_at`.
+```bash
+rca replay --city 0
+```
 
-This lets you compare quality across batches by querying `batch_id`. The batch summary printed to stdout (avg scores, top recurring cons) is a convenience view of the same data.
+Destructive cold-start replay is explicit:
 
-## Operational runbook addendum
+```bash
+rca replay --city 0 --reset
+```
 
-After any migration that drops and recreates `rca.signals`, run `rca signal` immediately. The Phase 1 migration did this silently and left the signals table empty, breaking all `rca run` calls until `rca signal` was re-run manually. This is now documented in `CLAUDE.md`.
+`--reset` deletes city rows from:
+
+- `outcomes`
+- `events`
+- `completions`
+- `memory`
+- `evidence_cache`
+- `external_events`
+
+Signals and base tables are never touched by replay reset.
+
+## Decision 4: Replay Review Storage
+
+`rca.replay_review` stores one row per replayed city/date within a generated batch.
+
+Important fields:
+
+- `batch_id`
+- `run_id`
+- `city_id`
+- `dt`
+- `signal_label`
+- `eval_score`
+- `eval_passed`
+- `alignment_score`
+- `alignment_label`
+- `pros`
+- `cons`
+- `improvements`
+- `reviewer_comment`
+- `deterministic_checks`
+
+This lets us compare quality across replay batches without adding more public CLI switches.
 
 ## Invariants
 
-- The public CLI (`build`, `signal`, `run`, `mcp`) is unchanged.
-- `replay` is additive — it calls the same `run_rca_graph` as `rca run`.
-- `--dry-run` must exercise the full pipeline: investigation_loop → decision → evaluation → memory → record → review. The integration test enforces this.
-- The reviewer prompt constant `REVIEWER_ALIGNMENT_PROMPT` must be audited before changes (per the project's prompt-audit rule).
+- Public CLI is intentionally small: `build`, `signal`, `run`, `replay`, `mcp`.
+- `run` accepts only `--city` and `--date`.
+- `replay` accepts only `--city` and optional `--reset`.
+- Replay uses the same `run_rca_graph` path as `rca run`.
+- Stub execution remains internal to tests.
+- The reviewer prompt must be audited before changes.

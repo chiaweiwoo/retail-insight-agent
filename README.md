@@ -16,9 +16,8 @@ The v2 direction is:
 uv run python -m rca.cli build
 uv run python -m rca.cli signal
 uv run python -m rca.cli run --city 0 --date 2024-04-01
-uv run python -m rca.cli run --city 0 --date 2024-04-01 --dry-run
 uv run python -m rca.cli replay --city 0
-uv run python -m rca.cli replay --city 0 --dry-run --limit 3
+uv run python -m rca.cli replay --city 0 --reset
 uv run python -m rca.cli mcp
 ```
 
@@ -45,8 +44,9 @@ uv run python -m rca.cli mcp
   - stores the full outcome (decision brief, evidence ledger, investigation rounds, evaluation) in Supabase
 
 - `rca replay`
-  - resets all city outputs and caches (outcomes, events, completions, memory, evidence_cache)
-  - reruns all triggered signal dates oldest→latest so memory accumulates across the batch
+  - keeps existing city outputs and memory by default
+  - deletes city outputs, memory, and caches only when `--reset` is passed
+  - reruns all triggered signal dates oldest to latest so memory accumulates across the batch
   - after each date, the alignment reviewer scores the output (deterministic audits + LLM judge)
   - stores per-date quality scores in `rca.replay_review` for incremental improvement tracking
   - prints a batch summary: avg eval score, avg alignment score, pass count, top recurring cons

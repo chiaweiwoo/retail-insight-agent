@@ -34,10 +34,8 @@ def _cmd_signal(_: argparse.Namespace) -> None:
 
 def _cmd_run(args: argparse.Namespace) -> None:
     from rca.graph import run_rca_graph
-    from rca.stubclient import stub_client_factory
 
-    client_factory = stub_client_factory if args.dry_run else None
-    result = run_rca_graph(city_id=args.city, dt=args.date, client_factory=client_factory)
+    result = run_rca_graph(city_id=args.city, dt=args.date)
     _safe_print(result["final_report"])
 
 
@@ -50,20 +48,15 @@ def _cmd_mcp(_: argparse.Namespace) -> None:
 def _cmd_replay(args: argparse.Namespace) -> None:
     from rca.replay import replay_city
 
-    if not args.no_reset:
+    if args.reset:
         _safe_print(
             f"WARNING: --reset is ON. This will delete all outcomes, events, completions,\n"
             f"         memory, evidence_cache, and external_events for city {args.city}.\n"
-            f"         Pass --no-reset to skip. Proceeding in 0s...\n"
         )
 
     replay_city(
         args.city,
-        reset=not args.no_reset,
-        dry_run=args.dry_run,
-        limit=args.limit,
-        review=not args.no_review,
-        batch_id=args.batch_id,
+        reset=args.reset,
     )
 
 
@@ -91,8 +84,7 @@ def main() -> None:
         help="Run the LangGraph RCA workflow for one city/date",
     )
     run_parser.add_argument("--city", required=True, type=int, help="City ID (0-17)")
-    run_parser.add_argument("--date", "--dt", required=True, dest="date", help="Date in YYYY-MM-DD format")
-    run_parser.add_argument("--dry-run", action="store_true", dest="dry_run", help="Use the stub LLM client")
+    run_parser.add_argument("--date", required=True, dest="date", help="Date in YYYY-MM-DD format")
     run_parser.set_defaults(func=_cmd_run)
 
     mcp_parser = subparsers.add_parser(
@@ -103,40 +95,14 @@ def main() -> None:
 
     replay_parser = subparsers.add_parser(
         "replay",
-        help="Reset state and rerun all triggered signal dates for a city, with quality review",
+        help="Rerun all triggered signal dates for a city, with quality review",
     )
     replay_parser.add_argument("--city", required=True, type=int, help="City ID (0-17)")
     replay_parser.add_argument(
-        "--no-reset",
+        "--reset",
         action="store_true",
-        dest="no_reset",
-        help="Skip the destructive state reset (keep existing memory and outputs)",
-    )
-    replay_parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        dest="dry_run",
-        help="Use the stub LLM client for both RCA and the alignment reviewer",
-    )
-    replay_parser.add_argument(
-        "--limit",
-        type=int,
-        default=None,
-        dest="limit",
-        metavar="N",
-        help="Only process the first N triggered signal dates",
-    )
-    replay_parser.add_argument(
-        "--no-review",
-        action="store_true",
-        dest="no_review",
-        help="Skip the LLM alignment review and replay_review storage",
-    )
-    replay_parser.add_argument(
-        "--batch-id",
-        default=None,
-        dest="batch_id",
-        help="Override the batch ID (default: timestamp)",
+        dest="reset",
+        help="Delete existing outputs and memory for the city before replaying",
     )
     replay_parser.set_defaults(func=_cmd_replay)
 

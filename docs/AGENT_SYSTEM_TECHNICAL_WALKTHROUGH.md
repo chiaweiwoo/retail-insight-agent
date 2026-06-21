@@ -71,7 +71,7 @@ At the time of writing, the CLI defines these commands:
 
 - calls `run_rca_graph()` from `rca/graph.py`
 - this is the main RCA runtime path
-- `--dry-run` swaps in the stub LLM client
+- public CLI always uses the configured LLM; tests inject the stub client internally
 
 `mcp`
 
@@ -1321,7 +1321,7 @@ If you want to go deeper after this walkthrough:
 1. Re-read `rca/agents.py` end to end.
 2. Re-read `rca/tools.py` and imagine which tool each agent is likely to use first.
 3. Read `rca/state.py` and ask which types are already used fully versus only partially.
-4. Run one `--dry-run` and inspect:
+4. Run the graph integration test with the injected stub client and inspect:
    - `rca.outcomes`
    - `rca.events`
    - `rca.completions`
