@@ -18,7 +18,7 @@ from rca.config import (
 ClientFactory = Callable[[str], Any]
 
 NODE_MODEL_MAP: dict[str, str] = {
-    "planner": "deep",
+    "planner": "fast",
     "statistician": "fast",
     "sales_agent": "fast",
     "inventory_agent": "fast",
@@ -26,12 +26,12 @@ NODE_MODEL_MAP: dict[str, str] = {
     "promotions_agent": "fast",
     "calendar_weather_agent": "fast",
     "news_agent": "fast",
-    "critic": "deep",
-    "coordinator": "deep",
-    "decision_brief": "deep",
-    "evaluation": "deep",
+    "critic": "fast",
+    "coordinator": "fast",
+    "decision_brief": "fast",
+    "evaluation": "fast",
     "memory_distiller": "fast",
-    "reviewer": "deep",
+    "reviewer": "fast",
 }
 
 
