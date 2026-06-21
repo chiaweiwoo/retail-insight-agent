@@ -7,6 +7,13 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, Callable
 
 from rca.config import AGENT_SKILLS_PATH, DEFAULT_LLM_MAX_TOOL_ROUNDS, SALES_FIELD_SEMANTICS, get_research_enabled
+
+MEMORY_DISTILLER_PROMPT = (
+    "Write short reusable city lessons from one RCA run.\n"
+    "Return markdown with section ## Lessons and 3-5 bullets.\n"
+    "Only extract lessons that are directly supported by evidence in the final report "
+    "— do not generalize beyond what was observed in this specific run.\n"
+)
 from rca.llm import LLMSettings, build_chat_completion_kwargs, build_openai_compatible_client, make_routed_settings
 from rca.memory import get_memory_notes, write_memory
 from rca.outcomes import record_completion
@@ -986,11 +993,7 @@ def run_memory_distiller(
             [
                 {
                     "role": "system",
-                    "content": (
-                        "Write short reusable city lessons from one RCA run.\n"
-                        "Return markdown with section ## Lessons and 3-5 bullets.\n"
-                        + skill
-                    ),
+                    "content": MEMORY_DISTILLER_PROMPT + skill,
                 },
                 {"role": "user", "content": final_report},
             ],

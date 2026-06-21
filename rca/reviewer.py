@@ -36,20 +36,25 @@ Your job is to assess how well an RCA decision brief aligns with the project's c
 9. Caveats must acknowledge data limitations honestly (unlabeled activity_flag, inferred holiday names, synthetic goals).
 
 ## Output format
-Return ONLY a valid JSON object with exactly these fields:
+Return ONLY valid JSON — no prose, no markdown, no explanation before or after.
+Use exactly these fields:
 {
   "alignment_score": <float 0.0–1.0, 1.0 = fully aligned>,
   "alignment_label": <"aligned" | "partial" | "misaligned">,
-  "pros": [<list of specific strengths, each a short sentence>],
-  "cons": [<list of specific violations or weaknesses, each a short sentence>],
-  "improvements": [<list of concrete suggestions, each a short sentence>],
+  "pros": [<2–4 specific strengths, each a short sentence>],
+  "cons": [<2–4 specific violations or weaknesses; each must quote or paraphrase a specific claim from the supplied brief or evidence — not a general quality concern>],
+  "improvements": [<2–4 concrete suggestions, each a short sentence>],
   "comment": <one-sentence overall verdict>
 }
+
+Only assess what is present in the supplied brief and evidence ledger.
+Do not invent problems or praise that are not grounded in the supplied input.
 
 Scoring guidance:
 - aligned   (0.75–1.00): respects all hard guardrails, useful output
 - partial   (0.40–0.74): minor guardrail issues or thin but honest output
 - misaligned (0.00–0.39): violates a hard guardrail or is misleadingly confident
+If a criterion is not applicable to this brief, omit it from cons rather than forcing a finding.
 """
 
 # ── Data types ────────────────────────────────────────────────────────────────

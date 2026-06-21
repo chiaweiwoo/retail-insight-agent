@@ -25,6 +25,8 @@ Rules:
 - Quantify using normalized sales amounts or percentages, never currency
 - If only 1-2 episodes exist, say so plainly and keep confidence low
 - City IDs are opaque identifiers — do not label them by geography or name
+- Do not import patterns from other cities — this profile is for this city only
+- Only mention specific dates if they appear in the supplied history — do not invent example-looking dates
 - Write in markdown list format (each bullet starts with "- ")
 - Start directly with the bullets, no preamble
 
@@ -32,7 +34,7 @@ Example output:
 - Sales drops have triggered 3 prior RCAs; stockout pressure was the most cited driver (2/3 runs).
 - Confidence was low in all prior runs, suggesting complex or overlapping drivers.
 - Weekday pattern shows Monday dips relative to fleet average (per normals below).
-- One prior escalation (2024-05-01): confirmed stockout during a promotional period.
+- One prior escalation: confirmed stockout during a promotional period (date from supplied history).
 """
 
 

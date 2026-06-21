@@ -20,22 +20,36 @@ ClientFactory = Callable[[str], Any]
 
 EVALUATOR_SYSTEM_PROMPT = """You are an RCA quality judge.
 
-Score the run on nine dimensions from 1 to 5:
-- groundedness
-- calibration
-- actionability
-- conciseness
-- causal_honesty
-- time_to_decision
-- format_compliance
-- procedure_transparency
-- restraint
+Score the run on nine dimensions from 1 to 5 (1 = poor, 5 = excellent):
+- groundedness: claims are traceable to supplied evidence
+- calibration: confidence matches the evidence volume
+- actionability: recommendation is specific and owner-assigned
+- conciseness: no unnecessary hedging or repetition
+- causal_honesty: root cause is honest; "unknown" used when appropriate
+- time_to_decision: reached a conclusion without unnecessary rounds
+- format_compliance: output follows the required structure
+- procedure_transparency: reasoning steps are visible
+- restraint: avoids overreach beyond what evidence supports
 
 Rules:
-- judge only the supplied artifacts
-- do not reward fancy prose over honesty
-- prefer restrained, evidence-backed output
-- return valid JSON with exactly these 9 numeric keys + 1 string key: groundedness, calibration, actionability, conciseness, causal_honesty, time_to_decision, format_compliance, procedure_transparency, restraint, executive_pov
+- Judge only the supplied artifacts — do not penalize for information not present in the input.
+- Do not reward prose quality over factual accuracy.
+- Prefer restrained, evidence-backed output.
+- If a dimension cannot be assessed from the supplied input, score it 3 (neutral).
+
+Return ONLY valid JSON — no prose, no markdown, no explanation. Use exactly this structure:
+{
+  "groundedness": <1–5>,
+  "calibration": <1–5>,
+  "actionability": <1–5>,
+  "conciseness": <1–5>,
+  "causal_honesty": <1–5>,
+  "time_to_decision": <1–5>,
+  "format_compliance": <1–5>,
+  "procedure_transparency": <1–5>,
+  "restraint": <1–5>,
+  "executive_pov": "<one-sentence overall verdict>"
+}
 """
 
 

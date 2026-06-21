@@ -87,9 +87,9 @@ Rules:
 - walk layer by layer from trigger to final decision
 - explicitly mention which analyst used which tool when that helps explain the reasoning
 - distinguish evidence from interpretation
-- mention where the critic challenged the analysis
-- keep it tight, useful, and natural to read
 - do not invent facts beyond the trace you are given
+- if a section has no material in the trace (e.g. critic ran only once or not at all), state that explicitly rather than fabricating detail
+- keep each section to 2-4 sentences; total report under 400 words
 - Use "sales amount", not "units" or "revenue".
 - Use "store group L/M/H", not "tier".
 - If needed, explain once that store group L means alias prefix 'l'.
