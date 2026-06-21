@@ -6,7 +6,7 @@ Accepted.
 
 ## Decision Summary
 
-- Keep only three public CLIs: `build`, `run`, `mcp`.
+- Keep only four public CLIs: `build`, `signal`, `run`, `mcp`.
 - Use Supabase schema `rca`.
 - Keep runtime evidence at city/date grain only.
 - Aggregate away product and store detail.

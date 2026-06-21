@@ -79,4 +79,5 @@ See:
 
 - [AGENT_SYSTEM_STUDY_NOTES.md](/C:/Users/chiaw/OneDrive/Desktop/playground/retail_insight_agent/docs/AGENT_SYSTEM_STUDY_NOTES.md)
 - [0001-v2-core-decisions.md](/C:/Users/chiaw/OneDrive/Desktop/playground/retail_insight_agent/docs/adr/0001-v2-core-decisions.md)
+- [0002-agentic-investigation-upgrade.md](/C:/Users/chiaw/OneDrive/Desktop/playground/retail_insight_agent/docs/adr/0002-agentic-investigation-upgrade.md)
 - [PRD.md](/C:/Users/chiaw/OneDrive/Desktop/playground/retail_insight_agent/docs/PRD.md)
