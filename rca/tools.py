@@ -379,6 +379,61 @@ def search_external_events(city_id: int, dt: str, query: str, max_results: int =
     return {"city_id": city_id, "dt": dt, "query": query, "results": results, "cache_hit": False}
 
 
+def run_stat_analysis(
+    city_id: int,
+    dt: str,
+    method: str,
+    rationale: str,
+    decision_use: str,
+) -> dict[str, Any]:
+    """Gated statistical analysis tool.
+
+    Requires non-empty rationale and decision_use before executing any computation.
+    Gated by RCA_STAT_TOOLS_ENABLED (default true).
+    """
+    from rca.config import get_stat_tools_enabled
+
+    if not get_stat_tools_enabled():
+        return {"error": "Statistical tools are disabled (RCA_STAT_TOOLS_ENABLED=false)."}
+    if not rationale.strip():
+        return {"error": "rationale must be non-empty. Explain why this analysis is needed."}
+    if not decision_use.strip():
+        return {"error": "decision_use must be non-empty. Explain what decision this analysis supports."}
+
+    if method == "robust_baseline_check":
+        result = compare_same_weekday_baseline(city_id, dt)
+        return {"method": method, "rationale": rationale, "decision_use": decision_use, **result}
+
+    if method == "driver_shift_scan":
+        result = detect_intraday_shift(city_id, dt)
+        return {"method": method, "rationale": rationale, "decision_use": decision_use, **result}
+
+    if method == "simple_expected_sales_sanity_check":
+        signal = get_signal_evidence(city_id, dt)
+        current = signal.get("current_sales")
+        expected = signal.get("expected_sales")
+        deviation_pct = signal.get("deviation_pct")
+        check = "pass" if deviation_pct is not None and abs(float(deviation_pct)) >= 10.0 else "warn_borderline"
+        return {
+            "method": method,
+            "rationale": rationale,
+            "decision_use": decision_use,
+            "city_id": city_id,
+            "dt": dt,
+            "current_sales": current,
+            "expected_sales": expected,
+            "deviation_pct": deviation_pct,
+            "sanity_check": check,
+            "interpretation": (
+                "Signal deviation exceeds 10% threshold — move is material."
+                if check == "pass"
+                else "Deviation is below 10% — move may be borderline or noise."
+            ),
+        }
+
+    return {"error": f"Unknown method '{method}'. Valid: robust_baseline_check, driver_shift_scan, simple_expected_sales_sanity_check."}
+
+
 TOOL_REGISTRY: dict[str, dict[str, Any]] = {
     "get_signal_evidence": {
         "description": "Get the city/date signal row and expected-sales comparison.",
@@ -523,6 +578,31 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
             "additionalProperties": False,
         },
         "function": search_external_events,
+    },
+    "run_stat_analysis": {
+        "description": (
+            "Gated statistical analysis tool. Requires a non-empty rationale (why this analysis is needed) "
+            "and decision_use (what decision this supports) before running. "
+            "Methods: robust_baseline_check (same-weekday baseline), "
+            "driver_shift_scan (intraday shape comparison), "
+            "simple_expected_sales_sanity_check (signal deviation check)."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "city_id": {"type": "integer"},
+                "dt": {"type": "string"},
+                "method": {
+                    "type": "string",
+                    "enum": ["robust_baseline_check", "driver_shift_scan", "simple_expected_sales_sanity_check"],
+                },
+                "rationale": {"type": "string", "description": "Why this analysis is needed for this investigation."},
+                "decision_use": {"type": "string", "description": "What decision or hypothesis this analysis will support."},
+            },
+            "required": ["city_id", "dt", "method", "rationale", "decision_use"],
+            "additionalProperties": False,
+        },
+        "function": run_stat_analysis,
     },
 }
 

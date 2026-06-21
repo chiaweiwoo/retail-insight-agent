@@ -33,14 +33,21 @@ Working notes and guardrails for the v2 RCA agent system.
 
 ## The LangGraph Pipeline
 
-Orchestration is handled by LangGraph via `RcaState`.
+Orchestration is handled by LangGraph via `RcaState`. Graph: `START → investigation_loop → decision → evaluation → memory → record → END`.
 
-1. **Plan**: Read the signal, recent context, and memory; decide which agents to run.
-2. **Specialists (Parallel)**: Run the chosen internal agents plus the news agent when useful.
-3. **Critic**: Downgrade weak claims and flag correlation-as-cause leaps.
-4. **Coordinator**: Build the decision card, RCA, prediction, and prescription.
-5. **Memory Distiller**: Save reusable lessons for later runs.
-6. **Record**: Persist outcomes, logs, completions, and memory in Supabase.
+The investigation loop is a bounded Python function (not a LangGraph subgraph) that runs up to `RCA_MAX_INVESTIGATION_ROUNDS` rounds:
+
+1. **Planner**: Select agents, set objective, identify target gaps, list expected evidence.
+2. **Specialists (Parallel)**: Run chosen internal agents in parallel via `ThreadPoolExecutor`. Evidence is accumulated into a typed ledger (one `observation` per tool call, one `inference` per memo).
+3. **Critic**: Return a structured JSON review with `continue_investigation`, `gaps`, and `stop_reason`. Drives the loop stop decision.
+4. **Loop stops when**: (a) critic says done, (b) all critic-identified gaps are `unavailable_data`, or (c) max rounds reached.
+
+After the loop:
+
+5. **Decision (Coordinator)**: Build a structured `DecisionBrief` JSON rendered into RCA, Prediction, and Prescription markdown sections.
+6. **Evaluation**: Run 8 deterministic audit checks; compute a 0-to-1 quality score.
+7. **Memory Distiller**: Extract reusable lessons and write them back to `rca.memory`.
+8. **Record**: Persist outcomes, logs, completions, evidence ledger, and evaluation in Supabase.
 
 ## Tool Access
 
@@ -48,13 +55,15 @@ All tools read directly from Supabase `rca.*` tables.
 
 | Agent | Tools |
 | --- | --- |
-| `statistician` | `compare_recent_baseline`, `compare_same_weekday_baseline`, `detect_intraday_shift` |
+| `statistician` | `get_signal_evidence`, `get_sales_context`, `compare_recent_baseline`, `compare_same_weekday_baseline`, `detect_intraday_shift`, `get_intraday_profile`, `run_stat_analysis` |
 | `sales_agent` | `get_signal_evidence`, `get_sales_context` |
 | `inventory_agent` | `get_inventory_context`, `get_intraday_profile`, `compare_recent_baseline` |
 | `pricing_agent` | `get_pricing_context`, `get_signal_evidence` |
 | `promotions_agent` | `get_promotions_context`, `get_signal_evidence` |
 | `calendar_weather_agent` | `get_calendar_weather_context`, `get_signal_evidence` |
-| `news_agent` | `search_external_events`, `get_signal_evidence` |
+| `news_agent` | `search_external_events` (gated: requires internal evidence + `missing_external_context` critic gap + `RCA_RESEARCH_ENABLED=true`) |
+
+`run_stat_analysis` requires non-empty `rationale` and `decision_use` fields before executing. Methods: `robust_baseline_check`, `driver_shift_scan`, `simple_expected_sales_sanity_check`. Gated by `RCA_STAT_TOOLS_ENABLED` (default true).
 
 ## Runtime Tables
 
@@ -90,14 +99,14 @@ The UI is a Next.js App Router app in `dashboard/`. It reads from the `rca` sche
 - `rca run` depends on `rca.signals`; run `build` and `signal` before running the LLM workflow on fresh data.
 - For `rca.events`, `rca.completions`, and `rca.memory` inserts to work through the service role, `rca` schema sequences must be granted to `service_role`.
 
-## Next Agentic Upgrade
+## Environment Variables
 
-- Move from a single planner dispatch toward an investigation controller with hypotheses, evidence, open questions, confidence, next actions, and stop conditions.
-- Upgrade RCA output into a management decision brief with business impact, action, urgency, expected benefit, confidence, monitoring, and caveats.
-- Add a claim-evidence ledger so important statements are traceable to observed evidence.
-- Make memory visibly affect later planning or interpretation.
-- Keep broader news/web research behind internal RCA stability.
-- Add ML/stat tools only when the agent can explain why the analysis is needed and what decision it supports.
+| Variable | Default | Effect |
+| --- | --- | --- |
+| `RCA_MAX_INVESTIGATION_ROUNDS` | `5` | Cap on investigation loop rounds |
+| `RCA_RESEARCH_ENABLED` | `false` | Enable news agent and web search |
+| `RCA_STAT_TOOLS_ENABLED` | `true` | Enable `run_stat_analysis` gated tool |
+| `RCA_LLM_JUDGE_ENABLED` | `false` | Enable LLM quality judge in evaluation |
 
 ## Skills
 

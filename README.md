@@ -33,12 +33,13 @@ uv run python -m rca.cli mcp
   - keeps signal tuning separate from stable ingestion
 
 - `rca run`
-  - retrieves memory and cached evidence
-  - runs a LangGraph planner
-  - dispatches internal agents and a news agent
-  - critiques and coordinates the result
-  - stores the latest RCA outcome
-  - writes logs, completions, and distilled lessons
+  - retrieves signal evidence and city memory from Supabase
+  - runs a bounded LangGraph investigation loop (up to 5 rounds by default)
+  - each round: planner selects agents → agents run in parallel → evidence accumulates → critic reviews and decides whether to continue
+  - produces a structured DecisionBrief with RCA, prediction, and prescription sections
+  - evaluates output with 8 deterministic audit checks and a 0-to-1 quality score
+  - distils reusable lessons into city memory
+  - stores the full outcome (decision brief, evidence ledger, investigation rounds, evaluation) in Supabase
 
 - `rca mcp`
   - exposes the evidence tools through FastMCP for learning and experimentation
@@ -81,4 +82,5 @@ See:
 - [AGENT_SYSTEM_DESIGN.md](/C:/Users/chiaw/OneDrive/Desktop/playground/retail_insight_agent/docs/AGENT_SYSTEM_DESIGN.md)
 - [0001-v2-core-decisions.md](/C:/Users/chiaw/OneDrive/Desktop/playground/retail_insight_agent/docs/adr/0001-v2-core-decisions.md)
 - [0002-agentic-investigation-upgrade.md](/C:/Users/chiaw/OneDrive/Desktop/playground/retail_insight_agent/docs/adr/0002-agentic-investigation-upgrade.md)
+- [0003-level-5-learning-mode-agent.md](/C:/Users/chiaw/OneDrive/Desktop/playground/retail_insight_agent/docs/adr/0003-level-5-learning-mode-agent.md)
 - [PRD.md](/C:/Users/chiaw/OneDrive/Desktop/playground/retail_insight_agent/docs/PRD.md)

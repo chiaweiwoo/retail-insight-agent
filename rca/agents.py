@@ -72,6 +72,7 @@ AGENT_SPECS: tuple[AgentSpec, ...] = (
             "compare_same_weekday_baseline",
             "detect_intraday_shift",
             "get_intraday_profile",
+            "run_stat_analysis",
         ),
         skill_file="statistician.md",
     ),
