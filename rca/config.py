@@ -93,6 +93,7 @@ HOLIDAY_FIELD_SEMANTICS = (
 
 DEFAULT_DROP_THRESHOLD_PCT = -10.0
 DEFAULT_LIFT_THRESHOLD_PCT = 25.0
+RCA_MAX_INVESTIGATION_ROUNDS = 5
 DEFAULT_LLM_BASE_URL = "https://api.deepseek.com"
 DEFAULT_LLM_MODEL = "deepseek-v4-flash"
 DEFAULT_LLM_MAX_TOOL_ROUNDS = 6
@@ -145,6 +146,14 @@ def get_llm_thinking_enabled() -> bool:
 
 def get_research_enabled() -> bool:
     return os.getenv("RCA_RESEARCH_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def get_max_investigation_rounds() -> int:
+    return int(os.getenv("RCA_MAX_INVESTIGATION_ROUNDS", str(RCA_MAX_INVESTIGATION_ROUNDS)))
+
+
+def get_stat_tools_enabled() -> bool:
+    return os.getenv("RCA_STAT_TOOLS_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def get_model_fast() -> str:

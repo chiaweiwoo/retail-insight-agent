@@ -277,6 +277,62 @@ def build_goals_df(sales_df: pd.DataFrame) -> pd.DataFrame:
     ]
 
 
+def _signal_strength(abs_dev: float | None, label: str) -> str:
+    if label in ("neutral", "insufficient_history") or abs_dev is None:
+        return "none"
+    if abs_dev < 15:
+        return "weak"
+    if abs_dev < 25:
+        return "moderate"
+    if abs_dev < 40:
+        return "strong"
+    return "extreme"
+
+
+def _baseline_quality(goal_method: str) -> str:
+    if goal_method == "same_weekday_4w":
+        return "strong"
+    if goal_method == "recent_7d":
+        return "usable"
+    if goal_method == "insufficient_history":
+        return "insufficient"
+    return "weak"
+
+
+def _signal_reason(label: str, goal_method: str) -> str:
+    if label == "insufficient_history":
+        return "insufficient history for expected-sales baseline"
+    if label == "drop":
+        return f"drop vs {goal_method} baseline"
+    if label == "lift":
+        return f"lift vs {goal_method} baseline"
+    return "neutral within threshold"
+
+
+def _priority_score(abs_dev: float | None, label: str, holiday_name: str | None) -> float:
+    if abs_dev is None:
+        return 0.0
+    score = abs_dev
+    if label in ("drop", "lift"):
+        strength = _signal_strength(abs_dev, label)
+        if strength in ("strong", "extreme"):
+            score += 10.0
+    inferred = holiday_name or ""
+    if inferred not in ("normal_weekday", "weekend", ""):
+        score += 5.0
+    return round(score, 4)
+
+
+def _first_hypothesis_hints(label: str, goal_method: str) -> dict:
+    baseline = ["same_weekday", "recent_trend"] if goal_method == "same_weekday_4w" else ["recent_trend"]
+    return {
+        "baseline": baseline,
+        "internal": ["inventory", "pricing", "activity"],
+        "external": ["holiday_weather", "news_if_enabled"],
+        "cautions": ["normalized_sales_not_currency", "city_date_grain_only"],
+    }
+
+
 def build_signals_df(
     sales_df: pd.DataFrame,
     goals_df: pd.DataFrame,
@@ -302,6 +358,29 @@ def build_signals_df(
         return "neutral"
 
     df["signal_label"] = df.apply(label_row, axis=1)
+    df["abs_deviation_pct"] = df["deviation_pct"].abs()
+    df["signal_strength"] = df.apply(
+        lambda r: _signal_strength(
+            None if pd.isna(r["abs_deviation_pct"]) else float(r["abs_deviation_pct"]),
+            r["signal_label"],
+        ),
+        axis=1,
+    )
+    df["baseline_quality"] = df["goal_method"].map(_baseline_quality)
+    df["signal_reason"] = df.apply(
+        lambda r: _signal_reason(r["signal_label"], r["goal_method"]), axis=1
+    )
+    df["priority_score"] = df.apply(
+        lambda r: _priority_score(
+            None if pd.isna(r["abs_deviation_pct"]) else float(r["abs_deviation_pct"]),
+            r["signal_label"],
+            r.get("holiday_name_inferred"),
+        ),
+        axis=1,
+    )
+    df["first_hypothesis_hints"] = df.apply(
+        lambda r: _first_hypothesis_hints(r["signal_label"], r["goal_method"]), axis=1
+    )
     df["build_version"] = build_version
     df["generated_at"] = build_version
     return df[
@@ -311,10 +390,16 @@ def build_signals_df(
             "total_sales",
             "expected_sales",
             "deviation_pct",
+            "abs_deviation_pct",
             "goal_method",
             "signal_label",
+            "signal_strength",
+            "baseline_quality",
+            "signal_reason",
+            "priority_score",
             "weekday",
             "holiday_name_inferred",
+            "first_hypothesis_hints",
             "build_version",
             "generated_at",
         ]

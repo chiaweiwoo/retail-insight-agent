@@ -178,6 +178,8 @@ def record_node(state: RcaState, config: RunnableConfig) -> dict[str, Any]:
             report_markdown=outcome_fields["rca"],
             prediction_markdown=outcome_fields["prediction"],
             prescription_markdown=outcome_fields["prescription"],
+            status="complete",
+            round_count=1,
         )
     )
     logger.log(actor_type="workflow", actor_name="rca_run", action="completed", source="system", details={})
