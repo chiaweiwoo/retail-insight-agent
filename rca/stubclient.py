@@ -58,7 +58,8 @@ class _StubCompletions:
                 dt = "2024-05-16"
                 break
         template = STUB_RESPONSES.get(self.node_name, STUB_RESPONSES["sales_agent"])
-        return _StubResponse(template.format(city=city, dt=dt), kwargs.get("model", "stub-model"))
+        rendered = template.replace("{city}", city).replace("{dt}", dt)
+        return _StubResponse(rendered, kwargs.get("model", "stub-model"))
 
 
 class _StubChat:
