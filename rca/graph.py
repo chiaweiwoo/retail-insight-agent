@@ -1,27 +1,25 @@
-"""LangGraph orchestration for the v2 city/date RCA workflow."""
+"""LangGraph orchestration for the v2 city/date RCA workflow.
+
+Graph: plan -> investigation_loop -> decision -> evaluation -> memory -> record
+The investigation_loop node contains the bounded multi-round loop internally.
+"""
 from __future__ import annotations
 
-import operator
-from dataclasses import asdict
-from typing import Annotated, Any
+from typing import Any
 
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, START, StateGraph
-from langgraph.types import Send
 from typing_extensions import TypedDict
 
 from rca.agents import (
-    AGENT_SPECS,
-    AgentRunResult,
-    PlannerDecision,
     extract_outcome_fields,
-    plan_investigation,
-    run_agent,
-    run_coordinator,
-    run_critic,
+    run_decision_brief,
+    run_investigation_loop,
     run_memory_distiller,
 )
+from rca.audits import run_evaluation
 from rca.llm import ClientFactory, LLMSettings, build_openai_compatible_client, load_llm_settings, make_routed_settings
+from rca.memory import get_memory_notes
 from rca.outcomes import OutcomeRecord, record_outcome
 from rca.runlog import RunLogger
 from rca.signals import get_signal_row
@@ -32,10 +30,21 @@ class RcaState(TypedDict):
     dt: str
     run_id: str
     signal_evidence: dict[str, Any]
-    planner_decision: dict[str, Any]
-    agent_results: Annotated[list[dict[str, Any]], operator.add]
-    critic_note: str
-    final_report: str
+    # From investigation_loop
+    investigation_rounds: list[dict[str, Any]]
+    evidence_ledger: list[dict[str, Any]]
+    critic_reviews: list[dict[str, Any]]
+    round_count: int
+    memory_context: dict[str, Any]
+    # From decision
+    decision_brief: dict[str, Any]
+    decision_card_markdown: str
+    report_markdown: str
+    prediction_markdown: str
+    prescription_markdown: str
+    # From evaluation
+    evaluation: dict[str, Any]
+    # From memory
     memory_note: str
 
 
@@ -43,106 +52,71 @@ def _cfg(config: RunnableConfig) -> dict[str, Any]:
     return config.get("configurable") or {}
 
 
-def _restore_agent_results(state: RcaState) -> list[AgentRunResult]:
-    return [
-        AgentRunResult(
-            name=item["name"],
-            focus=item["focus"],
-            memo_markdown=item["memo_markdown"],
-            tool_calls=item["tool_calls"],
-        )
-        for item in state["agent_results"]
-    ]
-
-
-def plan_node(state: RcaState, config: RunnableConfig) -> dict[str, Any]:
+def investigation_loop_node(state: RcaState, config: RunnableConfig) -> dict[str, Any]:
     cfg = _cfg(config)
     settings: LLMSettings = cfg["settings"]
     logger: RunLogger = cfg["logger"]
     client_factory: ClientFactory = cfg["client_factory"]
+
     signal_evidence = get_signal_row(state["city_id"], state["dt"])
-    decision = plan_investigation(
+    memory_notes = get_memory_notes(state["city_id"], limit=5)
+
+    run_state = run_investigation_loop(
         city_id=state["city_id"],
         dt=state["dt"],
-        settings=make_routed_settings(settings, "planner"),
+        signal_evidence=signal_evidence,
+        memory_notes=memory_notes,
+        run_id=state["run_id"],
+        settings=settings,
         logger=logger,
         client_factory=client_factory,
-        run_id=state["run_id"],
     )
-    return {"signal_evidence": signal_evidence, "planner_decision": asdict(decision)}
+    return {
+        "signal_evidence": signal_evidence,
+        "investigation_rounds": [r.model_dump(mode="json") for r in run_state.investigation_rounds],
+        "evidence_ledger": [ev.model_dump(mode="json") for ev in run_state.evidence_ledger],
+        "critic_reviews": [cr.model_dump(mode="json") for cr in run_state.critic_reviews],
+        "round_count": len(run_state.investigation_rounds),
+        "memory_context": run_state.memory_context.model_dump(mode="json"),
+    }
 
 
-def route_agents(state: RcaState) -> list[Send]:
-    planner_decision = PlannerDecision(**state["planner_decision"])
-    return [
-        Send(
-            "run_agent",
-            {
-                "spec_name": name,
-                "news_query": planner_decision.news_query,
-                "city_id": state["city_id"],
-                "dt": state["dt"],
-                "run_id": state["run_id"],
-            },
-        )
-        for name in planner_decision.selected_agents
-    ]
-
-
-def run_agent_node(state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
+def decision_node(state: RcaState, config: RunnableConfig) -> dict[str, Any]:
     cfg = _cfg(config)
     settings: LLMSettings = cfg["settings"]
     logger: RunLogger = cfg["logger"]
     client_factory: ClientFactory = cfg["client_factory"]
-    spec = next(spec for spec in AGENT_SPECS if spec.name == state["spec_name"])
-    result = run_agent(
-        spec=spec,
-        city_id=state["city_id"],
-        dt=state["dt"],
-        settings=make_routed_settings(settings, spec.name),
-        logger=logger,
-        client_factory=client_factory,
-        run_id=state["run_id"],
-        news_query=state.get("news_query", ""),
-    )
-    return {"agent_results": [asdict(result)]}
 
-
-def critic_node(state: RcaState, config: RunnableConfig) -> dict[str, Any]:
-    cfg = _cfg(config)
-    settings: LLMSettings = cfg["settings"]
-    logger: RunLogger = cfg["logger"]
-    client_factory: ClientFactory = cfg["client_factory"]
-    note = run_critic(
-        city_id=state["city_id"],
-        dt=state["dt"],
-        agent_results=_restore_agent_results(state),
-        settings=make_routed_settings(settings, "critic"),
-        logger=logger,
-        client_factory=client_factory,
-        run_id=state["run_id"],
-    )
-    return {"critic_note": note}
-
-
-def coordinator_node(state: RcaState, config: RunnableConfig) -> dict[str, Any]:
-    cfg = _cfg(config)
-    settings: LLMSettings = cfg["settings"]
-    logger: RunLogger = cfg["logger"]
-    client_factory: ClientFactory = cfg["client_factory"]
-    final_report = run_coordinator(
+    memory_notes = get_memory_notes(state["city_id"], limit=5)
+    brief, markdown = run_decision_brief(
         city_id=state["city_id"],
         dt=state["dt"],
         signal_evidence=state["signal_evidence"],
-        planner_decision=PlannerDecision(**state["planner_decision"]),
-        agent_results=_restore_agent_results(state),
-        critic_note=state["critic_note"],
+        investigation_rounds=state["investigation_rounds"],
+        evidence_ledger=state["evidence_ledger"],
+        critic_reviews=state["critic_reviews"],
+        memory_notes=memory_notes,
         settings=make_routed_settings(settings, "coordinator"),
         logger=logger,
         client_factory=client_factory,
         run_id=state["run_id"],
     )
-    return {"final_report": final_report}
+    outcome_fields = extract_outcome_fields(markdown)
+    return {
+        "decision_brief": brief.model_dump(mode="json"),
+        "decision_card_markdown": outcome_fields.get("decision_card", markdown),
+        "report_markdown": outcome_fields.get("rca", ""),
+        "prediction_markdown": outcome_fields.get("prediction", ""),
+        "prescription_markdown": outcome_fields.get("prescription", ""),
+    }
+
+
+def evaluation_node(state: RcaState, config: RunnableConfig) -> dict[str, Any]:
+    evaluation = run_evaluation(
+        decision_brief=state["decision_brief"],
+        evidence_ledger=state["evidence_ledger"],
+    )
+    return {"evaluation": evaluation.model_dump(mode="json")}
 
 
 def memory_node(state: RcaState, config: RunnableConfig) -> dict[str, Any]:
@@ -150,11 +124,12 @@ def memory_node(state: RcaState, config: RunnableConfig) -> dict[str, Any]:
     settings: LLMSettings = cfg["settings"]
     logger: RunLogger = cfg["logger"]
     client_factory: ClientFactory = cfg["client_factory"]
-    memory_note = run_memory_distiller(
+    signal_label = str(state["signal_evidence"].get("signal_label") or "")
+    memory_note, _ = run_memory_distiller(
         city_id=state["city_id"],
         dt=state["dt"],
-        signal_label=str(state["signal_evidence"].get("signal_label") or ""),
-        final_report=state["final_report"],
+        signal_label=signal_label,
+        final_report=state["decision_card_markdown"],
         settings=make_routed_settings(settings, "memory_distiller"),
         logger=logger,
         client_factory=client_factory,
@@ -165,21 +140,30 @@ def memory_node(state: RcaState, config: RunnableConfig) -> dict[str, Any]:
 
 def record_node(state: RcaState, config: RunnableConfig) -> dict[str, Any]:
     logger: RunLogger = _cfg(config)["logger"]
-    outcome_fields = extract_outcome_fields(state["final_report"])
+    brief = state["decision_brief"]
+    monitoring = brief.get("monitoring_plan") or {}
     record_outcome(
         OutcomeRecord(
             run_id=state["run_id"],
             city_id=state["city_id"],
             dt=state["dt"],
             signal_label=str(state["signal_evidence"].get("signal_label") or ""),
-            confidence=outcome_fields["confidence"],
-            headline=outcome_fields["headline"],
-            decision_card_markdown=outcome_fields["decision_card"],
-            report_markdown=outcome_fields["rca"],
-            prediction_markdown=outcome_fields["prediction"],
-            prescription_markdown=outcome_fields["prescription"],
+            confidence=str(brief.get("confidence") or "low"),
+            headline=str(brief.get("headline") or ""),
+            decision_card_markdown=state["decision_card_markdown"],
+            report_markdown=state["report_markdown"],
+            prediction_markdown=state["prediction_markdown"],
+            prescription_markdown=state["prescription_markdown"],
             status="complete",
-            round_count=1,
+            round_count=state["round_count"],
+            decision_brief_json=brief,
+            hypotheses_json=[],
+            evidence_ledger_json=state["evidence_ledger"],
+            investigation_rounds_json=state["investigation_rounds"],
+            critic_reviews_json=state["critic_reviews"],
+            monitoring_plan_json=monitoring if isinstance(monitoring, dict) else {},
+            evaluation_json=state["evaluation"],
+            memory_context_json=state["memory_context"],
         )
     )
     logger.log(actor_type="workflow", actor_name="rca_run", action="completed", source="system", details={})
@@ -189,18 +173,16 @@ def record_node(state: RcaState, config: RunnableConfig) -> dict[str, Any]:
 
 def build_rca_graph() -> Any:
     builder: StateGraph = StateGraph(RcaState)
-    builder.add_node("plan", plan_node)
-    builder.add_node("run_agent", run_agent_node)
-    builder.add_node("critic", critic_node)
-    builder.add_node("coordinator", coordinator_node)
+    builder.add_node("investigation_loop", investigation_loop_node)
+    builder.add_node("decision", decision_node)
+    builder.add_node("evaluation", evaluation_node)
     builder.add_node("memory", memory_node)
     builder.add_node("record", record_node)
 
-    builder.add_edge(START, "plan")
-    builder.add_conditional_edges("plan", route_agents, ["run_agent"])
-    builder.add_edge("run_agent", "critic")
-    builder.add_edge("critic", "coordinator")
-    builder.add_edge("coordinator", "memory")
+    builder.add_edge(START, "investigation_loop")
+    builder.add_edge("investigation_loop", "decision")
+    builder.add_edge("decision", "evaluation")
+    builder.add_edge("evaluation", "memory")
     builder.add_edge("memory", "record")
     builder.add_edge("record", END)
     return builder.compile()
@@ -226,10 +208,17 @@ def run_rca_graph(
             "dt": dt,
             "run_id": run_id,
             "signal_evidence": {},
-            "planner_decision": {},
-            "agent_results": [],
-            "critic_note": "",
-            "final_report": "",
+            "investigation_rounds": [],
+            "evidence_ledger": [],
+            "critic_reviews": [],
+            "round_count": 0,
+            "memory_context": {},
+            "decision_brief": {},
+            "decision_card_markdown": "",
+            "report_markdown": "",
+            "prediction_markdown": "",
+            "prescription_markdown": "",
+            "evaluation": {},
             "memory_note": "",
         },
         config={"configurable": {"settings": settings, "client_factory": base_factory, "logger": logger}},
@@ -237,9 +226,12 @@ def run_rca_graph(
     return {
         "run_id": run_id,
         "signal_evidence": final_state["signal_evidence"],
-        "planner_decision": final_state["planner_decision"],
-        "agent_results": _restore_agent_results(final_state),
-        "critic_note": final_state["critic_note"],
-        "final_report": final_state["final_report"],
+        "round_count": final_state["round_count"],
+        "decision_brief": final_state["decision_brief"],
+        "final_report": final_state["decision_card_markdown"],  # backward compat for CLI
+        "decision_card_markdown": final_state["decision_card_markdown"],
+        "evidence_ledger": final_state["evidence_ledger"],
+        "investigation_rounds": final_state["investigation_rounds"],
         "memory_note": final_state["memory_note"],
+        "evaluation": final_state["evaluation"],
     }

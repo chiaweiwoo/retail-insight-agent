@@ -2,14 +2,25 @@ from __future__ import annotations
 
 import json
 import re
-from dataclasses import asdict, dataclass
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import asdict, dataclass, field
 from typing import Any, Callable
 
 from rca.config import AGENT_SKILLS_PATH, DEFAULT_LLM_MAX_TOOL_ROUNDS, SALES_FIELD_SEMANTICS, get_research_enabled
-from rca.llm import LLMSettings, build_chat_completion_kwargs, build_openai_compatible_client
+from rca.llm import LLMSettings, build_chat_completion_kwargs, build_openai_compatible_client, make_routed_settings
 from rca.memory import get_memory_notes, write_memory
 from rca.outcomes import record_completion
 from rca.runlog import RunLogger
+from rca.state import (
+    CriticGap,
+    CriticReview,
+    DecisionBrief,
+    EvidenceItem,
+    InvestigationRound,
+    MemoryInfluence,
+    MonitoringPlan,
+    RcaRunState,
+)
 from rca.tools import (
     execute_tool,
     get_calendar_weather_context,
@@ -37,6 +48,7 @@ class AgentRunResult:
     focus: str
     memo_markdown: str
     tool_calls: list[dict[str, Any]]
+    evidence_items: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
@@ -44,6 +56,9 @@ class PlannerDecision:
     selected_agents: list[str]
     rationale: str
     news_query: str
+    objective: str = ""
+    target_gaps: list[str] = field(default_factory=list)
+    expected_evidence: list[str] = field(default_factory=list)
 
 
 AGENT_SPECS: tuple[AgentSpec, ...] = (
@@ -149,38 +164,125 @@ def _default_client_factory(settings: LLMSettings) -> ClientFactory:
     return factory
 
 
+def _make_investigation_key(agent_name: str, target_gap_ids: list[str]) -> str:
+    """Stable deduplication key so the repetition guard works across rounds."""
+    if not target_gap_ids:
+        return f"{agent_name}__initial"
+    return f"{agent_name}__{'_'.join(sorted(target_gap_ids))}"
+
+
+# ── Evidence conversion ───────────────────────────────────────────────────────
+
+
+def agent_memo_to_evidence_items(result: AgentRunResult, state: RcaRunState) -> list[EvidenceItem]:
+    """Convert an agent's tool calls and memo into typed EvidenceItem objects.
+
+    One observation item per tool call (raw data retrieval), one inference item
+    for the agent's written memo (interpretation of that data).
+    """
+    items: list[EvidenceItem] = []
+    for tc in result.tool_calls:
+        ev_id = state.next_evidence_id()
+        raw_result = tc.get("result")
+        payload = raw_result if isinstance(raw_result, dict) else {"raw": str(raw_result or "")}
+        args: dict[str, Any] = tc.get("arguments") or {}
+        city_hint = f" for city {args.get('city_id', '?')}" if args.get("city_id") is not None else ""
+        items.append(
+            EvidenceItem(
+                id=ev_id,
+                source=str(tc.get("name") or "unknown_tool"),
+                tool_name=str(tc.get("name") or ""),
+                agent_name=result.name,
+                summary=f"{result.name} retrieved {tc.get('name')}{city_hint}",
+                payload=payload,
+                evidence_type="observation",
+            )
+        )
+    if result.memo_markdown:
+        ev_id = state.next_evidence_id()
+        excerpt = result.memo_markdown[:500].strip()
+        items.append(
+            EvidenceItem(
+                id=ev_id,
+                source=result.name,
+                agent_name=result.name,
+                summary=f"{result.name}: {result.memo_markdown[:200].strip()}",
+                payload={"memo_excerpt": excerpt},
+                evidence_type="inference",
+            )
+        )
+    return items
+
+
+# ── Planner ───────────────────────────────────────────────────────────────────
+
+
 def plan_investigation(
     *,
     city_id: int,
     dt: str,
+    round_index: int = 1,
+    prior_gaps: list[dict[str, Any]] | None = None,
+    prior_evidence_summary: list[str] | None = None,
+    signal_context: dict[str, Any] | None = None,
     settings: LLMSettings,
     logger: RunLogger,
     client_factory: ClientFactory,
     run_id: str,
 ) -> PlannerDecision:
     research_enabled = get_research_enabled()
-    signal = get_signal_evidence(city_id, dt)
+    signal = signal_context or get_signal_evidence(city_id, dt)
     sales = get_sales_context(city_id, dt, history_days=10)
     calendar_weather = get_calendar_weather_context(city_id, dt)
     memory = get_memory_context(city_id, limit=4)
     skill = _load_skill_text("planner.md")
     client = client_factory("planner")
 
+    round_context = ""
+    if round_index > 1 and prior_gaps:
+        round_context = (
+            f"\nThis is round {round_index}. Address these critic gaps:\n"
+            + json.dumps(prior_gaps, ensure_ascii=False)
+            + "\nRecent evidence gathered:\n"
+            + "\n".join(f"- {s}" for s in (prior_evidence_summary or []))
+            + "\nSelect agents that can fill these specific gaps.\n"
+        )
+
     prompt = (
-        "You are planning a city/date retail RCA. Return valid JSON only.\n"
+        "You are planning a city/date retail RCA investigation round. Return valid JSON only.\n"
         "Allowed agents: statistician, sales_agent, inventory_agent, pricing_agent, "
         "promotions_agent, calendar_weather_agent, news_agent.\n"
-        "Always include statistician and sales_agent.\n"
-        + ("External web research is enabled.\n" if research_enabled else "External web research is disabled, so do not select news_agent.\n")
+        + ("Round 1: always include statistician and sales_agent.\n" if round_index == 1 else "")
+        + (
+            "External web research is enabled.\n"
+            if research_enabled
+            else "External web research is disabled. Do not select news_agent.\n"
+        )
+        + "Return JSON: {selected_agents, rationale, news_query, objective, "
+        "target_gaps (list of gap IDs from prior critic review), "
+        "expected_evidence (list of strings)}\n"
         + f"{skill}\n"
+        + round_context
     )
-    user = {
+    user: dict[str, Any] = {
+        "city_id": city_id,
+        "dt": dt,
+        "round_index": round_index,
         "signal": signal,
         "sales": sales,
         "calendar_weather": calendar_weather,
         "memory": memory,
     }
-    logger.log(actor_type="workflow", actor_name="planner", action="started", source="system", details={"signal": signal})
+    if prior_gaps:
+        user["prior_gaps"] = prior_gaps
+
+    logger.log(
+        actor_type="workflow",
+        actor_name="planner",
+        action="started",
+        source="system",
+        details={"round_index": round_index, "signal": signal},
+    )
     response = client.chat.completions.create(
         **build_chat_completion_kwargs(
             settings,
@@ -202,47 +304,58 @@ def plan_investigation(
     )
     try:
         parsed = _extract_json_object(content)
-        selected_agents = [
-            name
-            for name in parsed.get("selected_agents", [])
-            if name in SPEC_BY_NAME
-        ]
-        if "statistician" not in selected_agents:
-            selected_agents.insert(0, "statistician")
-        if "sales_agent" not in selected_agents:
-            selected_agents.insert(1, "sales_agent")
-        if research_enabled and "news_agent" not in selected_agents:
-            selected_agents.append("news_agent")
+        selected_agents = [name for name in parsed.get("selected_agents", []) if name in SPEC_BY_NAME]
+        if round_index == 1:
+            if "statistician" not in selected_agents:
+                selected_agents.insert(0, "statistician")
+            if "sales_agent" not in selected_agents:
+                selected_agents.insert(1, "sales_agent")
         if not research_enabled:
-            selected_agents = [name for name in selected_agents if name != "news_agent"]
+            selected_agents = [n for n in selected_agents if n != "news_agent"]
         decision = PlannerDecision(
             selected_agents=selected_agents,
             rationale=str(parsed.get("rationale") or ""),
             news_query=str(parsed.get("news_query") or f"city {city_id} retail news {dt}"),
+            objective=str(parsed.get("objective") or f"Round {round_index} investigation."),
+            target_gaps=list(parsed.get("target_gaps") or []),
+            expected_evidence=list(parsed.get("expected_evidence") or []),
         )
     except Exception:
-        decision = PlannerDecision(
-            selected_agents=[
+        # Fallback: use suggested agents from gaps, or default set for round 1
+        if round_index > 1 and prior_gaps:
+            suggested = []
+            for g in prior_gaps:
+                suggested.extend(g.get("suggested_agents") or [])
+            fallback_agents = [n for n in suggested if n in SPEC_BY_NAME] or [
+                "statistician",
+                "sales_agent",
+            ]
+        else:
+            fallback_agents = [
                 "statistician",
                 "sales_agent",
                 "inventory_agent",
                 "pricing_agent",
                 "promotions_agent",
                 "calendar_weather_agent",
-            ],
-            rationale="Fallback planner path used because structured parsing failed.",
+            ]
+        decision = PlannerDecision(
+            selected_agents=fallback_agents,
+            rationale="Fallback planner — JSON parsing failed.",
             news_query=f"city {city_id} retail news {dt}",
+            objective=f"Round {round_index} fallback investigation.",
         )
-        if research_enabled:
-            decision.selected_agents.append("news_agent")
     logger.log(
         actor_type="workflow",
         actor_name="planner",
         action="completed",
         source="llm",
-        details={"selected_agents": decision.selected_agents, "news_query": decision.news_query},
+        details={"round_index": round_index, "selected_agents": decision.selected_agents},
     )
     return decision
+
+
+# ── Specialist agents ─────────────────────────────────────────────────────────
 
 
 def run_agent(
@@ -268,7 +381,13 @@ def run_agent(
             "## Caveats\n"
             "- Any external explanation remains untested until research is enabled.\n"
         )
-        logger.log(actor_type="agent", actor_name=spec.name, action="completed", source="system", details={"research_enabled": False})
+        logger.log(
+            actor_type="agent",
+            actor_name=spec.name,
+            action="completed",
+            source="system",
+            details={"research_enabled": False},
+        )
         return AgentRunResult(name=spec.name, focus=spec.focus, memo_markdown=content, tool_calls=[])
 
     client = client_factory(spec.name)
@@ -286,18 +405,22 @@ def run_agent(
             "role": "user",
             "content": (
                 f"Analyze city {city_id} on {dt}. Focus: {spec.focus}."
-                + (f" Use this external query if helpful: {news_query}." if news_query and spec.name == "news_agent" else "")
+                + (
+                    f" Use this external query if helpful: {news_query}."
+                    if news_query and spec.name == "news_agent"
+                    else ""
+                )
             ),
         },
     ]
-    logger.log(actor_type="agent", actor_name=spec.name, action="started", source="system", details={"focus": spec.focus})
+    logger.log(
+        actor_type="agent", actor_name=spec.name, action="started", source="system", details={"focus": spec.focus}
+    )
     executed_tool_calls: list[dict[str, Any]] = []
     tool_schemas = get_tool_schemas(spec.tool_names)
 
     for round_index in range(1, max_tool_rounds + 1):
-        response = client.chat.completions.create(
-            **build_chat_completion_kwargs(settings, messages, tool_schemas)
-        )
+        response = client.chat.completions.create(**build_chat_completion_kwargs(settings, messages, tool_schemas))
         message = response.choices[0].message
         tool_calls = getattr(message, "tool_calls", None)
 
@@ -387,103 +510,102 @@ def run_agent(
     raise RuntimeError(f"{spec.name} exceeded the maximum tool rounds ({max_tool_rounds}).")
 
 
+def _run_agents_parallel(
+    *,
+    agent_names: list[str],
+    city_id: int,
+    dt: str,
+    news_query: str,
+    settings: LLMSettings,
+    logger: RunLogger,
+    client_factory: ClientFactory,
+    run_id: str,
+) -> list[AgentRunResult]:
+    def _run_one(name: str) -> AgentRunResult:
+        spec = SPEC_BY_NAME[name]
+        return run_agent(
+            spec=spec,
+            city_id=city_id,
+            dt=dt,
+            settings=make_routed_settings(settings, name),
+            logger=logger,
+            client_factory=client_factory,
+            run_id=run_id,
+            news_query=news_query,
+        )
+
+    results: list[AgentRunResult] = []
+    with ThreadPoolExecutor(max_workers=max(1, len(agent_names))) as executor:
+        futures = {executor.submit(_run_one, name): name for name in agent_names}
+        for future in as_completed(futures):
+            results.append(future.result())
+
+    order = {name: i for i, name in enumerate(agent_names)}
+    results.sort(key=lambda r: order.get(r.name, 99))
+    return results
+
+
+# ── Structured critic ─────────────────────────────────────────────────────────
+
+_GAP_TYPES = (
+    "missing_internal_evidence|missing_external_context|weak_causal_link|"
+    "baseline_conflict|scope_violation|format_violation|insufficient_business_action|unavailable_data"
+)
+
+
 def run_critic(
     *,
     city_id: int,
     dt: str,
+    round_index: int,
     agent_results: list[AgentRunResult],
+    evidence_ledger: list[dict[str, Any]],
     settings: LLMSettings,
     logger: RunLogger,
     client_factory: ClientFactory,
     run_id: str,
-) -> str:
+) -> CriticReview:
     client = client_factory("critic")
     skill = _load_skill_text("critic.md")
     memos = "\n\n".join(
-        f"## {result.name}\nFocus: {result.focus}\n\n{result.memo_markdown}"
-        for result in agent_results
+        f"## {result.name}\nFocus: {result.focus}\n\n{result.memo_markdown}" for result in agent_results
+    )
+
+    system = (
+        "You are the critic for a retail RCA investigation loop. Return valid JSON only.\n"
+        "Schema: {\"continue_investigation\":<bool>,\"confidence_ceiling\":\"low|medium|high\","
+        "\"gaps\":[{\"id\":\"gap_001\",\"description\":\"...\",\"severity\":\"low|medium|high\","
+        f"\"gap_type\":\"{_GAP_TYPES}\","
+        "\"suggested_agents\":[...],\"suggested_tools\":[...]}],"
+        "\"recommended_agents\":[...],\"recommended_tools\":[...],\"stop_reason\":\"...\"}\n"
+        "Set continue_investigation=false when: confidence_ceiling is high and gaps are minor, "
+        "all remaining gaps are unavailable_data, or sufficient evidence exists.\n"
+        "Do not identify product or store as root causes. "
+        "Do not use dollar signs, revenue, profit, or margin.\n"
+        + skill
+    )
+    logger.log(
+        actor_type="agent",
+        actor_name="critic",
+        action="started",
+        source="system",
+        details={"round_index": round_index},
     )
     response = client.chat.completions.create(
         **build_chat_completion_kwargs(
             settings,
             [
-                {
-                    "role": "system",
-                    "content": (
-                        "You are the critic for a retail RCA workflow.\n"
-                        "Return sections:\n## Claim Audit\n## Gaps\n## Calibration\n## Follow Up\n"
-                        + skill
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": f"Review the following agent memos for city {city_id} on {dt}.\n\n{memos}",
-                },
-            ],
-            tools=None,
-        )
-    )
-    content = response.choices[0].message.content or ""
-    _record_completion_response(
-        run_id=run_id,
-        city_id=city_id,
-        dt=dt,
-        node_name="critic",
-        response=response,
-        content=content,
-    )
-    logger.log(actor_type="agent", actor_name="critic", action="completed", source="llm", details={})
-    return content
-
-
-def run_coordinator(
-    *,
-    city_id: int,
-    dt: str,
-    signal_evidence: dict[str, Any],
-    planner_decision: PlannerDecision,
-    agent_results: list[AgentRunResult],
-    critic_note: str,
-    settings: LLMSettings,
-    logger: RunLogger,
-    client_factory: ClientFactory,
-    run_id: str,
-) -> str:
-    client = client_factory("coordinator")
-    skill = _load_skill_text("coordinator.md")
-    memory = get_memory_notes(city_id, limit=5)
-    memos = "\n\n".join(
-        f"## {result.name}\nFocus: {result.focus}\n\n{result.memo_markdown}"
-        for result in agent_results
-    )
-    response = client.chat.completions.create(
-        **build_chat_completion_kwargs(
-            settings,
-            [
-                {
-                    "role": "system",
-                    "content": (
-                        "You are the coordinator for a retail RCA system.\n"
-                        "Return exactly these sections in markdown:\n"
-                        "# Decision Card\n"
-                        "- headline: <one line>\n"
-                        "- confidence: <high | medium | low>\n"
-                        "- signal: <drop | lift | neutral | insufficient_history>\n"
-                        "## RCA\n## Internal Factors\n## External Factors\n## Prediction\n## Prescription\n## Caveats\n"
-                        + skill
-                    ),
-                },
+                {"role": "system", "content": system},
                 {
                     "role": "user",
                     "content": json.dumps(
                         {
                             "city_id": city_id,
                             "dt": dt,
-                            "signal_evidence": signal_evidence,
-                            "planner_decision": asdict(planner_decision),
-                            "recent_memory": memory,
-                            "critic_note": critic_note,
-                            "agent_memos": [asdict(item) for item in agent_results],
+                            "round_index": round_index,
+                            "evidence_count": len(evidence_ledger),
+                            "recent_evidence": evidence_ledger[-5:],
+                            "agent_memos": memos,
                         },
                         ensure_ascii=False,
                     ),
@@ -492,17 +614,356 @@ def run_coordinator(
             tools=None,
         )
     )
-    content = response.choices[0].message.content or ""
+    content = response.choices[0].message.content or "{}"
     _record_completion_response(
+        run_id=run_id, city_id=city_id, dt=dt, node_name="critic", response=response, content=content
+    )
+    logger.log(
+        actor_type="agent",
+        actor_name="critic",
+        action="completed",
+        source="llm",
+        details={"round_index": round_index},
+    )
+    try:
+        parsed = _extract_json_object(content)
+        gaps: list[CriticGap] = []
+        for i, g in enumerate(parsed.get("gaps") or []):
+            gaps.append(
+                CriticGap(
+                    id=str(g.get("id") or f"gap_{i + 1:03d}"),
+                    description=str(g.get("description") or ""),
+                    severity=g.get("severity") or "medium",
+                    gap_type=g.get("gap_type") or "missing_internal_evidence",
+                    suggested_agents=list(g.get("suggested_agents") or []),
+                    suggested_tools=list(g.get("suggested_tools") or []),
+                )
+            )
+        return CriticReview(
+            round_index=round_index,
+            continue_investigation=bool(parsed.get("continue_investigation", False)),
+            confidence_ceiling=parsed.get("confidence_ceiling") or "low",
+            gaps=gaps,
+            recommended_agents=list(parsed.get("recommended_agents") or []),
+            recommended_tools=list(parsed.get("recommended_tools") or []),
+            stop_reason=str(parsed.get("stop_reason") or ""),
+        )
+    except Exception:
+        return CriticReview(
+            round_index=round_index,
+            continue_investigation=False,
+            confidence_ceiling="low",
+            stop_reason="Critic JSON parsing failed — stopping conservatively.",
+        )
+
+
+# ── Bounded investigation loop ────────────────────────────────────────────────
+
+
+def run_investigation_loop(
+    *,
+    city_id: int,
+    dt: str,
+    signal_evidence: dict[str, Any],
+    memory_notes: list[dict[str, Any]],
+    run_id: str,
+    settings: LLMSettings,
+    logger: RunLogger,
+    client_factory: ClientFactory,
+    max_rounds: int | None = None,
+) -> RcaRunState:
+    from rca.config import get_max_investigation_rounds, get_research_enabled as _research_enabled
+
+    effective_max = max_rounds if max_rounds is not None else get_max_investigation_rounds()
+    research_enabled = _research_enabled()
+
+    state = RcaRunState(
         run_id=run_id,
         city_id=city_id,
         dt=dt,
-        node_name="coordinator",
-        response=response,
-        content=content,
+        signal_label=str(signal_evidence.get("signal_label") or "neutral"),
+    )
+    used_keys: set[str] = set()
+
+    for round_index in range(1, effective_max + 1):
+        prior_gaps: list[dict[str, Any]] = []
+        if state.critic_reviews:
+            prior_gaps = [g.model_dump(mode="json") for g in state.critic_reviews[-1].gaps]
+        prior_evidence_summary = [ev.summary for ev in state.evidence_ledger[-10:]]
+
+        decision = plan_investigation(
+            city_id=city_id,
+            dt=dt,
+            round_index=round_index,
+            prior_gaps=prior_gaps,
+            prior_evidence_summary=prior_evidence_summary,
+            signal_context=signal_evidence,
+            settings=make_routed_settings(settings, "planner"),
+            logger=logger,
+            client_factory=client_factory,
+            run_id=run_id,
+        )
+
+        # Repetition guard: skip agent+gap combos already dispatched
+        target_gap_ids = [g.get("id", "") for g in prior_gaps]
+        filtered_agents: list[str] = []
+        for agent_name in decision.selected_agents:
+            key = _make_investigation_key(agent_name, target_gap_ids)
+            if key not in used_keys:
+                filtered_agents.append(agent_name)
+                used_keys.add(key)
+
+        # Gate news_agent: only after ≥1 internal round when critic identified an external gap
+        if "news_agent" in filtered_agents:
+            has_internal_evidence = any(ev.evidence_type != "external" for ev in state.evidence_ledger)
+            has_external_gap = any(g.get("gap_type") == "missing_external_context" for g in prior_gaps)
+            if not (research_enabled and has_internal_evidence and has_external_gap):
+                filtered_agents = [a for a in filtered_agents if a != "news_agent"]
+
+        if not filtered_agents:
+            logger.log(
+                actor_type="workflow",
+                actor_name="investigation_loop",
+                action="stopped",
+                source="system",
+                details={"round_index": round_index, "reason": "no_new_agent_gap_combos"},
+            )
+            break
+
+        agent_results = _run_agents_parallel(
+            agent_names=filtered_agents,
+            city_id=city_id,
+            dt=dt,
+            news_query=decision.news_query,
+            settings=settings,
+            logger=logger,
+            client_factory=client_factory,
+            run_id=run_id,
+        )
+
+        # Convert agent output to evidence items
+        new_evidence_ids: list[str] = []
+        for result in agent_results:
+            items = agent_memo_to_evidence_items(result, state)
+            state.evidence_ledger.extend(items)
+            new_evidence_ids.extend(ev.id for ev in items)
+            result.evidence_items = [ev.model_dump(mode="json") for ev in items]
+
+        critic_review = run_critic(
+            city_id=city_id,
+            dt=dt,
+            round_index=round_index,
+            agent_results=agent_results,
+            evidence_ledger=[ev.model_dump(mode="json") for ev in state.evidence_ledger],
+            settings=make_routed_settings(settings, "critic"),
+            logger=logger,
+            client_factory=client_factory,
+            run_id=run_id,
+        )
+        state.critic_reviews.append(critic_review)
+
+        round_ = InvestigationRound(
+            round_index=round_index,
+            objective=decision.objective,
+            selected_agents=decision.selected_agents,
+            completed_agents=[r.name for r in agent_results],
+            new_evidence_ids=new_evidence_ids,
+            critic_review=critic_review,
+        )
+        state.investigation_rounds.append(round_)
+
+        # Stop conditions
+        if not critic_review.continue_investigation:
+            break
+
+        # All identified gaps are unavailable_data → nothing actionable remains
+        if critic_review.gaps:
+            actionable_gaps = [g for g in critic_review.gaps if g.gap_type != "unavailable_data"]
+            if not actionable_gaps:
+                logger.log(
+                    actor_type="workflow",
+                    actor_name="investigation_loop",
+                    action="stopped",
+                    source="system",
+                    details={"round_index": round_index, "reason": "only_unavailable_data_gaps"},
+                )
+                break
+
+    state.memory_context = MemoryInfluence(
+        used=bool(memory_notes),
+        memory_ids=[],
+        effect="Memory notes provided to planner." if memory_notes else "No relevant memory found.",
+    )
+    return state
+
+
+# ── Decision brief synthesis ──────────────────────────────────────────────────
+
+
+def _brief_to_markdown(brief: DecisionBrief, signal_label: str) -> str:
+    lines = [
+        "# Decision Card",
+        f"- headline: {brief.headline}",
+        f"- confidence: {brief.confidence}",
+        f"- signal: {signal_label}",
+        "",
+        "## RCA",
+        brief.situation,
+        "",
+        brief.most_likely_explanation,
+        "",
+        "## Business Impact",
+        brief.business_impact,
+        "",
+        "## Evidence Summary",
+    ]
+    for ev in brief.evidence_summary:
+        lines.append(f"- {ev}")
+    lines += [
+        "",
+        "## Prediction",
+    ]
+    mp = brief.monitoring_plan
+    if mp.metrics_to_watch:
+        lines.append(f"Watch: {', '.join(mp.metrics_to_watch)}")
+    if mp.review_horizon:
+        lines.append(f"Review horizon: {mp.review_horizon}")
+    if mp.escalation_trigger:
+        lines.append(f"Escalation trigger: {mp.escalation_trigger}")
+    lines += [
+        "",
+        "## Prescription",
+        brief.recommended_action,
+    ]
+    if brief.alternatives:
+        lines.append("Alternatives:")
+        for alt in brief.alternatives:
+            lines.append(f"- {alt}")
+    if brief.unknowns:
+        lines += ["", "## Unknowns"]
+        for u in brief.unknowns:
+            lines.append(f"- {u}")
+    if brief.caveats:
+        lines += ["", "## Caveats"]
+        for c in brief.caveats:
+            lines.append(f"- {c}")
+    return "\n".join(lines)
+
+
+def run_decision_brief(
+    *,
+    city_id: int,
+    dt: str,
+    signal_evidence: dict[str, Any],
+    investigation_rounds: list[dict[str, Any]],
+    evidence_ledger: list[dict[str, Any]],
+    critic_reviews: list[dict[str, Any]],
+    memory_notes: list[dict[str, Any]],
+    settings: LLMSettings,
+    logger: RunLogger,
+    client_factory: ClientFactory,
+    run_id: str,
+) -> tuple[DecisionBrief, str]:
+    skill = _load_skill_text("coordinator.md")
+    signal_label = str(signal_evidence.get("signal_label") or "neutral")
+    client = client_factory("coordinator")
+
+    ev_summaries = [ev.get("summary", "") for ev in evidence_ledger[-10:]]
+    last_critic = critic_reviews[-1] if critic_reviews else {}
+
+    system = (
+        "You are the final synthesis coordinator for a retail RCA. Return valid JSON only.\n"
+        f"{SALES_FIELD_SEMANTICS}\n"
+        'Schema: {"headline":"<one line>","confidence":"low|medium|high",'
+        '"situation":"<2-3 sentences>","business_impact":"<1-2 sentences>",'
+        '"most_likely_explanation":"<2-3 sentences>","evidence_summary":["<bullet>",...],'
+        '"recommended_action":"<1-2 sentences>","alternatives":["<alt>",...],'
+        '"owner_function":"<function>","urgency":"low|medium|high","expected_benefit":"<1 sentence>",'
+        '"monitoring_plan":{"metrics_to_watch":[...],"review_horizon":"...","escalation_trigger":"..."},'
+        '"unknowns":["<unknown>",...],"caveats":["<caveat>",...]}\n'
+        "Rules:\n"
+        "- Do not mention product or store as root causes.\n"
+        "- Do not use dollar signs, revenue, profit, or margin without explicit data.\n"
+        "- Use 'insufficient evidence' when data is absent. Do not force a cause.\n"
+        "- External evidence is supportive only; internal facts are primary.\n"
+        + skill
+    )
+    user_context: dict[str, Any] = {
+        "city_id": city_id,
+        "dt": dt,
+        "signal": signal_evidence,
+        "investigation_rounds": len(investigation_rounds),
+        "evidence_count": len(evidence_ledger),
+        "evidence_summaries": ev_summaries,
+        "last_critic_review": last_critic,
+        "recent_memory": memory_notes,
+    }
+
+    logger.log(
+        actor_type="agent",
+        actor_name="coordinator",
+        action="started",
+        source="system",
+        details={"round_count": len(investigation_rounds)},
+    )
+    response = client.chat.completions.create(
+        **build_chat_completion_kwargs(
+            settings,
+            [
+                {"role": "system", "content": system},
+                {"role": "user", "content": json.dumps(user_context, ensure_ascii=False)},
+            ],
+            tools=None,
+        )
+    )
+    content = response.choices[0].message.content or "{}"
+    _record_completion_response(
+        run_id=run_id, city_id=city_id, dt=dt, node_name="coordinator", response=response, content=content
     )
     logger.log(actor_type="agent", actor_name="coordinator", action="completed", source="llm", details={})
-    return content
+
+    try:
+        parsed = _extract_json_object(content)
+        monitoring_raw = parsed.get("monitoring_plan") or {}
+        monitoring = MonitoringPlan(
+            metrics_to_watch=list(monitoring_raw.get("metrics_to_watch") or []),
+            review_horizon=str(monitoring_raw.get("review_horizon") or ""),
+            escalation_trigger=str(monitoring_raw.get("escalation_trigger") or ""),
+        ) if isinstance(monitoring_raw, dict) else MonitoringPlan()
+        brief = DecisionBrief(
+            headline=str(parsed.get("headline") or ""),
+            confidence=parsed.get("confidence") or "low",
+            situation=str(parsed.get("situation") or ""),
+            business_impact=str(parsed.get("business_impact") or ""),
+            most_likely_explanation=str(parsed.get("most_likely_explanation") or ""),
+            evidence_summary=list(parsed.get("evidence_summary") or []),
+            recommended_action=str(parsed.get("recommended_action") or ""),
+            alternatives=list(parsed.get("alternatives") or []),
+            owner_function=str(parsed.get("owner_function") or ""),
+            urgency=parsed.get("urgency") or "medium",
+            expected_benefit=str(parsed.get("expected_benefit") or ""),
+            monitoring_plan=monitoring,
+            unknowns=list(parsed.get("unknowns") or []),
+            caveats=list(parsed.get("caveats") or []),
+        )
+    except Exception:
+        brief = DecisionBrief(
+            headline="Decision brief parsing failed — insufficient evidence.",
+            confidence="low",
+            situation="Unable to parse structured decision from coordinator output.",
+            business_impact="Unknown.",
+            most_likely_explanation="Insufficient evidence to determine root cause.",
+            recommended_action="Re-run investigation with more data.",
+            owner_function="Analytics",
+            urgency="low",
+            expected_benefit="Clearer signal after re-run.",
+        )
+
+    markdown = _brief_to_markdown(brief, signal_label)
+    return brief, markdown
+
+
+# ── Memory distiller ──────────────────────────────────────────────────────────
 
 
 def run_memory_distiller(
@@ -515,7 +976,7 @@ def run_memory_distiller(
     logger: RunLogger,
     client_factory: ClientFactory,
     run_id: str,
-) -> str:
+) -> tuple[str, dict[str, Any]]:
     client = client_factory("memory_distiller")
     skill = _load_skill_text("memory_distiller.md")
     response = client.chat.completions.create(
@@ -544,6 +1005,14 @@ def run_memory_distiller(
         response=response,
         content=content,
     )
+
+    lessons: list[str] = []
+    for line in content.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("- "):
+            lessons.append(stripped[2:].strip())
+
+    memory_json: dict[str, Any] = {"lessons": lessons, "version": 1}
     write_memory(
         city_id=city_id,
         dt=dt,
@@ -552,9 +1021,14 @@ def run_memory_distiller(
         topic="rca_lesson",
         content=content,
         signal_label=signal_label,
+        memory_json=memory_json,
+        influence_score=0.5,
     )
     logger.log(actor_type="agent", actor_name="memory_distiller", action="completed", source="llm", details={})
-    return content
+    return content, memory_json
+
+
+# ── Markdown extraction (kept for decision card column rendering) ──────────────
 
 
 def extract_outcome_fields(markdown: str) -> dict[str, str]:

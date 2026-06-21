@@ -44,20 +44,25 @@ def write_memory(
     topic: str,
     content: str,
     signal_label: str,
+    memory_json: dict[str, Any] | None = None,
+    influence_score: float | None = None,
 ) -> None:
     client = make_supabase_schema_client()
+    row: dict[str, Any] = {
+        "city_id": city_id,
+        "dt": dt,
+        "run_id": run_id,
+        "memory_type": memory_type,
+        "topic": topic,
+        "content": content,
+        "signal_label": signal_label,
+    }
+    if memory_json is not None:
+        row["memory_json"] = memory_json
+    if influence_score is not None:
+        row["influence_score"] = influence_score
     try:
-        client.table(TABLE_MEMORY).insert(
-            {
-                "city_id": city_id,
-                "dt": dt,
-                "run_id": run_id,
-                "memory_type": memory_type,
-                "topic": topic,
-                "content": content,
-                "signal_label": signal_label,
-            }
-        ).execute()
+        client.table(TABLE_MEMORY).insert(row).execute()
     except Exception:
         return
 
