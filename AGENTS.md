@@ -25,8 +25,9 @@ Working notes and guardrails for the v2 RCA agent system.
 - `uv run python -m rca.cli build`
 - `uv run python -m rca.cli signal`
 - `uv run python -m rca.cli run --city <id> --date <YYYY-MM-DD>`
-- `uv run python -m rca.cli simulate --city <id>`
 - `uv run python -m rca.cli mcp`
+
+`rca simulate` and `rca export` are disabled. Do not re-enable without explicit user confirmation. Current workflow is single city/date via `rca run` only.
 
 ## Delivery Rule
 

@@ -45,81 +45,12 @@ def _cmd_mcp(_: argparse.Namespace) -> None:
     mcp.run()
 
 
-def _cmd_export(args: argparse.Namespace) -> None:
-    import json
-    import pathlib
-    from rca.config import (
-        TABLE_COMPLETIONS, TABLE_EVENTS, TABLE_EVIDENCE_CACHE,
-        TABLE_EXTERNAL_EVENTS, TABLE_MEMORY, TABLE_OUTCOMES,
-        TABLE_SIMULATE_REVIEW, make_supabase_schema_client,
-    )
-
-    client = make_supabase_schema_client()
-    bundle: dict = {"city_id": args.city, "tables": {}}
-
-    # Tables reset-and-repopulated per simulate run — export current state for city
-    plain_tables = [
-        TABLE_OUTCOMES, TABLE_EVENTS, TABLE_COMPLETIONS,
-        TABLE_MEMORY, TABLE_EVIDENCE_CACHE, TABLE_EXTERNAL_EVENTS,
-    ]
-    for table in plain_tables:
-        rows = (client.table(table).select("*").eq("city_id", args.city).order("id").execute().data or [])
-        bundle["tables"][table] = rows
-        _safe_print(f"  {table}: {len(rows)} rows")
-
-    # simulate_review keeps all batches — filter by batch_id if given
-    q = client.table(TABLE_SIMULATE_REVIEW).select("*").eq("city_id", args.city).order("created_at")
-    if args.batch:
-        q = q.eq("batch_id", args.batch)
-    rows = q.execute().data or []
-    bundle["tables"][TABLE_SIMULATE_REVIEW] = rows
-    _safe_print(f"  {TABLE_SIMULATE_REVIEW}: {len(rows)} rows" + (f" (batch {args.batch})" if args.batch else ""))
-
-    out = pathlib.Path(args.output)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(bundle, indent=2, ensure_ascii=False), encoding="utf-8")
-    _safe_print(f"Exported to {out}")
+def _cmd_export(_args: argparse.Namespace) -> None:
+    _safe_print("rca export is disabled. Confirm with the team before re-enabling.")
 
 
-def _cmd_simulate(args: argparse.Namespace) -> None:
-    import json
-    import pathlib
-    from rca.simulate import simulate_city
-    from rca.config import (
-        TABLE_COMPLETIONS, TABLE_EVENTS, TABLE_EVIDENCE_CACHE,
-        TABLE_EXTERNAL_EVENTS, TABLE_MEMORY, TABLE_OUTCOMES,
-        TABLE_SIMULATE_REVIEW, make_supabase_schema_client,
-    )
-
-    _safe_print(
-        f"Starting cold-start city simulation for city {args.city}.\n"
-        f"This will delete existing outcomes, events, completions,\n"
-        f"memory, evidence_cache, and external_events for that city first.\n"
-    )
-
-    summary = simulate_city(args.city)
-
-    # Auto-export full city bundle immediately after simulation completes
-    client = make_supabase_schema_client()
-    bundle: dict = {"city_id": args.city, "batch_id": summary.batch_id, "tables": {}}
-    plain_tables = [
-        TABLE_OUTCOMES, TABLE_EVENTS, TABLE_COMPLETIONS,
-        TABLE_MEMORY, TABLE_EVIDENCE_CACHE, TABLE_EXTERNAL_EVENTS,
-    ]
-    for table in plain_tables:
-        rows = (client.table(table).select("*").eq("city_id", args.city).order("id").execute().data or [])
-        bundle["tables"][table] = rows
-    rows = (
-        client.table(TABLE_SIMULATE_REVIEW).select("*")
-        .eq("city_id", args.city).eq("batch_id", summary.batch_id)
-        .order("created_at").execute().data or []
-    )
-    bundle["tables"][TABLE_SIMULATE_REVIEW] = rows
-
-    out = pathlib.Path(f"results/city{args.city}_{summary.batch_id}.json")
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(bundle, indent=2, ensure_ascii=False), encoding="utf-8")
-    _safe_print(f"\nAuto-exported {sum(len(v) for v in bundle['tables'].values())} total rows to {out}")
+def _cmd_simulate(_args: argparse.Namespace) -> None:
+    _safe_print("rca simulate is disabled. Confirm with the team before re-enabling.")
 
 
 def main() -> None:

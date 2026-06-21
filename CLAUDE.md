@@ -8,16 +8,17 @@ Read `README.md` first for the current workflow.
 uv run python -m rca.cli build                          # ingest parquet and push base tables to Supabase
 uv run python -m rca.cli signal                         # materialize rca.signals from ingested tables
 uv run python -m rca.cli run --city 0 --date 2024-04-01 # run RCA for one city/date
-uv run python -m rca.cli simulate --city 0              # cold-start city simulation across all signal dates
 uv run python -m rca.cli mcp                            # start the FastMCP tool server
 ```
+
+`rca simulate` and `rca export` are disabled in the CLI. Do not re-enable without explicit confirmation.
 
 ## Important Behavior
 
 - `rca build` reads parquet from disk and pushes base city/date tables to Supabase. Run before `rca signal`.
 - `rca signal` rebuilds `rca.signals` from the ingested tables. Re-run after any migration that drops/recreates `rca.signals`.
 - `rca run` runs a single city/date through the bounded LangGraph investigation loop.
-- `rca simulate` always deletes prior outcomes, events, completions, memory, evidence_cache, and external_events for the city before running. It is a cold-start batch simulation by design.
+- Current workflow: single city, single date only (`rca run`). Do not run `rca simulate` or `rca export` without explicit user confirmation.
 - Model routing: specialists run on the fast model; planner, critic, coordinator, reviewer run on the deep model.
 - `sale_amount` and `hours_sale` are normalized sales amounts from the source dataset, not currency.
 
@@ -33,7 +34,7 @@ Three-layer split:
 
 Signal trigger: drop <= -10%, lift >= +25% vs synthetic business goal. Thresholds live in `config.py` only, not in SQL.
 
-Runbook: `rca build` -> `rca signal` -> `rca run --city N --date YYYY-MM-DD` or `rca simulate --city N`.
+Runbook: `rca build` -> `rca signal` -> `rca run --city N --date YYYY-MM-DD`.
 
 Supabase is the sole system of record (`rca` schema).
 
