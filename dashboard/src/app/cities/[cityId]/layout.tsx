@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { use } from "react";
-import { BrainCircuit, FileText, LayoutDashboard, ScrollText } from "lucide-react";
+import { BrainCircuit, FileText, History, LayoutDashboard, ScrollText } from "lucide-react";
 
 export default function CityLayout({
   children,
@@ -19,6 +19,7 @@ export default function CityLayout({
   const tabs = [
     { name: "Overview", href: `/cities/${cityId}`, icon: LayoutDashboard, active: pathname === `/cities/${cityId}` },
     { name: "RCA", href: `/cities/${cityId}/rca`, icon: FileText, active: pathname === `/cities/${cityId}/rca` },
+    { name: "Replay", href: `/cities/${cityId}/replay`, icon: History, active: pathname === `/cities/${cityId}/replay` },
     { name: "Logs", href: `/cities/${cityId}/logs`, icon: ScrollText, active: pathname === `/cities/${cityId}/logs` },
     { name: "Memory", href: `/cities/${cityId}/profile`, icon: BrainCircuit, active: pathname === `/cities/${cityId}/profile` },
   ];
