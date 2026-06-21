@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from rca.replay import ReplaySummary, find_signal_dates, reset_city_state
+from rca.simulate import SimulateSummary, find_signal_dates, reset_city_state
 
 
 @pytest.fixture()
@@ -20,7 +20,7 @@ def fake_client():
 
 @pytest.fixture(autouse=True)
 def _patch_supabase(monkeypatch, fake_client):
-    monkeypatch.setattr("rca.replay.make_supabase_schema_client", lambda schema=None: fake_client)
+    monkeypatch.setattr("rca.simulate.make_supabase_schema_client", lambda schema=None: fake_client)
     monkeypatch.setattr("rca.config.make_supabase_schema_client", lambda schema=None: fake_client)
 
 
@@ -41,25 +41,25 @@ def test_reset_city_state_calls_delete(fake_client):
 
 
 def test_find_signal_dates_returns_list(fake_client):
-    with patch("rca.replay.make_supabase_schema_client", return_value=fake_client):
+    with patch("rca.simulate.make_supabase_schema_client", return_value=fake_client):
         dates = find_signal_dates(city_id=0)
     assert isinstance(dates, list)
 
 
 def test_find_signal_dates_all_strings(fake_client):
-    with patch("rca.replay.make_supabase_schema_client", return_value=fake_client):
+    with patch("rca.simulate.make_supabase_schema_client", return_value=fake_client):
         dates = find_signal_dates(city_id=0)
     assert all(isinstance(d, str) for d in dates)
 
 
 def test_simulate_city_always_resets_and_reviews_outputs(monkeypatch):
     """simulate_city always cold-starts and always reviews outputs."""
-    from rca.replay import simulate_city
+    from rca.simulate import simulate_city
     from rca.stubclient import stub_client_factory
 
-    monkeypatch.setattr("rca.replay.find_signal_dates", lambda city_id: ["2024-04-01"])
+    monkeypatch.setattr("rca.simulate.find_signal_dates", lambda city_id: ["2024-04-01"])
     reset_calls = []
-    monkeypatch.setattr("rca.replay.reset_city_state", lambda city_id: reset_calls.append(city_id) or {})
+    monkeypatch.setattr("rca.simulate.reset_city_state", lambda city_id: reset_calls.append(city_id) or {})
 
     fake_result = {
         "run_id": "city_0_2024-04-01_stub",
@@ -77,14 +77,14 @@ def test_simulate_city_always_resets_and_reviews_outputs(monkeypatch):
         "investigation_rounds": [],
         "memory_note": "",
     }
-    monkeypatch.setattr("rca.replay.run_rca_graph", lambda city_id, dt, settings=None, client_factory=None: fake_result)
+    monkeypatch.setattr("rca.simulate.run_rca_graph", lambda city_id, dt, settings=None, client_factory=None: fake_result)
 
     stored_reviews = []
-    monkeypatch.setattr("rca.replay.store_replay_review", lambda **kwargs: stored_reviews.append(kwargs))
+    monkeypatch.setattr("rca.simulate.store_replay_review", lambda **kwargs: stored_reviews.append(kwargs))
 
     summary = simulate_city(0, client_factory=stub_client_factory)
 
-    assert isinstance(summary, ReplaySummary)
+    assert isinstance(summary, SimulateSummary)
     assert summary.total_dates == 1
     assert summary.passed_count == 1
     assert summary.avg_eval_score == pytest.approx(0.9)
@@ -95,12 +95,12 @@ def test_simulate_city_always_resets_and_reviews_outputs(monkeypatch):
 
 def test_replay_city_wrapper_forces_reset(monkeypatch):
     """The legacy wrapper still forces a cold-start simulation."""
-    from rca.replay import replay_city
+    from rca.simulate import replay_city
     from rca.stubclient import stub_client_factory
 
-    monkeypatch.setattr("rca.replay.find_signal_dates", lambda city_id: ["2024-04-01"])
+    monkeypatch.setattr("rca.simulate.find_signal_dates", lambda city_id: ["2024-04-01"])
     reset_calls = []
-    monkeypatch.setattr("rca.replay.reset_city_state", lambda city_id: reset_calls.append(city_id) or {})
+    monkeypatch.setattr("rca.simulate.reset_city_state", lambda city_id: reset_calls.append(city_id) or {})
 
     fake_result = {
         "run_id": "city_0_2024-04-01_stub",
@@ -118,8 +118,8 @@ def test_replay_city_wrapper_forces_reset(monkeypatch):
         "investigation_rounds": [],
         "memory_note": "",
     }
-    monkeypatch.setattr("rca.replay.run_rca_graph", lambda city_id, dt, settings=None, client_factory=None: fake_result)
-    monkeypatch.setattr("rca.replay.store_replay_review", lambda **kwargs: None)
+    monkeypatch.setattr("rca.simulate.run_rca_graph", lambda city_id, dt, settings=None, client_factory=None: fake_result)
+    monkeypatch.setattr("rca.simulate.store_replay_review", lambda **kwargs: None)
 
     summary = replay_city(0, reset=False, client_factory=stub_client_factory)
 
@@ -130,11 +130,11 @@ def test_replay_city_wrapper_forces_reset(monkeypatch):
 
 def test_simulate_city_returns_correct_top_cons(monkeypatch):
     """Top cons are aggregated across dates and sorted by frequency."""
-    from rca.replay import simulate_city
+    from rca.simulate import simulate_city
     from rca.reviewer import ReplayReview
 
-    monkeypatch.setattr("rca.replay.find_signal_dates", lambda city_id: ["2024-04-01", "2024-04-03"])
-    monkeypatch.setattr("rca.replay.reset_city_state", lambda city_id: {})
+    monkeypatch.setattr("rca.simulate.find_signal_dates", lambda city_id: ["2024-04-01", "2024-04-03"])
+    monkeypatch.setattr("rca.simulate.reset_city_state", lambda city_id: {})
 
     fake_result = {
         "run_id": "stub",
@@ -147,7 +147,7 @@ def test_simulate_city_returns_correct_top_cons(monkeypatch):
         "investigation_rounds": [],
         "memory_note": "",
     }
-    monkeypatch.setattr("rca.replay.run_rca_graph", lambda city_id, dt, settings=None, client_factory=None: fake_result)
+    monkeypatch.setattr("rca.simulate.run_rca_graph", lambda city_id, dt, settings=None, client_factory=None: fake_result)
 
     fake_review = ReplayReview(
         eval_score=0.8,
@@ -159,8 +159,8 @@ def test_simulate_city_returns_correct_top_cons(monkeypatch):
         improvements=["More rounds."],
         reviewer_comment="Stub.",
     )
-    monkeypatch.setattr("rca.replay.review_outcome", lambda **kwargs: fake_review)
-    monkeypatch.setattr("rca.replay.store_replay_review", lambda **kwargs: None)
+    monkeypatch.setattr("rca.simulate.review_outcome", lambda **kwargs: fake_review)
+    monkeypatch.setattr("rca.simulate.store_replay_review", lambda **kwargs: None)
 
     summary = simulate_city(0, client_factory=lambda _: None)
 
@@ -169,10 +169,10 @@ def test_simulate_city_returns_correct_top_cons(monkeypatch):
 
 
 def test_simulate_city_no_signal_dates_returns_empty_summary(monkeypatch):
-    from rca.replay import simulate_city
+    from rca.simulate import simulate_city
 
-    monkeypatch.setattr("rca.replay.find_signal_dates", lambda city_id: [])
-    monkeypatch.setattr("rca.replay.reset_city_state", lambda city_id: {})
+    monkeypatch.setattr("rca.simulate.find_signal_dates", lambda city_id: [])
+    monkeypatch.setattr("rca.simulate.reset_city_state", lambda city_id: {})
 
     summary = simulate_city(0)
 

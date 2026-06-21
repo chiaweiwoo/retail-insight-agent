@@ -29,7 +29,7 @@ from rca.reviewer import ReplayReview, review_outcome, store_replay_review
 
 
 @dataclass
-class ReplaySummary:
+class SimulateSummary:
     batch_id: str
     city_id: int
     total_dates: int
@@ -90,7 +90,7 @@ def simulate_city(
     *,
     settings: Any = None,
     client_factory: Any = None,
-) -> ReplaySummary:
+) -> SimulateSummary:
     """Run a cold-start city simulation across all triggered signal dates.
 
     Memory accumulates across dates within the batch so the agent learns
@@ -106,7 +106,7 @@ def simulate_city(
     dates = find_signal_dates(city_id)
     if not dates:
         _print(f"No triggered signal dates found for city {city_id}.")
-        return ReplaySummary(
+        return SimulateSummary(
             batch_id=effective_batch_id,
             city_id=city_id,
             total_dates=0,
@@ -178,7 +178,7 @@ def simulate_city(
     con_counts = Counter(all_cons).most_common(3)
     top_cons = [(text, count) for text, count in con_counts]
 
-    summary = ReplaySummary(
+    summary = SimulateSummary(
         batch_id=effective_batch_id,
         city_id=city_id,
         total_dates=len(dates),
@@ -197,7 +197,7 @@ def replay_city(
     reset: bool = True,
     settings: Any = None,
     client_factory: Any = None,
-) -> ReplaySummary:
+) -> SimulateSummary:
     """Backward-compatible wrapper around the city simulation flow.
 
     Public callers should use `simulate_city()` or the `rca simulate` CLI.
@@ -221,7 +221,7 @@ def _print(text: str) -> None:
         sys.stdout.flush()
 
 
-def _print_summary(summary: ReplaySummary) -> None:
+def _print_summary(summary: SimulateSummary) -> None:
     _print(f"\n{'-' * 50}")
     _print(f"Batch summary - {summary.batch_id}")
     _print(f"  Dates:       {summary.total_dates} triggered")

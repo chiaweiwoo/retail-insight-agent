@@ -120,7 +120,7 @@ The UI is a Next.js App Router app in `dashboard/`. It reads from the `rca` sche
 | `RCA_MAX_INVESTIGATION_ROUNDS` | `5` | Cap on investigation loop rounds |
 | `RCA_RESEARCH_ENABLED` | `true` | Enable news agent and web search. Requires `missing_external_context` critic gap and internal evidence before the news agent fires. |
 | `RCA_STAT_TOOLS_ENABLED` | `true` | Enable `run_stat_analysis` gated tool |
-| `RCA_LLM_JUDGE_ENABLED` | `true` | Run LLM alignment judge in the evaluation node of every `rca run` and `rca replay`. Set to `false` to use deterministic audits only. |
+| `RCA_LLM_JUDGE_ENABLED` | `true` | Run LLM alignment judge in the evaluation node of every `rca run` and `rca simulate`. Set to `false` to use deterministic audits only. |
 
 ## Skills
 

@@ -46,7 +46,7 @@ def _cmd_mcp(_: argparse.Namespace) -> None:
 
 
 def _cmd_simulate(args: argparse.Namespace) -> None:
-    from rca.replay import simulate_city
+    from rca.simulate import simulate_city
 
     _safe_print(
         f"Starting cold-start city simulation for city {args.city}.\n"
