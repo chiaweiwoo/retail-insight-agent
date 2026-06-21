@@ -131,3 +131,12 @@ def test_run_rca_graph_stub_round_count_positive():
     result = run_rca_graph(city_id=0, dt="2024-04-01", client_factory=stub_client_factory)
 
     assert result.get("round_count", 0) >= 1
+
+
+def test_run_rca_graph_uses_unique_attempt_run_id():
+    from rca.graph import run_rca_graph
+
+    with patch("rca.graph.current_timestamp_sgt_label", return_value="20260621T131500_SGT"):
+        result = run_rca_graph(city_id=0, dt="2024-04-01", client_factory=stub_client_factory)
+
+    assert result["run_id"] == "city_0_2024-04-01_20260621T131500_SGT"

@@ -1,9 +1,9 @@
 """City replay harness: reset state, rerun all signal dates, review output.
 
-reset_city_state  — deletes all outputs + caches for a city (outcomes,
+reset_city_state  - deletes all outputs + caches for a city (outcomes,
                     events, completions, memory, evidence_cache, external_events)
-find_signal_dates — returns triggered city dates oldest→latest from rca.signals
-replay_city       — orchestrates reset → rerun → review → store, prints progress
+find_signal_dates - returns triggered city dates oldest to latest from rca.signals
+replay_city       - orchestrates reset, rerun, review, store, and progress output
 """
 from __future__ import annotations
 
@@ -98,10 +98,10 @@ def replay_city(
     settings: Any = None,
     client_factory: Any = None,
 ) -> ReplaySummary:
-    """Run (reset →) rerun all signal dates → (review) for one city.
+    """Run reset, rerun all signal dates, and optionally review one city.
 
     Memory accumulates across dates within the batch so the agent learns
-    as it processes oldest→latest dates — the intended learning-mode replay.
+    as it processes oldest to latest dates: the intended learning-mode replay.
     """
     from rca.stubclient import stub_client_factory
 
@@ -179,7 +179,7 @@ def replay_city(
                 alignment_label = f"error:{exc}"
 
         _print(
-            f"  {dt}  {signal_label:<6}  eval={eval_score:.2f}{'✓' if eval_passed else '✗'}"
+            f"  {dt}  {signal_label:<6}  eval={eval_score:.2f}{' PASS' if eval_passed else ' FAIL'}"
             + (f"  {alignment_label}" if review else "")
         )
 
@@ -202,7 +202,7 @@ def replay_city(
     return summary
 
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
+# Helpers
 
 
 def _print(text: str) -> None:
@@ -216,10 +216,10 @@ def _print(text: str) -> None:
 
 
 def _print_summary(summary: ReplaySummary) -> None:
-    _print(f"\n{'─' * 50}")
-    _print(f"Batch summary — {summary.batch_id}")
+    _print(f"\n{'-' * 50}")
+    _print(f"Batch summary - {summary.batch_id}")
     _print(f"  Dates:       {summary.total_dates} triggered")
-    _print(f"  Passed:      {summary.passed_count} / {summary.total_dates}  (eval ≥ 0.5)")
+    _print(f"  Passed:      {summary.passed_count} / {summary.total_dates}  (eval >= 0.5)")
     _print(f"  Avg eval:    {summary.avg_eval_score:.3f}")
     if summary.avg_alignment_score is not None:
         _print(f"  Avg align:   {summary.avg_alignment_score:.3f}")
@@ -227,7 +227,7 @@ def _print_summary(summary: ReplaySummary) -> None:
         _print("  Top cons:")
         for text, count in summary.top_cons:
             _print(f"    - {text}  ({count} date{'s' if count != 1 else ''})")
-    _print(f"{'─' * 50}\n")
+    _print(f"{'-' * 50}\n")
 
 
 def _load_settings_if_needed(settings: Any, dry_run: bool) -> Any:

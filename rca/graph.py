@@ -18,6 +18,7 @@ from rca.agents import (
     run_memory_distiller,
 )
 from rca.audits import run_evaluation
+from rca.config import current_timestamp_sgt_label
 from rca.llm import ClientFactory, LLMSettings, build_openai_compatible_client, load_llm_settings, make_routed_settings
 from rca.memory import get_memory_notes
 from rca.outcomes import OutcomeRecord, record_outcome
@@ -197,7 +198,7 @@ def run_rca_graph(
 ) -> dict[str, Any]:
     settings = settings or load_llm_settings()
     base_factory: ClientFactory = client_factory or (lambda _: build_openai_compatible_client(settings))
-    run_id = f"{city_id}_{dt}"
+    run_id = f"city_{city_id}_{dt}_{current_timestamp_sgt_label()}"
     logger = RunLogger(run_id=run_id, city_id=city_id, dt=dt)
     logger.log(actor_type="workflow", actor_name="rca_run", action="started", source="system", details={})
 
